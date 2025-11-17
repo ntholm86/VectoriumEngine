@@ -267,72 +267,67 @@ export class WebGLBatchRenderer {
       }
     }
     
-    // Calculate corners
     const w = width * scaleX;
     const h = height * scaleY;
     
-    // Corner offsets (relative to center)
-    const x1 = -w / 2;
-    const y1 = -h / 2;
-    const x2 = w / 2;
-    const y2 = h / 2;
+    const hw = w * 0.5;
+    const hh = h * 0.5;
     
-    // OPTIMIZATION: Pre-calculate rotated corners (avoid array allocation)
-    const c0x = x1 * cos - y1 * sin + x;
-    const c0y = x1 * sin + y1 * cos + y;
-    const c1x = x2 * cos - y1 * sin + x;
-    const c1y = x2 * sin + y1 * cos + y;
-    const c2x = x2 * cos - y2 * sin + x;
-    const c2y = x2 * sin + y2 * cos + y;
-    const c3x = x1 * cos - y2 * sin + x;
-    const c3y = x1 * sin + y2 * cos + y;
+    const hwCos = hw * cos;
+    const hwSin = hw * sin;
+    const hhCos = hh * cos;
+    const hhSin = hh * sin;
+    
+    const c0x = -hwCos + hhSin + x;
+    const c0y = -hwSin - hhCos + y;
+    const c1x = hwCos + hhSin + x;
+    const c1y = hwSin - hhCos + y;
+    const c2x = hwCos - hhSin + x;
+    const c2y = hwSin + hhCos + y;
+    const c3x = -hwCos - hhSin + x;
+    const c3y = -hwSin + hhCos + y;
     
     const r = color.r;
     const g = color.g;
     const b = color.b;
     const a = alpha;
     
-    // OPTIMIZATION: Direct array writes instead of object iteration (8 floats per vertex)
     let offset = this.vertexCount * 8;
     
-    // Vertex 0
     this.batchVertices[offset++] = c0x;
     this.batchVertices[offset++] = c0y;
-    this.batchVertices[offset++] = 0; // u
-    this.batchVertices[offset++] = 0; // v
+    this.batchVertices[offset++] = 0;
+    this.batchVertices[offset++] = 0;
     this.batchVertices[offset++] = r;
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
     this.batchVertices[offset++] = a;
     this.vertexCount++;
     
-    // Vertex 1
     this.batchVertices[offset++] = c1x;
     this.batchVertices[offset++] = c1y;
-    this.batchVertices[offset++] = 1; // u
-    this.batchVertices[offset++] = 0; // v
+    this.batchVertices[offset++] = 1;
+    this.batchVertices[offset++] = 0;
     this.batchVertices[offset++] = r;
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
     this.batchVertices[offset++] = a;
     this.vertexCount++;
     
-    // Vertex 2
     this.batchVertices[offset++] = c2x;
     this.batchVertices[offset++] = c2y;
-    this.batchVertices[offset++] = 1; // u
-    this.batchVertices[offset++] = 1; // v
+    this.batchVertices[offset++] = 1;
+    this.batchVertices[offset++] = 1;
     this.batchVertices[offset++] = r;
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
     this.batchVertices[offset++] = a;
     this.vertexCount++;
     
-    // Vertex 3
     this.batchVertices[offset++] = c3x;
     this.batchVertices[offset++] = c3y;
-    this.batchVertices[offset++] = 0; // u
-    this.batchVertices[offset++] = 1; // v
+    this.batchVertices[offset++] = 0;
+    this.batchVertices[offset++] = 1;
     this.batchVertices[offset++] = r;
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
@@ -435,15 +430,17 @@ export class WebGLBatchRenderer {
         const sin = this.sinCache[rotDeg];
         
         const hw = size * 0.5;
+        const hwCos = hw * cos;
+        const hwSin = hw * sin;
         
-        const c0x = -hw * cos - (-hw) * sin + x;
-        const c0y = -hw * sin + (-hw) * cos + y;
-        const c1x = hw * cos - (-hw) * sin + x;
-        const c1y = hw * sin + (-hw) * cos + y;
-        const c2x = hw * cos - hw * sin + x;
-        const c2y = hw * sin + hw * cos + y;
-        const c3x = -hw * cos - hw * sin + x;
-        const c3y = -hw * sin + hw * cos + y;
+        const c0x = -hwCos + hwSin + x;
+        const c0y = -hwSin - hwCos + y;
+        const c1x = hwCos + hwSin + x;
+        const c1y = hwSin - hwCos + y;
+        const c2x = hwCos - hwSin + x;
+        const c2y = hwSin + hwCos + y;
+        const c3x = -hwCos - hwSin + x;
+        const c3y = -hwSin + hwCos + y;
         
         const r = colorR[i] * COLOR_NORM;
         const g = colorG[i] * COLOR_NORM;
