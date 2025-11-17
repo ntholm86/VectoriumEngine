@@ -56,15 +56,32 @@ class DemoScene extends Scene {
     this.addEntities(1000);
   }
   
-  addEntities(count: number): void {
-    // Spawn entities in the HUGE world (10x canvas size) to test frustum culling!
-    const worldWidth = (this as any).worldWidth || this.canvasWidth * 10;
-    const worldHeight = (this as any).worldHeight || this.canvasHeight * 10;
+  addEntities(count: number, inViewportOnly: boolean = false): void {
+    // Spawn entities in world or viewport
+    let spawnWidth, spawnHeight;
+    
+    if (inViewportOnly) {
+      // Spawn in viewport only - see all new entities!
+      spawnWidth = this.canvasWidth;
+      spawnHeight = this.canvasHeight;
+      
+      // Set physics bounds to canvas for viewport entities
+      (this as any).worldWidth = this.canvasWidth;
+      (this as any).worldHeight = this.canvasHeight;
+    } else {
+      // Spawn in the HUGE world (10x canvas size) to test frustum culling!
+      spawnWidth = this.canvasWidth * 10;
+      spawnHeight = this.canvasHeight * 10;
+      
+      // Set physics bounds to 10x world
+      (this as any).worldWidth = spawnWidth;
+      (this as any).worldHeight = spawnHeight;
+    }
     
     for (let i = 0; i < count; i++) {
       const entity = new BouncingEntity();
-      const x = Math.random() * worldWidth;
-      const y = Math.random() * worldHeight;
+      const x = Math.random() * spawnWidth;
+      const y = Math.random() * spawnHeight;
       const angle = Math.random() * Math.PI * 2;
       const speed = 100 + Math.random() * 200;
       const vx = Math.cos(angle) * speed;
@@ -299,15 +316,27 @@ class UIControls {
       
       <div style="margin-bottom: 12px;">
         <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">Entity Controls</h3>
+        <div style="margin-bottom: 6px; font-size: 11px; color: #FFFF00;">
+          🌍 World Spawning (10x area):
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;">
           <button id="add100Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100</button>
           <button id="add1000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1K</button>
           <button id="add10000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+10K</button>
           <button id="add100000Btn" style="padding: 8px; background: #FF00FF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100K 🔥</button>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px;">
           <button id="add500000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+500K 💥</button>
           <button id="add1000000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1M ☢️</button>
+        </div>
+        <div style="margin-bottom: 6px; font-size: 11px; color: #00FFFF;">
+          📺 Viewport Spawning (visible):
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;">
+          <button id="addViewport100Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100 👁️</button>
+          <button id="addViewport1000Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1K 👁️</button>
+          <button id="addViewport10000Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+10K 👁️</button>
+          <button id="addViewport100000Btn" style="padding: 8px; background: #00AAAA; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100K 👁️</button>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
           <button id="remove1000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">-1K</button>
@@ -376,6 +405,25 @@ class UIControls {
         console.log('Spawning 1 million entities...');
         this.scene.addEntities(1000000);
         console.log('Spawn complete!');
+      }
+    });
+    
+    // Viewport spawning buttons (spawn entities in visible area only)
+    container.querySelector('#addViewport100Btn')?.addEventListener('click', () => {
+      this.scene.addEntities(100, true); // true = viewport only
+    });
+    
+    container.querySelector('#addViewport1000Btn')?.addEventListener('click', () => {
+      this.scene.addEntities(1000, true);
+    });
+    
+    container.querySelector('#addViewport10000Btn')?.addEventListener('click', () => {
+      this.scene.addEntities(10000, true);
+    });
+    
+    container.querySelector('#addViewport100000Btn')?.addEventListener('click', () => {
+      if (confirm('⚠️ Add 100,000 entities in viewport? Screen will be PACKED!')) {
+        this.scene.addEntities(100000, true);
       }
     });
     
