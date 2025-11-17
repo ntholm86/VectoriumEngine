@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./dist"
+  },
+  "include": ["src/index.ts", "src/vectorium/**/*.ts"],
+  "exclude": ["src/**/*.demo.ts", "src/vectorium-demo.ts", "src/stress-test-demo.ts", "src/showcase/**/*", "src/stress-test/**/*"]
+}

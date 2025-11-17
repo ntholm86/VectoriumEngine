@@ -1,0 +1,32 @@
+# Source files (only include dist)
+src/showcase
+src/stress-test
+src/vectorium-demo.ts
+src/stress-test-demo.ts
+src/style.css
+
+# Build artifacts
+node_modules
+.vscode
+*.log
+
+# Demo files
+index.html
+stress-test.html
+vite.config.ts
+
+# Documentation (include in package)
+# Keep: README.md, LICENSE
+
+# Git
+.git
+.gitignore
+
+# Development
+docs/start.md
+*.md
+!README.md
+!LICENSE
+
+# Test and demo output
+dist/*.html
