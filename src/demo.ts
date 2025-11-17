@@ -209,7 +209,10 @@ class UIControls {
           <span>└─ Custom:</span> <span id="renderCustom">0.00</span>ms
         </div>
         <div style="padding-top: 6px; border-top: 1px solid rgba(255,0,255,0.3); font-size: 11px; display: flex; justify-content: space-between;">
-          <span>WebGL Draw Calls:</span> <span id="drawCalls">0</span>
+          <span>WebGL Draw Calls:</span> <span id="drawCalls" style="font-weight: bold;">0</span>
+        </div>
+        <div style="font-size: 11px; display: flex; justify-content: space-between; margin-top: 4px;">
+          <span>Rendering Mode:</span> <span id="renderMode" style="font-weight: bold; color: #FF00FF;">Batch</span>
         </div>
       </div>
       
@@ -338,7 +341,18 @@ class UIControls {
           <button id="addViewport10000Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+10K 👁️</button>
           <button id="addViewport100000Btn" style="padding: 8px; background: #00AAAA; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100K 👁️</button>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+        
+        <div style="margin: 12px 0 6px 0; font-size: 11px; color: #FF00FF;">
+          🚀 GPU INSTANCING:
+        </div>
+        <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">
+          <button id="toggleInstancingBtn" style="padding: 8px; flex: 1; background: #FF00FF; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">✓ INSTANCING ON</button>
+        </div>
+        <div style="font-size: 9px; color: #FF00FF;">
+          <div id="instancingStatus">Checking GPU...</div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px;">
           <button id="remove1000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">-1K</button>
           <button id="clearBtn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">Clear All</button>
         </div>
@@ -449,6 +463,36 @@ class UIControls {
       toggleCullingBtn.textContent = cullingEnabled ? '✓ Culling ON' : '✗ Culling OFF';
       toggleCullingBtn.style.background = cullingEnabled ? '#8000FF' : '#666';
     });
+    
+    // Instancing toggle button
+    const renderer = (this.engine as any).renderer;
+    let instancingEnabled = renderer.isInstancingActive();
+    const toggleInstancingBtn = container.querySelector('#toggleInstancingBtn') as HTMLButtonElement;
+    const instancingStatus = container.querySelector('#instancingStatus') as HTMLDivElement;
+    
+    if (renderer.instancingSupported) {
+      instancingStatus.textContent = instancingEnabled ? 
+        '✅ GPU Instancing Active (Single Draw Call!)' : 
+        '⚠️ Batch Rendering (Fallback)';
+      toggleInstancingBtn.textContent = instancingEnabled ? '✓ INSTANCING ON' : '✗ INSTANCING OFF';
+      toggleInstancingBtn.style.background = instancingEnabled ? '#FF00FF' : '#666';
+    } else {
+      instancingStatus.textContent = '❌ GPU does not support instancing';
+      toggleInstancingBtn.textContent = '✗ NOT SUPPORTED';
+      toggleInstancingBtn.disabled = true;
+      toggleInstancingBtn.style.background = '#333';
+      toggleInstancingBtn.style.cursor = 'not-allowed';
+    }
+    
+    toggleInstancingBtn?.addEventListener('click', () => {
+      instancingEnabled = !instancingEnabled;
+      renderer.setInstancingEnabled(instancingEnabled);
+      toggleInstancingBtn.textContent = instancingEnabled ? '✓ INSTANCING ON' : '✗ INSTANCING OFF';
+      toggleInstancingBtn.style.background = instancingEnabled ? '#FF00FF' : '#666';
+      instancingStatus.textContent = instancingEnabled ? 
+        '✅ GPU Instancing Active (Single Draw Call!)' : 
+        '⚠️ Batch Rendering (Fallback)';
+    });
   }
   
   private updateMetrics(): void {
@@ -476,6 +520,19 @@ class UIControls {
       document.getElementById('renderCustom')!.textContent = scenePerfMetrics.renderCustom.toFixed(2);
     }
     document.getElementById('drawCalls')!.textContent = perfMonitorMetrics.drawCalls.toString();
+    
+    // Rendering mode indicator
+    const renderer = (this.engine as any).renderer;
+    const renderModeEl = document.getElementById('renderMode');
+    if (renderModeEl) {
+      if (renderer.isInstancingActive()) {
+        renderModeEl.textContent = '🚀 Instanced';
+        renderModeEl.style.color = '#FF00FF';
+      } else {
+        renderModeEl.textContent = 'Batch';
+        renderModeEl.style.color = '#AAA';
+      }
+    }
     
     // ECS Metrics (from scene)
     if (scenePerfMetrics) {

@@ -175,20 +175,20 @@ export class Scene {
     const totalCount = this.world.getActiveCount();
     
     if (!this.cullingEnabled) {
-      // No culling - render all entities
-      renderer.drawBulk(
-        posX,
-        posY,
-        rotation,
-        sizes,
-        colorR,
-        colorG,
-        colorB,
-        alphas,
-        flags,
-        totalCount,
-        this.world.FLAG_VISIBLE
-      );
+      // No culling - render all entities using best available method
+      if (renderer.isInstancingActive()) {
+        renderer.drawInstanced(
+          posX, posY, rotation, sizes,
+          colorR, colorG, colorB, alphas,
+          flags, totalCount, this.world.FLAG_VISIBLE
+        );
+      } else {
+        renderer.drawBulk(
+          posX, posY, rotation, sizes,
+          colorR, colorG, colorB, alphas,
+          flags, totalCount, this.world.FLAG_VISIBLE
+        );
+      }
       return;
     }
     
@@ -227,20 +227,20 @@ export class Scene {
       visFlags[i] = flags[idx];
     }
     
-    // Render only visible entities
-    renderer.drawBulk(
-      visPosX,
-      visPosY,
-      visRot,
-      visSizes,
-      visColorR,
-      visColorG,
-      visColorB,
-      visAlphas,
-      visFlags,
-      visibleCount,
-      this.world.FLAG_VISIBLE
-    );
+    // Render only visible entities using best available method
+    if (renderer.isInstancingActive()) {
+      renderer.drawInstanced(
+        visPosX, visPosY, visRot, visSizes,
+        visColorR, visColorG, visColorB, visAlphas,
+        visFlags, visibleCount, this.world.FLAG_VISIBLE
+      );
+    } else {
+      renderer.drawBulk(
+        visPosX, visPosY, visRot, visSizes,
+        visColorR, visColorG, visColorB, visAlphas,
+        visFlags, visibleCount, this.world.FLAG_VISIBLE
+      );
+    }
     
     // Track culling stats (stored on scene for perf monitor access)
     (this as any).culledCount = totalCount - visibleCount;

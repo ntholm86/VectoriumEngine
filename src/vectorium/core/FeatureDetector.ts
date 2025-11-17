@@ -14,6 +14,8 @@ export interface BrowserCapabilities {
   supportsWebP: boolean;
   isMobile: boolean;
   gpuTier: 'high' | 'medium' | 'low';
+  hasInstancing: boolean; // GPU instancing support
+  hasInstancedArrays: boolean; // WebGL1 extension
 }
 
 export class FeatureDetector {
@@ -34,7 +36,9 @@ export class FeatureDetector {
       supportsAVIF: false, // Will be detected async
       supportsWebP: false, // Will be detected async
       isMobile: this.checkMobile(),
-      gpuTier: this.estimateGPUTier()
+      gpuTier: this.estimateGPUTier(),
+      hasInstancing: this.checkInstancing(),
+      hasInstancedArrays: this.checkInstancedArraysExtension()
     };
   }
 
@@ -98,6 +102,39 @@ export class FeatureDetector {
 
   private checkPerformanceMemory(): boolean {
     return 'memory' in performance;
+  }
+
+  private checkInstancing(): boolean {
+    // WebGL2 has native instancing support
+    if (this.checkWebGL2()) {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl2') as WebGL2RenderingContext;
+        if (gl && 'drawArraysInstanced' in gl) {
+          return true;
+        }
+      } catch (e) {
+        return false;
+      }
+    }
+    
+    // WebGL1 needs ANGLE_instanced_arrays extension
+    return this.checkInstancedArraysExtension();
+  }
+
+  private checkInstancedArraysExtension(): boolean {
+    // Check for ANGLE_instanced_arrays extension in WebGL1
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (gl) {
+        const ext = gl.getExtension('ANGLE_instanced_arrays');
+        return ext !== null;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
   }
 
   private checkMobile(): boolean {
