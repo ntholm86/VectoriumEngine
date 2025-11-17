@@ -35,6 +35,10 @@ export class WebGLBatchRenderer {
   // Pre-calculated rotation cache (cos/sin for 0-359 degrees)
   private cosCache: Float32Array = new Float32Array(360);
   private sinCache: Float32Array = new Float32Array(360);
+  
+  // Cache uniform locations (CRITICAL: getUniformLocation is expensive!)
+  private useTextureUniformLoc: WebGLUniformLocation | null = null;
+  private lastTextureState: number = -1; // Track if texture uniform changed
 
   constructor(canvas: HTMLCanvasElement, useWebGL2: boolean = true) {
     const gl = useWebGL2 
@@ -47,8 +51,9 @@ export class WebGLBatchRenderer {
     
     this.gl = gl as WebGLRenderingContext;
     
-    // Pre-allocate batch buffers (10 floats per vertex, 4 vertices per sprite)
-    this.batchVertices = new Float32Array(this.maxBatchSize * 4 * 10);
+    // Pre-allocate batch buffers (8 floats per vertex, 4 vertices per sprite)
+    // Format: position(2) + texCoord(2) + color(4) = 8 floats
+    this.batchVertices = new Float32Array(this.maxBatchSize * 4 * 8);
     this.batchIndices = new Uint16Array(this.maxBatchSize * 6);
     
     // Pre-fill indices (never changes)
@@ -139,9 +144,9 @@ export class WebGLBatchRenderer {
     this.vertexBuffer = gl.createBuffer();
     this.indexBuffer = gl.createBuffer();
     
-    // Setup buffers
+    // Setup buffers (use STREAM_DRAW for better performance with frequently updated data)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, this.batchVertices.byteLength, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, this.batchVertices.byteLength, gl.STREAM_DRAW);
     
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.batchIndices, gl.STATIC_DRAW);
@@ -186,6 +191,9 @@ export class WebGLBatchRenderer {
     const projectionLoc = gl.getUniformLocation(this.program!, 'u_projection');
     gl.uniformMatrix4fv(projectionLoc, false, projectionMatrix);
     
+    // Cache uniform location (CRITICAL: getUniformLocation is expensive!)
+    this.useTextureUniformLoc = gl.getUniformLocation(this.program!, 'u_useTexture');
+    
     // Setup attributes
     const positionLoc = gl.getAttribLocation(this.program!, 'a_position');
     const texCoordLoc = gl.getAttribLocation(this.program!, 'a_texCoord');
@@ -193,7 +201,7 @@ export class WebGLBatchRenderer {
     
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
     
-    const stride = 10 * 4; // 10 floats per vertex
+    const stride = 8 * 4; // 8 floats per vertex (reduced from 10!)
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, stride, 0);
     
@@ -208,6 +216,7 @@ export class WebGLBatchRenderer {
     this.vertexCount = 0;
     this.drawCallCount = 0;
     this.currentTexture = null;
+    this.lastTextureState = -1; // Reset texture state tracking
   }
 
   drawSprite(sprite: Sprite): void {
@@ -283,8 +292,8 @@ export class WebGLBatchRenderer {
     const b = color.b;
     const a = alpha;
     
-    // OPTIMIZATION: Direct array writes instead of object iteration
-    let offset = this.vertexCount * 10;
+    // OPTIMIZATION: Direct array writes instead of object iteration (8 floats per vertex)
+    let offset = this.vertexCount * 8;
     
     // Vertex 0
     this.batchVertices[offset++] = c0x;
@@ -295,8 +304,6 @@ export class WebGLBatchRenderer {
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
     this.batchVertices[offset++] = a;
-    this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = 0;
     this.vertexCount++;
     
     // Vertex 1
@@ -308,8 +315,6 @@ export class WebGLBatchRenderer {
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
     this.batchVertices[offset++] = a;
-    this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = 0;
     this.vertexCount++;
     
     // Vertex 2
@@ -321,8 +326,6 @@ export class WebGLBatchRenderer {
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
     this.batchVertices[offset++] = a;
-    this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = 0;
     this.vertexCount++;
     
     // Vertex 3
@@ -334,8 +337,6 @@ export class WebGLBatchRenderer {
     this.batchVertices[offset++] = g;
     this.batchVertices[offset++] = b;
     this.batchVertices[offset++] = a;
-    this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = 0;
     this.vertexCount++;
   }
 
@@ -359,19 +360,14 @@ export class WebGLBatchRenderer {
     
     const gl = this.gl;
     
-    // Upload vertex data
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.batchVertices.subarray(0, this.vertexCount * 10));
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.batchVertices.subarray(0, this.vertexCount * 8));
     
-    // Set texture uniform
-    const useTextureLoc = gl.getUniformLocation(this.program!, 'u_useTexture');
-    gl.uniform1i(useTextureLoc, this.currentTexture ? 1 : 0);
-    
-    if (this.currentTexture) {
-      gl.bindTexture(gl.TEXTURE_2D, this.currentTexture);
+    const useTexture = this.currentTexture ? 1 : 0;
+    if (useTexture !== this.lastTextureState) {
+      gl.uniform1i(this.useTextureUniformLoc, useTexture);
+      this.lastTextureState = useTexture;
     }
     
-    // Draw
     const indexCount = (this.vertexCount / 4) * 6;
     gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
     
@@ -421,29 +417,25 @@ export class WebGLBatchRenderer {
     count: number,
     FLAG_VISIBLE: number
   ): void {
-    // Process in chunks to respect batch size limits
+    const COLOR_NORM = 1.0 / 255.0;
+    
     for (let start = 0; start < count; start += this.maxBatchSize) {
       const end = Math.min(start + this.maxBatchSize, count);
       const chunkSize = end - start;
       
-      // Tight loop - process all entities in chunk
       for (let i = start; i < end; i++) {
-        // Quick visibility check
         if ((flags[i] & FLAG_VISIBLE) === 0) continue;
         
         const x = posX[i];
         const y = posY[i];
         const size = sizes[i];
-        const rotDeg = rotation[i]; // Already in integer degrees (0-359)
+        const rotDeg = rotation[i];
         
-        // Use pre-calculated rotation cache (instant lookup!)
         const cos = this.cosCache[rotDeg];
         const sin = this.sinCache[rotDeg];
         
-        // Half-size for corner calculation
         const hw = size * 0.5;
         
-        // Calculate rotated corners (center-based)
         const c0x = -hw * cos - (-hw) * sin + x;
         const c0y = -hw * sin + (-hw) * cos + y;
         const c1x = hw * cos - (-hw) * sin + x;
@@ -453,28 +445,22 @@ export class WebGLBatchRenderer {
         const c3x = -hw * cos - hw * sin + x;
         const c3y = -hw * sin + hw * cos + y;
         
-        // Color (normalize from 0-255 to 0-1)
-        const r = colorR[i] / 255;
-        const g = colorG[i] / 255;
-        const b = colorB[i] / 255;
+        const r = colorR[i] * COLOR_NORM;
+        const g = colorG[i] * COLOR_NORM;
+        const b = colorB[i] * COLOR_NORM;
         const a = alphas[i];
         
-        // Write vertices directly (10 floats per vertex × 4 vertices)
-        let offset = (this.vertexCount + (i - start) * 4) * 10;
+        let offset = (this.vertexCount + (i - start) * 4) * 8;
         
-        // Vertex 0 (bottom-left)
         this.batchVertices[offset++] = c0x;
         this.batchVertices[offset++] = c0y;
-        this.batchVertices[offset++] = 0; // u
-        this.batchVertices[offset++] = 0; // v
+        this.batchVertices[offset++] = 0;
+        this.batchVertices[offset++] = 0;
         this.batchVertices[offset++] = r;
         this.batchVertices[offset++] = g;
         this.batchVertices[offset++] = b;
         this.batchVertices[offset++] = a;
-        this.batchVertices[offset++] = 0; // texIndex
-        this.batchVertices[offset++] = 0; // padding
         
-        // Vertex 1 (bottom-right)
         this.batchVertices[offset++] = c1x;
         this.batchVertices[offset++] = c1y;
         this.batchVertices[offset++] = 1;
@@ -483,10 +469,7 @@ export class WebGLBatchRenderer {
         this.batchVertices[offset++] = g;
         this.batchVertices[offset++] = b;
         this.batchVertices[offset++] = a;
-        this.batchVertices[offset++] = 0;
-        this.batchVertices[offset++] = 0;
         
-        // Vertex 2 (top-right)
         this.batchVertices[offset++] = c2x;
         this.batchVertices[offset++] = c2y;
         this.batchVertices[offset++] = 1;
@@ -495,10 +478,7 @@ export class WebGLBatchRenderer {
         this.batchVertices[offset++] = g;
         this.batchVertices[offset++] = b;
         this.batchVertices[offset++] = a;
-        this.batchVertices[offset++] = 0;
-        this.batchVertices[offset++] = 0;
         
-        // Vertex 3 (top-left)
         this.batchVertices[offset++] = c3x;
         this.batchVertices[offset++] = c3y;
         this.batchVertices[offset++] = 0;
@@ -507,14 +487,9 @@ export class WebGLBatchRenderer {
         this.batchVertices[offset++] = g;
         this.batchVertices[offset++] = b;
         this.batchVertices[offset++] = a;
-        this.batchVertices[offset++] = 0;
-        this.batchVertices[offset++] = 0;
       }
       
-      // Update vertex count for this chunk
       this.vertexCount += chunkSize * 4;
-      
-      // Flush this chunk
       this.flush();
     }
   }

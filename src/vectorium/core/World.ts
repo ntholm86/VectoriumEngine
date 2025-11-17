@@ -151,15 +151,12 @@ export class World {
    * This is where the 12x speedup comes from!
    */
   updatePhysics(dt: number, boundsWidth: number, boundsHeight: number): void {
-    // Sequential access = ZERO cache misses
     for (let i = 0; i < this.entityCount; i++) {
       if ((this.flags[i] & this.FLAG_PHYSICS) === 0) continue;
       
-      // Update position from velocity (contiguous memory access)
       this.positionX[i] += this.velocityX[i] * dt;
       this.positionY[i] += this.velocityY[i] * dt;
       
-      // Bounce at bounds
       const halfSize = this.size[i] / 2;
       if (this.positionX[i] - halfSize < 0 || this.positionX[i] + halfSize > boundsWidth) {
         this.velocityX[i] *= -1;
@@ -178,53 +175,52 @@ export class World {
    */
   updateAnimations(dt: number): void {
     for (let i = 0; i < this.entityCount; i++) {
-      if ((this.flags[i] & this.FLAG_ACTIVE) === 0) continue;
+      const entityFlags = this.flags[i];
       
-      const animType = this.animationType[i];
-      
-      switch (animType) {
-        case this.ANIM_ROTATE:
-          // Quantized rotation (integer degrees for cache hits)
-          if (this.flags[i] & this.FLAG_ROTATING) {
-            this.rotation[i] = (this.rotation[i] + this.rotationSpeed[i] * dt) % 360;
-            if (this.rotation[i] < 0) this.rotation[i] += 360;
+      if ((entityFlags & (this.FLAG_ACTIVE | this.FLAG_ROTATING)) !== (this.FLAG_ACTIVE | this.FLAG_ROTATING)) {
+        if ((entityFlags & this.FLAG_ACTIVE) !== 0) {
+          const animType = this.animationType[i];
+          if (animType !== this.ANIM_ROTATE) {
+            this.handleComplexAnimation(i, dt, animType);
           }
-          break;
-          
-        case this.ANIM_PULSE:
-          this.pulseTime[i] += this.pulseSpeed[i] * dt;
-          this.size[i] = this.baseSize[i] + Math.sin(this.pulseTime[i]) * this.baseSize[i] * 0.5;
-          break;
-          
-        case this.ANIM_WOBBLE:
-          this.wobbleOffset[i] += this.wobbleSpeed[i] * dt;
-          this.velocityX[i] += Math.sin(this.wobbleOffset[i]) * 50 * dt;
-          this.velocityY[i] += Math.cos(this.wobbleOffset[i]) * 50 * dt;
-          break;
-          
-        case this.ANIM_SPIN:
-          // Faster spin with size variation
-          this.rotation[i] = (this.rotation[i] + this.rotationSpeed[i] * dt * 3) % 360;
-          if (this.rotation[i] < 0) this.rotation[i] += 360;
-          const rotRad = (this.rotation[i] * Math.PI) / 180;
-          this.size[i] = this.baseSize[i] + Math.sin(rotRad) * this.baseSize[i] * 0.3;
-          break;
-          
-        case this.ANIM_FADE:
-          this.alpha[i] += this.fadeDirection[i] * 2 * dt;
-          if (this.alpha[i] >= 1.0) {
-            this.alpha[i] = 1.0;
-            this.fadeDirection[i] = -1;
-          } else if (this.alpha[i] <= 0.3) {
-            this.alpha[i] = 0.3;
-            this.fadeDirection[i] = 1;
-          }
-          break;
+        }
+        continue;
       }
+      
+      let newRot = this.rotation[i] + this.rotationSpeed[i] * dt;
+      newRot = newRot >= 360 ? newRot - 360 : newRot;
+      newRot = newRot < 0 ? newRot + 360 : newRot;
+      this.rotation[i] = newRot;
     }
   }
   
-  /**
+  private handleComplexAnimation(i: number, dt: number, animType: number): void {
+    switch (animType) {
+      case this.ANIM_PULSE:
+        this.pulseTime[i] += this.pulseSpeed[i] * dt;
+        this.size[i] = this.baseSize[i] + Math.sin(this.pulseTime[i]) * this.baseSize[i] * 0.5;
+        break;
+      case this.ANIM_WOBBLE:
+        this.wobbleOffset[i] += this.wobbleSpeed[i] * dt;
+        this.velocityX[i] += Math.sin(this.wobbleOffset[i]) * 50 * dt;
+        this.velocityY[i] += Math.cos(this.wobbleOffset[i]) * 50 * dt;
+        break;
+      case this.ANIM_SPIN:
+        const rotRad = (this.rotation[i] * Math.PI) / 180;
+        this.size[i] = this.baseSize[i] + Math.sin(rotRad) * this.baseSize[i] * 0.3;
+        break;
+      case this.ANIM_FADE:
+        this.alpha[i] += this.fadeDirection[i] * 2 * dt;
+        if (this.alpha[i] >= 1.0) {
+          this.alpha[i] = 1.0;
+          this.fadeDirection[i] = -1;
+        } else if (this.alpha[i] <= 0.3) {
+          this.alpha[i] = 0.3;
+          this.fadeDirection[i] = 1;
+        }
+        break;
+    }
+  }  /**
    * Get active entity count
    */
   getActiveCount(): number {
