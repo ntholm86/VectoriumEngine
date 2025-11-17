@@ -666,6 +666,107 @@ export class WebGLBatchRenderer {
   }
 
   /**
+   * 🚀 ULTRA-OPTIMIZED: Draw from indexed arrays (zero copy!)
+   * Renders only visible entities directly from source arrays using indices
+   * Eliminates the expensive copy loop in frustum culling
+   */
+  drawBulkIndexed(
+    posX: Float32Array,
+    posY: Float32Array,
+    rotation: Uint16Array,
+    sizes: Float32Array,
+    colorR: Uint8Array,
+    colorG: Uint8Array,
+    colorB: Uint8Array,
+    alphas: Float32Array,
+    flags: Uint32Array,
+    indices: Uint32Array,
+    indexCount: number,
+    FLAG_VISIBLE: number
+  ): void {
+    const COLOR_NORM = 1.0 / 255.0;
+    const HALF = 0.5;
+    
+    for (let start = 0; start < indexCount; start += this.maxBatchSize) {
+      const end = Math.min(start + this.maxBatchSize, indexCount);
+      let visibleCount = 0;
+      
+      for (let i = start; i < end; i++) {
+        const idx = indices[i];  // Get actual entity index
+        if ((flags[idx] & FLAG_VISIBLE) === 0) continue;
+        
+        const x = posX[idx];
+        const y = posY[idx];
+        const hw = sizes[idx] * HALF;
+        const rotDeg = rotation[idx];
+        
+        const cos = this.cosCache[rotDeg];
+        const sin = this.sinCache[rotDeg];
+        
+        const hwCos = hw * cos;
+        const hwSin = hw * sin;
+        
+        const c0x = -hwCos + hwSin + x;
+        const c0y = -hwSin - hwCos + y;
+        const c1x = hwCos + hwSin + x;
+        const c1y = hwSin - hwCos + y;
+        const c2x = hwCos - hwSin + x;
+        const c2y = hwSin + hwCos + y;
+        const c3x = -hwCos - hwSin + x;
+        const c3y = -hwSin + hwCos + y;
+        
+        const r = colorR[idx] * COLOR_NORM;
+        const g = colorG[idx] * COLOR_NORM;
+        const b = colorB[idx] * COLOR_NORM;
+        const a = alphas[idx];
+        
+        let offset = (this.vertexCount + visibleCount * 4) * 8;
+        visibleCount++;
+        
+        // Write 4 vertices (32 floats) - UNROLLED
+        this.batchVertices[offset++] = c0x;
+        this.batchVertices[offset++] = c0y;
+        this.batchVertices[offset++] = 0;
+        this.batchVertices[offset++] = 0;
+        this.batchVertices[offset++] = r;
+        this.batchVertices[offset++] = g;
+        this.batchVertices[offset++] = b;
+        this.batchVertices[offset++] = a;
+        
+        this.batchVertices[offset++] = c1x;
+        this.batchVertices[offset++] = c1y;
+        this.batchVertices[offset++] = 1;
+        this.batchVertices[offset++] = 0;
+        this.batchVertices[offset++] = r;
+        this.batchVertices[offset++] = g;
+        this.batchVertices[offset++] = b;
+        this.batchVertices[offset++] = a;
+        
+        this.batchVertices[offset++] = c2x;
+        this.batchVertices[offset++] = c2y;
+        this.batchVertices[offset++] = 1;
+        this.batchVertices[offset++] = 1;
+        this.batchVertices[offset++] = r;
+        this.batchVertices[offset++] = g;
+        this.batchVertices[offset++] = b;
+        this.batchVertices[offset++] = a;
+        
+        this.batchVertices[offset++] = c3x;
+        this.batchVertices[offset++] = c3y;
+        this.batchVertices[offset++] = 0;
+        this.batchVertices[offset++] = 1;
+        this.batchVertices[offset++] = r;
+        this.batchVertices[offset++] = g;
+        this.batchVertices[offset++] = b;
+        this.batchVertices[offset++] = a;
+      }
+      
+      this.vertexCount += visibleCount * 4;
+      this.flush();
+    }
+  }
+
+  /**
    * Draw entities using GPU instancing - SINGLE DRAW CALL!
    * 10-20x faster than drawBulk for large entity counts
    * Requires WebGL2 or ANGLE_instanced_arrays extension

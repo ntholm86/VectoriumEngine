@@ -46,6 +46,19 @@ export class Scene {
   private camera: Camera;
   private cullingEnabled = true;
   
+  // 🚀 PRE-ALLOCATED CULLING BUFFERS (zero allocations per frame!)
+  private maxEntities: number;
+  private visibleIndices: Uint32Array;
+  private visPosX: Float32Array;
+  private visPosY: Float32Array;
+  private visRot: Uint16Array;
+  private visSizes: Float32Array;
+  private visColorR: Uint8Array;
+  private visColorG: Uint8Array;
+  private visColorB: Uint8Array;
+  private visAlphas: Float32Array;
+  private visFlags: Uint32Array;
+  
   // Performance monitoring
   private enableWarnings = true;
   private updateTimeWarningThreshold = 10; // ms
@@ -68,8 +81,21 @@ export class Scene {
 
   constructor(name: string, maxEntities = 2000000) { // Increased to 2M for extreme testing
     this.name = name;
+    this.maxEntities = maxEntities;
     this.world = new World(maxEntities);
     this.camera = new Camera(1920, 1080); // Default viewport
+    
+    // 🚀 Allocate culling buffers once (reused every frame!)
+    this.visibleIndices = new Uint32Array(maxEntities);
+    this.visPosX = new Float32Array(maxEntities);
+    this.visPosY = new Float32Array(maxEntities);
+    this.visRot = new Uint16Array(maxEntities);
+    this.visSizes = new Float32Array(maxEntities);
+    this.visColorR = new Uint8Array(maxEntities);
+    this.visColorG = new Uint8Array(maxEntities);
+    this.visColorB = new Uint8Array(maxEntities);
+    this.visAlphas = new Float32Array(maxEntities);
+    this.visFlags = new Uint32Array(maxEntities);
   }
 
   async load(): Promise<void> {
@@ -193,52 +219,42 @@ export class Scene {
     }
     
     // FRUSTUM CULLING: Only render visible entities
-    const visibleIndices = new Uint32Array(totalCount);
+    // 🚀 ULTRA-OPTIMIZED: Use indexed rendering (zero copy!)
     const visibleCount = this.camera.cullEntities(
       posX,
       posY,
       sizes,
       totalCount,
-      visibleIndices
+      this.visibleIndices
     );
     
-    // Create temporary arrays for visible entities only
-    const visPosX = new Float32Array(visibleCount);
-    const visPosY = new Float32Array(visibleCount);
-    const visRot = new Uint16Array(visibleCount);
-    const visSizes = new Float32Array(visibleCount);
-    const visColorR = new Uint8Array(visibleCount);
-    const visColorG = new Uint8Array(visibleCount);
-    const visColorB = new Uint8Array(visibleCount);
-    const visAlphas = new Float32Array(visibleCount);
-    const visFlags = new Uint32Array(visibleCount);
-    
-    // Copy visible entity data
-    for (let i = 0; i < visibleCount; i++) {
-      const idx = visibleIndices[i];
-      visPosX[i] = posX[idx];
-      visPosY[i] = posY[idx];
-      visRot[i] = rotation[idx];
-      visSizes[i] = sizes[idx];
-      visColorR[i] = colorR[idx];
-      visColorG[i] = colorG[idx];
-      visColorB[i] = colorB[idx];
-      visAlphas[i] = alphas[idx];
-      visFlags[i] = flags[idx];
-    }
-    
-    // Render only visible entities using best available method
+    // Render directly from source arrays using indices (NO COPY!)
     if (renderer.isInstancingActive()) {
+      // TODO: Add drawInstancedIndexed if needed
+      // For now, fall back to copy-based approach for instancing
+      for (let i = 0; i < visibleCount; i++) {
+        const idx = this.visibleIndices[i];
+        this.visPosX[i] = posX[idx];
+        this.visPosY[i] = posY[idx];
+        this.visRot[i] = rotation[idx];
+        this.visSizes[i] = sizes[idx];
+        this.visColorR[i] = colorR[idx];
+        this.visColorG[i] = colorG[idx];
+        this.visColorB[i] = colorB[idx];
+        this.visAlphas[i] = alphas[idx];
+        this.visFlags[i] = flags[idx];
+      }
       renderer.drawInstanced(
-        visPosX, visPosY, visRot, visSizes,
-        visColorR, visColorG, visColorB, visAlphas,
-        visFlags, visibleCount, this.world.FLAG_VISIBLE
+        this.visPosX, this.visPosY, this.visRot, this.visSizes,
+        this.visColorR, this.visColorG, this.visColorB, this.visAlphas,
+        this.visFlags, visibleCount, this.world.FLAG_VISIBLE
       );
     } else {
-      renderer.drawBulk(
-        visPosX, visPosY, visRot, visSizes,
-        visColorR, visColorG, visColorB, visAlphas,
-        visFlags, visibleCount, this.world.FLAG_VISIBLE
+      // 🔥 ZERO COPY: Render directly using indices!
+      renderer.drawBulkIndexed(
+        posX, posY, rotation, sizes,
+        colorR, colorG, colorB, alphas,
+        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
       );
     }
     
