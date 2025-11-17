@@ -49,14 +49,22 @@ class DemoScene extends Scene {
   private entityCount = 0;
   
   async load(): Promise<void> {
+    // Set world bounds to 10x canvas size for frustum culling demo!
+    (this as any).worldWidth = this.canvasWidth * 10;   // 19,200 pixels
+    (this as any).worldHeight = this.canvasHeight * 10; // 10,800 pixels
+    
     this.addEntities(1000);
   }
   
   addEntities(count: number): void {
+    // Spawn entities in the HUGE world (10x canvas size) to test frustum culling!
+    const worldWidth = (this as any).worldWidth || this.canvasWidth * 10;
+    const worldHeight = (this as any).worldHeight || this.canvasHeight * 10;
+    
     for (let i = 0; i < count; i++) {
       const entity = new BouncingEntity();
-      const x = Math.random() * this.canvasWidth;
-      const y = Math.random() * this.canvasHeight;
+      const x = Math.random() * worldWidth;
+      const y = Math.random() * worldHeight;
       const angle = Math.random() * Math.PI * 2;
       const speed = 100 + Math.random() * 200;
       const vx = Math.cos(angle) * speed;
@@ -253,6 +261,26 @@ class UIControls {
           <span>Variance:</span> <span id="frameTimeVariance">0.00</span>ms
         </div>
       </div>
+
+      <div style="margin-bottom: 12px; padding: 10px; background: rgba(128, 0, 255, 0.1); border-radius: 4px; border-left: 3px solid #8000FF;">
+        <div style="font-weight: bold; margin-bottom: 6px; color: #8000FF;">
+          🎯 FRUSTUM CULLING
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Visible Entities:</span> <span id="entitiesInFrustum" style="font-weight: bold;">0</span>
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Culled Entities:</span> <span id="entitiesCulled">0</span>
+        </div>
+        <div style="margin-bottom: 6px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Culling Efficiency:</span> <span id="cullingEfficiency" style="font-weight: bold;">0.0</span>%
+        </div>
+        <div style="padding-top: 6px; border-top: 1px solid rgba(128,0,255,0.3); font-size: 11px;">
+          <button id="toggleCullingBtn" style="width: 100%; padding: 6px; background: #8000FF; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">
+            ✓ Culling ON
+          </button>
+        </div>
+      </div>
       
       <div style="margin-bottom: 12px;">
         <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">Canvas Resolution</h3>
@@ -276,6 +304,10 @@ class UIControls {
           <button id="add1000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1K</button>
           <button id="add10000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+10K</button>
           <button id="add100000Btn" style="padding: 8px; background: #FF00FF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100K 🔥</button>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;">
+          <button id="add500000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+500K 💥</button>
+          <button id="add1000000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1M ☢️</button>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
           <button id="remove1000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">-1K</button>
@@ -333,6 +365,20 @@ class UIControls {
       }
     });
     
+    container.querySelector('#add500000Btn')?.addEventListener('click', () => {
+      if (confirm('💥 Add 500,000 entities?! This will test frustum culling!\n\nOnly visible entities will be rendered.')) {
+        this.scene.addEntities(500000);
+      }
+    });
+    
+    container.querySelector('#add1000000Btn')?.addEventListener('click', () => {
+      if (confirm('☢️ Add 1,000,000 entities?!?!\n\nThis is EXTREME and may take a moment to spawn.\nFrustum culling will only render visible entities.')) {
+        console.log('Spawning 1 million entities...');
+        this.scene.addEntities(1000000);
+        console.log('Spawn complete!');
+      }
+    });
+    
     container.querySelector('#remove1000Btn')?.addEventListener('click', () => {
       this.scene.removeEntities(1000);
     });
@@ -341,6 +387,19 @@ class UIControls {
       if (confirm('Clear all entities?')) {
         this.scene.clearEntities();
       }
+    });
+    
+    // Culling toggle button
+    let cullingEnabled = true;
+    const toggleCullingBtn = container.querySelector('#toggleCullingBtn') as HTMLButtonElement;
+    toggleCullingBtn?.addEventListener('click', () => {
+      cullingEnabled = !cullingEnabled;
+      const currentScene = (this.engine as any).currentScene;
+      if (currentScene) {
+        currentScene.setCullingEnabled(cullingEnabled);
+      }
+      toggleCullingBtn.textContent = cullingEnabled ? '✓ Culling ON' : '✗ Culling OFF';
+      toggleCullingBtn.style.background = cullingEnabled ? '#8000FF' : '#666';
     });
   }
   
@@ -397,6 +456,24 @@ class UIControls {
     document.getElementById('frameTimeAvg')!.textContent = perfMonitorMetrics.frameTime.toFixed(2);
     document.getElementById('frameTimeMax')!.textContent = perfMonitorMetrics.frameTimeMax.toFixed(2);
     document.getElementById('frameTimeVariance')!.textContent = perfMonitorMetrics.frameTimeVariance.toFixed(2);
+    
+    // Culling Metrics (NEW!)
+    const inFrustum = perfMonitorMetrics.entitiesInFrustum || 0;
+    const culled = perfMonitorMetrics.entitiesCulled || 0;
+    const cullingEff = perfMonitorMetrics.cullingEfficiency || 0;
+    document.getElementById('entitiesInFrustum')!.textContent = inFrustum.toLocaleString();
+    document.getElementById('entitiesCulled')!.textContent = culled.toLocaleString();
+    document.getElementById('cullingEfficiency')!.textContent = cullingEff.toFixed(1);
+    
+    // Color code culling efficiency
+    const cullingEffElement = document.getElementById('cullingEfficiency')!;
+    if (cullingEff > 50) {
+      cullingEffElement.style.color = '#00FF00'; // Green = great culling
+    } else if (cullingEff > 20) {
+      cullingEffElement.style.color = '#FFFF00'; // Yellow = moderate
+    } else {
+      cullingEffElement.style.color = '#FF8000'; // Orange = low culling
+    }
     
     // Color coding for FPS
     const fpsElement = document.getElementById('fps')!;
@@ -492,7 +569,7 @@ function initDemo() {
     debugMode: false
   });
   
-  const scene = new DemoScene('demo');
+  const scene = new DemoScene('demo', 2000000); // Support up to 2M entities for extreme stress testing
   engine.registerScene('demo', scene);
   engine.loadScene('demo').then(() => {
     engine.start();

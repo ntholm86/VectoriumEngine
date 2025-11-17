@@ -231,6 +231,12 @@ export class PerformanceMonitor {
     this.maxBatchSize = size;
   }
 
+  recordCulling(inFrustum: number, culled: number): void {
+    // Store culling stats for this frame
+    (this as any).cullingInFrustum = inFrustum;
+    (this as any).cullingCulled = culled;
+  }
+
   private adjustQuality(): void {
     const avgFPS = this.getAverageFPS();
     const targetFrame = 1000 / this.targetFPS;
@@ -333,6 +339,13 @@ export class PerformanceMonitor {
     const vertexBufferSize = (this.verticesThisFrame * 8 * 4) / (1024 * 1024); // 8 floats per vertex
     const indexBufferSize = (this.indicesThisFrame * 2) / (1024 * 1024); // Uint16Array
 
+    // Culling metrics
+    const cullingInFrustum = (this as any).cullingInFrustum || this.entitiesRenderedThisFrame;
+    const cullingCulled = (this as any).cullingCulled || 0;
+    const cullingEfficiency = (cullingInFrustum + cullingCulled) > 0
+      ? (cullingCulled / (cullingInFrustum + cullingCulled)) * 100
+      : 0;
+
     return {
       // Core metrics
       fps: this.getAverageFPS(),
@@ -356,6 +369,11 @@ export class PerformanceMonitor {
       entitiesProcessed: this.entitiesProcessedThisFrame,
       entitiesRendered: this.entitiesRenderedThisFrame,
       timePerEntity: timePerEntity,
+
+      // Culling metrics
+      entitiesInFrustum: cullingInFrustum,
+      entitiesCulled: cullingCulled,
+      cullingEfficiency: cullingEfficiency,
 
       // Memory breakdown
       vertexBufferSize: vertexBufferSize,

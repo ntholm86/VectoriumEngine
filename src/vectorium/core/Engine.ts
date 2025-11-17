@@ -9,6 +9,7 @@ import { TextRenderer, TextStyle } from '../rendering/TextRenderer';
 import { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { BufferPool } from '../memory/Pooling';
 import { World, EntityId } from './World';
+import { Camera } from './Camera';
 
 export interface Entity {
   x: number;
@@ -33,9 +34,17 @@ export class Scene {
   // Track entities with custom render logic (rare!)
   private entitiesWithCustomRender: Entity[] = [];
   
-  // Canvas dimensions for physics bounds
+  // World dimensions for physics bounds (can be larger than canvas!)
+  protected worldWidth = 19200;  // 10x canvas
+  protected worldHeight = 10800; // 10x canvas
+  
+  // Canvas dimensions for camera
   protected canvasWidth = 1920;
   protected canvasHeight = 1080;
+  
+  // Camera for frustum culling
+  private camera: Camera;
+  private cullingEnabled = true;
   
   // Performance monitoring
   private enableWarnings = true;
@@ -57,9 +66,10 @@ export class Scene {
     ecsTotalEntities: 0
   };
 
-  constructor(name: string, maxEntities = 200000) {
+  constructor(name: string, maxEntities = 2000000) { // Increased to 2M for extreme testing
     this.name = name;
     this.world = new World(maxEntities);
+    this.camera = new Camera(1920, 1080); // Default viewport
   }
 
   async load(): Promise<void> {
@@ -72,7 +82,7 @@ export class Scene {
     // CRITICAL OPTIMIZATION: Run ECS systems ONLY
     // Pure data entities don't need update() calls at all!
     const physicsStart = performance.now();
-    this.world.updatePhysics(dt, this.canvasWidth, this.canvasHeight);
+    this.world.updatePhysics(dt, this.worldWidth, this.worldHeight); // Use world bounds, not canvas!
     this.perfMetrics.updatePhysics = performance.now() - physicsStart;
     
     const animStart = performance.now();
@@ -147,6 +157,7 @@ export class Scene {
   
   /**
    * CRITICAL OPTIMIZATION: Batch-render all ECS entities in one tight loop
+   * WITH FRUSTUM CULLING: Only render visible entities!
    * This is 10-100x faster than calling entity.render() per-entity
    * Uses cached rotation lookups and contiguous array access
    */
@@ -161,22 +172,79 @@ export class Scene {
     const alphas = this.world.getAlphas();
     const flags = this.world.getFlags();
     
-    // ULTRA OPTIMIZATION: Use bulk rendering API
-    // This eliminates 100k+ function calls and processes arrays directly!
-    const count = this.world.getActiveCount();
-    renderer.drawBulk(
+    const totalCount = this.world.getActiveCount();
+    
+    if (!this.cullingEnabled) {
+      // No culling - render all entities
+      renderer.drawBulk(
+        posX,
+        posY,
+        rotation,
+        sizes,
+        colorR,
+        colorG,
+        colorB,
+        alphas,
+        flags,
+        totalCount,
+        this.world.FLAG_VISIBLE
+      );
+      return;
+    }
+    
+    // FRUSTUM CULLING: Only render visible entities
+    const visibleIndices = new Uint32Array(totalCount);
+    const visibleCount = this.camera.cullEntities(
       posX,
       posY,
-      rotation,
       sizes,
-      colorR,
-      colorG,
-      colorB,
-      alphas,
-      flags,
-      count,
+      totalCount,
+      visibleIndices
+    );
+    
+    // Create temporary arrays for visible entities only
+    const visPosX = new Float32Array(visibleCount);
+    const visPosY = new Float32Array(visibleCount);
+    const visRot = new Uint16Array(visibleCount);
+    const visSizes = new Float32Array(visibleCount);
+    const visColorR = new Uint8Array(visibleCount);
+    const visColorG = new Uint8Array(visibleCount);
+    const visColorB = new Uint8Array(visibleCount);
+    const visAlphas = new Float32Array(visibleCount);
+    const visFlags = new Uint32Array(visibleCount);
+    
+    // Copy visible entity data
+    for (let i = 0; i < visibleCount; i++) {
+      const idx = visibleIndices[i];
+      visPosX[i] = posX[idx];
+      visPosY[i] = posY[idx];
+      visRot[i] = rotation[idx];
+      visSizes[i] = sizes[idx];
+      visColorR[i] = colorR[idx];
+      visColorG[i] = colorG[idx];
+      visColorB[i] = colorB[idx];
+      visAlphas[i] = alphas[idx];
+      visFlags[i] = flags[idx];
+    }
+    
+    // Render only visible entities
+    renderer.drawBulk(
+      visPosX,
+      visPosY,
+      visRot,
+      visSizes,
+      visColorR,
+      visColorG,
+      visColorB,
+      visAlphas,
+      visFlags,
+      visibleCount,
       this.world.FLAG_VISIBLE
     );
+    
+    // Track culling stats (stored on scene for perf monitor access)
+    (this as any).culledCount = totalCount - visibleCount;
+    (this as any).visibleCount = visibleCount;
   }
   
   setWarningsEnabled(enabled: boolean): void {
@@ -184,12 +252,27 @@ export class Scene {
   }
   
   /**
-   * Update canvas dimensions for physics bounds
+   * Enable/disable frustum culling
+   */
+  setCullingEnabled(enabled: boolean): void {
+    this.cullingEnabled = enabled;
+  }
+  
+  /**
+   * Get the camera for manual control
+   */
+  getCamera(): Camera {
+    return this.camera;
+  }
+  
+  /**
+   * Update canvas dimensions for physics bounds and camera
    * Should be called when canvas is resized
    */
   setCanvasDimensions(width: number, height: number): void {
     this.canvasWidth = width;
     this.canvasHeight = height;
+    this.camera.resize(width, height);
   }
 
   addEntity(entity: Entity): void {
@@ -453,6 +536,13 @@ export class Vectorium {
     
     if (this.currentScene && this.currentScene.active) {
       this.currentScene.render(this.renderer, this.textRenderer);
+      
+      // Record culling statistics if available
+      const visibleCount = (this.currentScene as any).visibleCount;
+      const culledCount = (this.currentScene as any).culledCount;
+      if (visibleCount !== undefined && culledCount !== undefined) {
+        this.performanceMonitor.recordCulling(visibleCount, culledCount);
+      }
     }
     
     this.renderer.end();
