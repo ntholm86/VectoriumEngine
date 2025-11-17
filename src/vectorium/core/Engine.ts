@@ -367,6 +367,9 @@ export class Vectorium {
     );
     this.performanceMonitor.setAdaptiveQuality(this.config.enableAdaptiveQuality);
     
+    // Connect performance monitor to renderer for detailed metrics
+    this.renderer.setPerformanceMonitor(this.performanceMonitor);
+    
     // Initialize buffer pool
     this.bufferPool = new BufferPool();
     
@@ -433,9 +436,13 @@ export class Vectorium {
     const qualitySettings = this.performanceMonitor.getQualitySettings();
     this.textRenderer.setResolutionScale(qualitySettings.resolutionScale);
     
-    // Update
+    // Update scene
     if (this.currentScene && this.currentScene.active) {
       this.currentScene.update(dt);
+      
+      // Record entities processed for performance monitoring
+      this.performanceMonitor.recordEntitiesProcessed(this.currentScene.perfMetrics.ecsActiveEntities);
+      this.performanceMonitor.recordEntitiesRendered(this.currentScene.perfMetrics.ecsActiveEntities);
     }
     
     // Render WebGL

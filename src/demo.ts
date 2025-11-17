@@ -205,6 +205,54 @@ class UIControls {
           <span>Efficiency:</span> <span id="ecsEfficiency">100</span>%
         </div>
       </div>
+
+      <div style="margin-bottom: 12px; padding: 10px; background: rgba(0, 255, 128, 0.1); border-radius: 4px; border-left: 3px solid #00FF80;">
+        <div style="font-weight: bold; margin-bottom: 6px; color: #00FF80;">
+          🔬 ADVANCED METRICS
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Vertices/Frame:</span> <span id="verticesRendered">0</span>
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Triangles/Frame:</span> <span id="trianglesRendered">0</span>
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Batch Efficiency:</span> <span id="batchEfficiency">0</span>%
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Buffer Upload:</span> <span id="bufferUploadSize">0.00</span>MB
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>State Changes:</span> <span id="stateChanges">0</span>
+        </div>
+        <div style="margin-bottom: 6px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Time/Entity:</span> <span id="timePerEntity">0.00</span>μs
+        </div>
+        <div style="padding-top: 6px; border-top: 1px solid rgba(0,255,128,0.3); font-size: 11px; display: flex; justify-content: space-between;">
+          <span>Bottleneck:</span> <span id="bottleneck" style="font-weight: bold;">BALANCED</span>
+        </div>
+        <div style="margin-top: 4px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Perf Score:</span> <span id="performanceScore" style="font-weight: bold;">100</span>/100
+        </div>
+      </div>
+
+      <div style="margin-bottom: 12px; padding: 10px; background: rgba(255, 128, 0, 0.1); border-radius: 4px; border-left: 3px solid #FF8000;">
+        <div style="font-weight: bold; margin-bottom: 6px; color: #FF8000;">
+          📈 FRAME PACING
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>1% Low:</span> <span id="frameTimeMin">0.00</span>ms
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Average:</span> <span id="frameTimeAvg">0.00</span>ms
+        </div>
+        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Worst:</span> <span id="frameTimeMax">0.00</span>ms
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px;">
+          <span>Variance:</span> <span id="frameTimeVariance">0.00</span>ms
+        </div>
+      </div>
       
       <div style="margin-bottom: 12px;">
         <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">Canvas Resolution</h3>
@@ -297,57 +345,109 @@ class UIControls {
   }
   
   private updateMetrics(): void {
-    const metrics = this.engine.getMetrics();
+    const perfMonitorMetrics = this.engine.performanceMonitor.getMetrics();
+    const scenePerfMetrics = (this.engine as any).currentScene?.perfMetrics;
     
-    document.getElementById('fps')!.textContent = Math.round(metrics.fps).toString();
-    document.getElementById('frameTime')!.textContent = metrics.frameTime.toFixed(2);
-    document.getElementById('quality')!.textContent = metrics.quality.toUpperCase();
+    // Frame Metrics
+    document.getElementById('fps')!.textContent = Math.round(perfMonitorMetrics.fps).toString();
+    document.getElementById('frameTime')!.textContent = perfMonitorMetrics.frameTime.toFixed(2);
+    document.getElementById('quality')!.textContent = perfMonitorMetrics.quality.toUpperCase();
     
-    document.getElementById('updateTotal')!.textContent = metrics.updateTotal.toFixed(2);
-    document.getElementById('updatePhysics')!.textContent = metrics.updatePhysics.toFixed(2);
-    document.getElementById('updateAnimation')!.textContent = metrics.updateAnimation.toFixed(2);
-    document.getElementById('updateEntitySync')!.textContent = metrics.updateEntitySync.toFixed(2);
-    document.getElementById('customUpdateCount')!.textContent = metrics.customUpdateCount.toString();
+    // Update Breakdown (from scene)
+    if (scenePerfMetrics) {
+      document.getElementById('updateTotal')!.textContent = scenePerfMetrics.updateTotal.toFixed(2);
+      document.getElementById('updatePhysics')!.textContent = scenePerfMetrics.updatePhysics.toFixed(2);
+      document.getElementById('updateAnimation')!.textContent = scenePerfMetrics.updateAnimation.toFixed(2);
+      document.getElementById('updateEntitySync')!.textContent = scenePerfMetrics.updateEntitySync.toFixed(2);
+      document.getElementById('customUpdateCount')!.textContent = scenePerfMetrics.customUpdateCount.toString();
+    }
     
-    document.getElementById('renderTotal')!.textContent = metrics.renderTotal.toFixed(2);
-    document.getElementById('renderBatch')!.textContent = metrics.renderBatch.toFixed(2);
-    document.getElementById('renderCustom')!.textContent = metrics.renderCustom.toFixed(2);
-    document.getElementById('drawCalls')!.textContent = metrics.drawCalls.toString();
+    // Render Breakdown (from scene)
+    if (scenePerfMetrics) {
+      document.getElementById('renderTotal')!.textContent = scenePerfMetrics.renderTotal.toFixed(2);
+      document.getElementById('renderBatch')!.textContent = scenePerfMetrics.renderBatch.toFixed(2);
+      document.getElementById('renderCustom')!.textContent = scenePerfMetrics.renderCustom.toFixed(2);
+    }
+    document.getElementById('drawCalls')!.textContent = perfMonitorMetrics.drawCalls.toString();
     
-    document.getElementById('ecsActive')!.textContent = metrics.ecsActiveEntities.toLocaleString();
-    document.getElementById('ecsTotal')!.textContent = metrics.ecsTotalEntities.toLocaleString();
-    document.getElementById('memory')!.textContent = metrics.memory.toFixed(1);
+    // ECS Metrics (from scene)
+    if (scenePerfMetrics) {
+      document.getElementById('ecsActive')!.textContent = scenePerfMetrics.ecsActiveEntities.toLocaleString();
+      document.getElementById('ecsTotal')!.textContent = scenePerfMetrics.ecsTotalEntities.toLocaleString();
+      
+      const efficiency = scenePerfMetrics.ecsTotalEntities > 0 
+        ? (scenePerfMetrics.ecsActiveEntities / scenePerfMetrics.ecsTotalEntities * 100).toFixed(0)
+        : '100';
+      document.getElementById('ecsEfficiency')!.textContent = efficiency;
+    }
+    document.getElementById('memory')!.textContent = perfMonitorMetrics.memory.toFixed(1);
     
-    const efficiency = metrics.ecsTotalEntities > 0 
-      ? (metrics.ecsActiveEntities / metrics.ecsTotalEntities * 100).toFixed(0)
-      : '100';
-    document.getElementById('ecsEfficiency')!.textContent = efficiency;
+    // Advanced Metrics
+    document.getElementById('verticesRendered')!.textContent = perfMonitorMetrics.verticesRendered.toLocaleString();
+    document.getElementById('trianglesRendered')!.textContent = perfMonitorMetrics.trianglesRendered.toLocaleString();
+    document.getElementById('batchEfficiency')!.textContent = (perfMonitorMetrics.batchEfficiency * 100).toFixed(1);
+    document.getElementById('bufferUploadSize')!.textContent = perfMonitorMetrics.bufferUploadSize.toFixed(2);
+    document.getElementById('stateChanges')!.textContent = perfMonitorMetrics.stateChanges.toString();
+    document.getElementById('timePerEntity')!.textContent = perfMonitorMetrics.timePerEntity.toFixed(2);
+    document.getElementById('bottleneck')!.textContent = perfMonitorMetrics.bottleneck.toUpperCase();
+    document.getElementById('performanceScore')!.textContent = Math.round(perfMonitorMetrics.performanceScore).toString();
     
+    // Frame Pacing
+    document.getElementById('frameTimeMin')!.textContent = perfMonitorMetrics.frameTimeMin.toFixed(2);
+    document.getElementById('frameTimeAvg')!.textContent = perfMonitorMetrics.frameTime.toFixed(2);
+    document.getElementById('frameTimeMax')!.textContent = perfMonitorMetrics.frameTimeMax.toFixed(2);
+    document.getElementById('frameTimeVariance')!.textContent = perfMonitorMetrics.frameTimeVariance.toFixed(2);
+    
+    // Color coding for FPS
     const fpsElement = document.getElementById('fps')!;
-    if (metrics.fps >= 58) {
+    if (perfMonitorMetrics.fps >= 58) {
       fpsElement.style.color = '#00FF00';
-    } else if (metrics.fps >= 45) {
+    } else if (perfMonitorMetrics.fps >= 45) {
       fpsElement.style.color = '#FFFF00';
     } else {
       fpsElement.style.color = '#FF0000';
     }
     
-    const updateElement = document.getElementById('updateTotal')!;
-    if (metrics.updateTotal < 5) {
-      updateElement.style.color = '#00FF00';
-    } else if (metrics.updateTotal < 10) {
-      updateElement.style.color = '#FFFF00';
-    } else {
-      updateElement.style.color = '#FF0000';
+    // Color coding for bottleneck
+    const bottleneckElement = document.getElementById('bottleneck')!;
+    switch (perfMonitorMetrics.bottleneck) {
+      case 'balanced':
+        bottleneckElement.style.color = '#00FF00';
+        break;
+      case 'cpu':
+        bottleneckElement.style.color = '#FFFF00';
+        break;
+      case 'gpu':
+        bottleneckElement.style.color = '#FF8000';
+        break;
+      case 'memory':
+        bottleneckElement.style.color = '#FF0000';
+        break;
     }
     
-    const renderElement = document.getElementById('renderTotal')!;
-    if (metrics.renderTotal < 5) {
-      renderElement.style.color = '#00FF00';
-    } else if (metrics.renderTotal < 10) {
-      renderElement.style.color = '#FFFF00';
+    // Color coding for performance score
+    const scoreElement = document.getElementById('performanceScore')!;
+    const score = perfMonitorMetrics.performanceScore;
+    if (score >= 90) {
+      scoreElement.style.color = '#00FF00';
+    } else if (score >= 70) {
+      scoreElement.style.color = '#FFFF00';
+    } else if (score >= 50) {
+      scoreElement.style.color = '#FF8000';
     } else {
-      renderElement.style.color = '#FF0000';
+      scoreElement.style.color = '#FF0000';
+    }
+    
+    // Update Total color coding
+    const updateElement = document.getElementById('updateTotal')!;
+    if (scenePerfMetrics) {
+      if (scenePerfMetrics.updateTotal < 5) {
+        updateElement.style.color = '#00FF00';
+      } else if (scenePerfMetrics.updateTotal < 10) {
+        updateElement.style.color = '#FFFF00';
+      } else {
+        updateElement.style.color = '#FF0000';
+      }
     }
   }
 }

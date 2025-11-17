@@ -3,6 +3,8 @@
  * High-performance WebGL rendering with automatic batching
  */
 
+import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
+
 export interface Sprite {
   x: number;
   y: number;
@@ -40,6 +42,9 @@ export class WebGLBatchRenderer {
   private useTextureUniformLoc: WebGLUniformLocation | null = null;
   private lastTextureState: number = -1; // Track if texture uniform changed
 
+  // Performance monitoring
+  private perfMonitor: PerformanceMonitor | null = null;
+
   constructor(canvas: HTMLCanvasElement, useWebGL2: boolean = true) {
     const gl = useWebGL2 
       ? canvas.getContext('webgl2', { alpha: false, antialias: false, premultipliedAlpha: false })
@@ -72,6 +77,13 @@ export class WebGLBatchRenderer {
     this.initializeRotationCache();
     
     this.initialize();
+  }
+
+  setPerformanceMonitor(monitor: PerformanceMonitor | null): void {
+    this.perfMonitor = monitor;
+    if (monitor) {
+      monitor.setMaxBatchSize(this.maxBatchSize);
+    }
   }
 
   /**
@@ -355,16 +367,33 @@ export class WebGLBatchRenderer {
     
     const gl = this.gl;
     
+    const vertexDataSize = this.vertexCount * 8 * 4; // 8 floats per vertex, 4 bytes per float
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.batchVertices.subarray(0, this.vertexCount * 8));
+    
+    // Record buffer upload for performance monitoring
+    if (this.perfMonitor) {
+      this.perfMonitor.recordBufferUpload(vertexDataSize);
+      this.perfMonitor.recordVertices(this.vertexCount);
+      this.perfMonitor.recordStateChange(); // Buffer update is a state change
+    }
     
     const useTexture = this.currentTexture ? 1 : 0;
     if (useTexture !== this.lastTextureState) {
       gl.uniform1i(this.useTextureUniformLoc, useTexture);
       this.lastTextureState = useTexture;
+      if (this.perfMonitor) {
+        this.perfMonitor.recordStateChange(); // Uniform update is a state change
+      }
     }
     
     const indexCount = (this.vertexCount / 4) * 6;
     gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
+    
+    // Record rendering metrics
+    if (this.perfMonitor) {
+      this.perfMonitor.recordIndices(indexCount);
+      this.perfMonitor.recordBatch(this.vertexCount / 4); // sprites in this batch
+    }
     
     this.drawCallCount++;
     this.vertexCount = 0;
