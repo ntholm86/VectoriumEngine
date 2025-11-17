@@ -568,6 +568,8 @@ export class WebGLBatchRenderer {
    * CRITICAL OPTIMIZATION: Bulk render from ECS arrays
    * Eliminates 100k+ function calls by processing arrays directly
    * This is 10-20x faster than calling drawSprite() for each entity
+   * 
+   * 🔥 OPTIMIZED: Hoisted constants and reduced calculations per sprite
    */
   drawBulk(
     posX: Float32Array,
@@ -583,23 +585,24 @@ export class WebGLBatchRenderer {
     FLAG_VISIBLE: number
   ): void {
     const COLOR_NORM = 1.0 / 255.0;
+    const HALF = 0.5;  // Hoist constant
     
     for (let start = 0; start < count; start += this.maxBatchSize) {
       const end = Math.min(start + this.maxBatchSize, count);
       const chunkSize = end - start;
+      let visibleCount = 0;  // Track actual visible entities
       
       for (let i = start; i < end; i++) {
         if ((flags[i] & FLAG_VISIBLE) === 0) continue;
         
         const x = posX[i];
         const y = posY[i];
-        const size = sizes[i];
+        const hw = sizes[i] * HALF;  // Use hoisted constant
         const rotDeg = rotation[i];
         
         const cos = this.cosCache[rotDeg];
         const sin = this.sinCache[rotDeg];
         
-        const hw = size * 0.5;
         const hwCos = hw * cos;
         const hwSin = hw * sin;
         
@@ -617,7 +620,8 @@ export class WebGLBatchRenderer {
         const b = colorB[i] * COLOR_NORM;
         const a = alphas[i];
         
-        let offset = (this.vertexCount + (i - start) * 4) * 8;
+        let offset = (this.vertexCount + visibleCount * 4) * 8;  // Use visibleCount instead of (i - start)
+        visibleCount++;  // Increment for each visible entity
         
         this.batchVertices[offset++] = c0x;
         this.batchVertices[offset++] = c0y;
@@ -656,7 +660,7 @@ export class WebGLBatchRenderer {
         this.batchVertices[offset++] = a;
       }
       
-      this.vertexCount += chunkSize * 4;
+      this.vertexCount += visibleCount * 4;  // Use actual visible count, not chunk size
       this.flush();
     }
   }
