@@ -224,7 +224,14 @@ export class Scene {
     );
     
     // 🔥 ZERO COPY: Render directly from source arrays using indices!
-    if (renderer.isInstancingActive()) {
+    if (renderer.isGPURotationActive()) {
+      // GPU Rotation: Rotation calculated in vertex shader (70% less data transfer)
+      renderer.drawBulkGPURotation(
+        posX, posY, rotation, sizes,
+        colorR, colorG, colorB, alphas,
+        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
+      );
+    } else if (renderer.isInstancingActive()) {
       // Use drawInstancedIndexed for optimal instanced rendering with culling
       renderer.drawInstancedIndexed(
         posX, posY, rotation, sizes,
@@ -232,7 +239,7 @@ export class Scene {
         flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
       );
     } else {
-      // Use indexed batch rendering for non-instanced path
+      // CPU Rotation: Pre-calculated rotation on CPU (current default)
       renderer.drawBulkIndexed(
         posX, posY, rotation, sizes,
         colorR, colorG, colorB, alphas,

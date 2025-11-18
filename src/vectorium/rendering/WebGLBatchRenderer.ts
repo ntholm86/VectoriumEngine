@@ -4,6 +4,7 @@
  */
 
 import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
+import { GPURotationVertexLayout, GPURotationShaders, GPURotationInstanceBuilder } from './GPURotationVertexFormat';
 
 export interface Sprite {
   x: number;
@@ -42,6 +43,25 @@ export class WebGLBatchRenderer {
   private instanceSizeBuffer: WebGLBuffer | null = null;
   private instancedVertexBuffer: WebGLBuffer | null = null; // Single quad for all instances
   private ext: any = null; // ANGLE_instanced_arrays extension for WebGL1
+  
+  // GPU Rotation Mode (rotation calculated in vertex shader)
+  private gpuRotationEnabled = false; // Toggle between CPU and GPU rotation
+  private gpuRotationProgram: WebGLProgram | null = null;
+  private gpuRotationInstanceBuffer: WebGLBuffer | null = null;
+  private gpuRotationQuadBuffer: WebGLBuffer | null = null;
+  private gpuRotationIndexBuffer: WebGLBuffer | null = null;
+  private gpuRotationLayout: GPURotationVertexLayout = new GPURotationVertexLayout();
+  private gpuRotationBuilder: GPURotationInstanceBuilder = new GPURotationInstanceBuilder();
+  private gpuRotationInstances: Float32Array = new Float32Array(0); // Allocated on first use
+  
+  // GPU Rotation cached attribute locations (CRITICAL: getAttribLocation is expensive!)
+  private gpuRotationAttrCorner: number = -1;
+  private gpuRotationAttrPosition: number = -1;
+  private gpuRotationAttrSize: number = -1;
+  private gpuRotationAttrRotation: number = -1;
+  private gpuRotationAttrColor: number = -1;
+  private gpuRotationUniformProjection: WebGLUniformLocation | null = null;
+  private gpuRotationUniformTexture: WebGLUniformLocation | null = null;
   
   // Optimization warnings
   private enableWarnings = true;
@@ -150,6 +170,27 @@ export class WebGLBatchRenderer {
    */
   isInstancingActive(): boolean {
     return this.instancingSupported && this.instancingEnabled;
+  }
+  
+  /**
+   * Enable or disable GPU rotation mode (for A/B testing)
+   * GPU rotation: Calculates rotation in vertex shader (less data transfer)
+   * CPU rotation: Pre-calculates rotation on CPU (current default)
+   */
+  setGPURotationEnabled(enabled: boolean): void {
+    this.gpuRotationEnabled = enabled;
+    
+    if (enabled && !this.gpuRotationProgram) {
+      // Initialize GPU rotation mode on first use
+      this.initializeGPURotation();
+    }
+  }
+  
+  /**
+   * Check if GPU rotation is currently active
+   */
+  isGPURotationActive(): boolean {
+    return this.gpuRotationEnabled;
   }
 
   private initialize(): void {
@@ -320,6 +361,65 @@ export class WebGLBatchRenderer {
     this.instanceRotationBuffer = gl.createBuffer();
     this.instanceColorBuffer = gl.createBuffer();
     this.instanceSizeBuffer = gl.createBuffer();
+  }
+  
+  /**
+   * Initialize GPU rotation mode
+   * Creates shaders and buffers for GPU-side rotation calculations
+   * YAGNI: Only initialized on first use (lazy initialization)
+   */
+  private initializeGPURotation(): void {
+    const gl = this.gl;
+    
+    // Compile GPU rotation shaders
+    const vertexShader = this.compileShader(gl.VERTEX_SHADER, GPURotationShaders.getVertexShader());
+    const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, GPURotationShaders.getFragmentShader());
+    
+    // Create shader program
+    this.gpuRotationProgram = gl.createProgram()!;
+    gl.attachShader(this.gpuRotationProgram, vertexShader);
+    gl.attachShader(this.gpuRotationProgram, fragmentShader);
+    gl.linkProgram(this.gpuRotationProgram);
+    
+    if (!gl.getProgramParameter(this.gpuRotationProgram, gl.LINK_STATUS)) {
+      throw new Error('GPU rotation shader program failed to link');
+    }
+    
+    // CRITICAL: Cache all attribute/uniform locations now (expensive operations!)
+    this.gpuRotationAttrCorner = gl.getAttribLocation(this.gpuRotationProgram, 'a_corner');
+    this.gpuRotationAttrPosition = gl.getAttribLocation(this.gpuRotationProgram, 'a_position');
+    this.gpuRotationAttrSize = gl.getAttribLocation(this.gpuRotationProgram, 'a_size');
+    this.gpuRotationAttrRotation = gl.getAttribLocation(this.gpuRotationProgram, 'a_rotation');
+    this.gpuRotationAttrColor = gl.getAttribLocation(this.gpuRotationProgram, 'a_color');
+    this.gpuRotationUniformProjection = gl.getUniformLocation(this.gpuRotationProgram, 'u_projection');
+    this.gpuRotationUniformTexture = gl.getUniformLocation(this.gpuRotationProgram, 'u_useTexture');
+    
+    // Create shared quad vertices (corners for all instances)
+    const quadCorners = new Float32Array([
+      -1, -1,  // Bottom-left
+       1, -1,  // Bottom-right
+       1,  1,  // Top-right
+      -1,  1   // Top-left
+    ]);
+    
+    this.gpuRotationQuadBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationQuadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, quadCorners, gl.STATIC_DRAW);
+    
+    // Create index buffer for quad (2 triangles = 6 indices)
+    const quadIndices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    this.gpuRotationIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gpuRotationIndexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIndices, gl.STATIC_DRAW);
+    
+    // Create instance buffer (will be filled during rendering)
+    this.gpuRotationInstanceBuffer = gl.createBuffer();
+    
+    // Pre-allocate instance buffer for maxBatchSize
+    const bufferSize = this.gpuRotationLayout.calculateBufferSize(this.maxBatchSize);
+    this.gpuRotationInstances = new Float32Array(bufferSize);
+    
+    console.log('✅ GPU Rotation Mode initialized - Attribute locations cached');
   }
 
   begin(width: number, height: number): void {
@@ -770,6 +870,153 @@ export class WebGLBatchRenderer {
       
       this.vertexCount += visibleCount * 4;
       this.flush();
+    }
+  }
+  
+  /**
+   * Draw entities using GPU rotation (rotation calculated in vertex shader)
+   * 70% less data transfer: 24 bytes per sprite vs 80 bytes (CPU rotation)
+   * Single vertex per sprite instead of 4 transformed corners
+   * 
+   * SOLID: Separate method for GPU rotation path (Single Responsibility)
+   * DDD: Works with domain model (GPURotationVertexLayout)
+   */
+  drawBulkGPURotation(
+    posX: Float32Array,
+    posY: Float32Array,
+    rotation: Uint16Array,
+    sizes: Float32Array,
+    colorR: Uint8Array,
+    colorG: Uint8Array,
+    colorB: Uint8Array,
+    alphas: Float32Array,
+    flags: Uint32Array,
+    indices: Uint32Array,
+    indexCount: number,
+    FLAG_VISIBLE: number
+  ): void {
+    const gl = this.gl;
+    
+    // Ensure GPU rotation is initialized
+    if (!this.gpuRotationProgram) {
+      this.initializeGPURotation();
+    }
+    
+    const HALF = 0.5;
+    const DEG_TO_RAD = Math.PI / 180;
+    
+    // Process in batches
+    for (let start = 0; start < indexCount; start += this.maxBatchSize) {
+      const end = Math.min(start + this.maxBatchSize, indexCount);
+      let instanceCount = 0;
+      let instanceOffset = 0;
+      
+      // Build instance buffer
+      for (let i = start; i < end; i++) {
+        const idx = indices[i];
+        if ((flags[idx] & FLAG_VISIBLE) === 0) continue;
+        
+        // Pack color as uint32
+        const rByte = colorR[idx];
+        const gByte = colorG[idx];
+        const bByte = colorB[idx];
+        const aByte = Math.floor(alphas[idx] * 255);
+        const packedColor = (rByte) | (gByte << 8) | (bByte << 16) | (aByte << 24);
+        
+        // Write instance data (6 floats per sprite)
+        instanceOffset = this.gpuRotationBuilder.writeInstance(
+          this.gpuRotationInstances,
+          instanceOffset,
+          posX[idx],
+          posY[idx],
+          sizes[idx] * HALF,  // halfWidth
+          sizes[idx] * HALF,  // halfHeight
+          rotation[idx] * DEG_TO_RAD,  // Convert degrees to radians
+          packedColor
+        );
+        
+        instanceCount++;
+      }
+      
+      if (instanceCount === 0) continue;
+      
+      // Upload instance data
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationInstanceBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, this.gpuRotationInstances.subarray(0, instanceCount * 6), gl.STREAM_DRAW);
+      
+      // Use GPU rotation shader
+      gl.useProgram(this.gpuRotationProgram);
+      
+      // Setup projection matrix
+      const projectionMatrix = new Float32Array([
+        2 / this.gl.canvas.width, 0, 0, 0,
+        0, -2 / this.gl.canvas.height, 0, 0,
+        0, 0, 1, 0,
+        -1, 1, 0, 1
+      ]);
+      const projectionLoc = gl.getUniformLocation(this.gpuRotationProgram!, 'u_projection');
+      gl.uniformMatrix4fv(projectionLoc, false, projectionMatrix);
+      
+      // Setup texture uniform
+      const useTextureLoc = gl.getUniformLocation(this.gpuRotationProgram!, 'u_useTexture');
+      gl.uniform1i(useTextureLoc, 0); // No texture for now
+      
+      // Bind quad corners (shared vertices)
+      const cornerLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_corner');
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationQuadBuffer);
+      gl.enableVertexAttribArray(cornerLoc);
+      gl.vertexAttribPointer(cornerLoc, 2, gl.FLOAT, false, 0, 0);
+      
+      // Bind instance buffer
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationInstanceBuffer);
+      const stride = this.gpuRotationLayout.getStride();
+      
+      // Setup per-instance attributes
+      const positionLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_position');
+      gl.enableVertexAttribArray(positionLoc);
+      gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, stride, this.gpuRotationLayout.getPositionByteOffset());
+      
+      const sizeLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_size');
+      gl.enableVertexAttribArray(sizeLoc);
+      gl.vertexAttribPointer(sizeLoc, 2, gl.FLOAT, false, stride, this.gpuRotationLayout.getSizeByteOffset());
+      
+      const rotationLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_rotation');
+      gl.enableVertexAttribArray(rotationLoc);
+      gl.vertexAttribPointer(rotationLoc, 1, gl.FLOAT, false, stride, this.gpuRotationLayout.getRotationByteOffset());
+      
+      const colorLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_color');
+      gl.enableVertexAttribArray(colorLoc);
+      gl.vertexAttribPointer(colorLoc, 4, gl.UNSIGNED_BYTE, true, stride, this.gpuRotationLayout.getColorByteOffset());
+      
+      // Enable instancing for per-instance attributes
+      const ext = this.ext || (gl as any);
+      ext.vertexAttribDivisor(positionLoc, 1);
+      ext.vertexAttribDivisor(sizeLoc, 1);
+      ext.vertexAttribDivisor(rotationLoc, 1);
+      ext.vertexAttribDivisor(colorLoc, 1);
+      
+      // Draw instanced
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gpuRotationIndexBuffer);
+      ext.drawElementsInstanced(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0, instanceCount);
+      
+      // Reset divisors
+      ext.vertexAttribDivisor(positionLoc, 0);
+      ext.vertexAttribDivisor(sizeLoc, 0);
+      ext.vertexAttribDivisor(rotationLoc, 0);
+      ext.vertexAttribDivisor(colorLoc, 0);
+      
+      this.drawCallCount++;
+      
+      // Performance tracking
+      if (this.perfMonitor) {
+        this.perfMonitor.recordGPURotationBatch(instanceCount);
+      }
+    }
+    
+    // Log GPU rotation stats for debugging
+    if (this.enableWarnings && !this.warnedAbout.has('gpu_rotation_stats')) {
+      console.log(`✅ GPU Rotation: Rendered ${indexCount} entities in ${Math.ceil(indexCount / this.maxBatchSize)} batches`);
+      this.warnedAbout.add('gpu_rotation_stats');
     }
   }
 
