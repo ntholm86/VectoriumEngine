@@ -435,6 +435,7 @@ export class Vectorium {
     // Initialize text renderer (uses same WebGL context, no overlay canvas)
     this.textRenderer = new TextRenderer(this.config.width, this.config.height);
     this.textRenderer.setGLContext(this.renderer.getContext());
+    this.textRenderer.setBatchRenderer(this.renderer);
     
     // Initialize performance monitor
     this.performanceMonitor = new PerformanceMonitor(

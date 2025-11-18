@@ -92,7 +92,7 @@ class ImmersiveScene extends Scene {
     this.setWorldBoundsMultiplier(1.0);
     
     // Spawn initial particles
-    this.spawnParticles(1000);
+    this.spawnParticles(10);
   }
   
   addEntities(count: number): void {
@@ -150,7 +150,7 @@ class ImmersiveScene extends Scene {
     super.render(renderer, textRenderer);
     
     // Render metrics and graphs in-canvas
-    this.renderMetrics(renderer);
+    this.renderMetrics(renderer, textRenderer);
     this.renderGraphs(renderer);
     this.renderControls(textRenderer, renderer);
   }
@@ -266,7 +266,7 @@ class ImmersiveScene extends Scene {
     });
   }
   
-  private renderMetrics(renderer: WebGLBatchRenderer): void {
+  private renderMetrics(renderer: WebGLBatchRenderer, textRenderer: TextRenderer): void {
     if (!this.engineRef) return;
     
     const metrics = this.engineRef.performanceMonitor.getMetrics();
@@ -280,59 +280,90 @@ class ImmersiveScene extends Scene {
       this.updateTimeHistory.shift();
     }
     
-    // Note: Text rendering is not fully implemented yet
-    // For now, just draw colored rectangles as visual indicators
-    
-    const panelX = 10;
-    const panelY = 10;
-    const panelWidth = 280;
-    const panelHeight = 200;
+    const panelX = 20;
+    const panelY = 20;
+    const panelWidth = 350;
+    const panelHeight = 400;
     
     // Draw semi-transparent background panel
-    renderer.drawRect(panelX, panelY, panelWidth, panelHeight, { r: 0, g: 0, b: 0 }, 0.85);
-    // Green border
-    renderer.drawRect(panelX, panelY, panelWidth, 2, { r: 0, g: 255, b: 0 }, 1.0);
-    renderer.drawRect(panelX, panelY + panelHeight - 2, panelWidth, 2, { r: 0, g: 255, b: 0 }, 1.0);
-    renderer.drawRect(panelX, panelY, 2, panelHeight, { r: 0, g: 255, b: 0 }, 1.0);
-    renderer.drawRect(panelX + panelWidth - 2, panelY, 2, panelHeight, { r: 0, g: 255, b: 0 }, 1.0);
+    renderer.drawRect(panelX, panelY, panelWidth, panelHeight, { r: 0, g: 0, b: 0 }, 0.7);
     
-    // FPS indicator bar
+    // Bright green border (top, bottom, left, right)
+    renderer.drawRect(panelX, panelY, panelWidth, 4, { r: 0, g: 1, b: 0 }, 1.0);
+    renderer.drawRect(panelX, panelY + panelHeight - 4, panelWidth, 4, { r: 0, g: 1, b: 0 }, 1.0);
+    renderer.drawRect(panelX, panelY, 4, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
+    renderer.drawRect(panelX + panelWidth - 4, panelY, 4, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
+    
+    let yPos = panelY + 30;
+    
+    // Title bar with indicator dots (green = FPS, cyan = entities, yellow = update, magenta = render)
+    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 30, { r: 0, g: 0.5, b: 0 }, 0.9);
+    textRenderer.drawText('VECTORIUM ENGINE', panelX + 100, yPos + 7, { fontSize: 14, color: '#0f0' });
+    renderer.drawRect(panelX + 20, yPos + 10, 10, 10, { r: 0, g: 1, b: 0 }, 1.0); // Green dot
+    renderer.drawRect(panelX + 40, yPos + 10, 10, 10, { r: 0, g: 0.8, b: 1 }, 1.0); // Cyan dot
+    renderer.drawRect(panelX + 60, yPos + 10, 10, 10, { r: 1, g: 1, b: 0 }, 1.0); // Yellow dot
+    renderer.drawRect(panelX + 80, yPos + 10, 10, 10, { r: 1, g: 0, b: 1 }, 1.0); // Magenta dot
+    yPos += 50;
+    
+    // FPS Section (GREEN)
+    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
+    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 0, g: 1, b: 0 }, 1.0); // Label indicator
+    textRenderer.drawText('FPS', panelX + 30, yPos + 5, { fontSize: 11, color: '#0f0' });
     const fps = Math.round(metrics.fps);
-    const fpsBarWidth = (fps / 60) * (panelWidth - 40);
-    const fpsColor = fps >= 55 ? { r: 0, g: 255, b: 0 } : fps >= 30 ? { r: 255, g: 255, b: 0 } : { r: 255, g: 0, b: 0 };
-    renderer.drawRect(panelX + 20, panelY + 30, fpsBarWidth, 10, fpsColor, 1.0);
+    textRenderer.drawText(fps.toString(), panelX + panelWidth - 60, yPos + 5, { fontSize: 14, color: '#0f0' });
+    const fpsBarWidth = Math.min((fps / 60) * (panelWidth - 60), panelWidth - 60);
+    const fpsColor = fps >= 55 ? { r: 0, g: 1, b: 0 } : fps >= 30 ? { r: 1, g: 1, b: 0 } : { r: 1, g: 0, b: 0 };
+    renderer.drawRect(panelX + 30, yPos + 30, fpsBarWidth, 20, fpsColor, 0.9);
+    yPos += 70;
     
-    // Entity count indicator
+    // Entity Count Section (CYAN)
+    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
+    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 0, g: 0.8, b: 1 }, 1.0); // Label indicator
+    textRenderer.drawText('Entities', panelX + 30, yPos + 5, { fontSize: 11, color: '#0cf' });
     const entityCount = scenePerfMetrics.ecsActiveEntities || 0;
-    const entityBarHeight = Math.min((entityCount / 10000) * 100, 100);
-    renderer.drawRect(panelX + 20, panelY + panelHeight - 120 - entityBarHeight, 40, entityBarHeight, { r: 0, g: 200, b: 255 }, 0.8);
+    textRenderer.drawText(entityCount.toLocaleString(), panelX + panelWidth - 100, yPos + 5, { fontSize: 14, color: '#0cf' });
+    const entityBarWidth = Math.min((entityCount / 100000) * (panelWidth - 60), panelWidth - 60);
+    renderer.drawRect(panelX + 30, yPos + 30, entityBarWidth, 20, { r: 0, g: 0.8, b: 1 }, 0.9);
+    yPos += 70;
     
-    // Update time indicator
+    // Update Time Section (YELLOW)
+    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
+    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 1, g: 1, b: 0 }, 1.0); // Label indicator
+    textRenderer.drawText('Update', panelX + 30, yPos + 5, { fontSize: 11, color: '#ff0' });
     const updateTime = scenePerfMetrics.updateTotal || 0;
-    const updateBarHeight = Math.min((updateTime / 16.67) * 80, 80);
-    const updateColor = updateTime < 8 ? { r: 0, g: 255, b: 0 } : updateTime < 12 ? { r: 255, g: 255, b: 0 } : { r: 255, g: 0, b: 0 };
-    renderer.drawRect(panelX + 80, panelY + panelHeight - 120 - updateBarHeight, 40, updateBarHeight, updateColor, 0.8);
+    textRenderer.drawText(`${updateTime.toFixed(2)}ms`, panelX + panelWidth - 80, yPos + 5, { fontSize: 14, color: '#ff0' });
+    const updateBarWidth = Math.min((updateTime / 16.67) * (panelWidth - 60), panelWidth - 60);
+    const updateColor = updateTime < 8 ? { r: 0, g: 1, b: 0 } : updateTime < 12 ? { r: 1, g: 1, b: 0 } : { r: 1, g: 0, b: 0 };
+    renderer.drawRect(panelX + 30, yPos + 30, updateBarWidth, 20, updateColor, 0.9);
+    yPos += 70;
     
-    // Render time indicator  
+    // Render Time Section (MAGENTA)
+    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
+    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 1, g: 0, b: 1 }, 1.0); // Label indicator
+    textRenderer.drawText('Render', panelX + 30, yPos + 5, { fontSize: 11, color: '#f0f' });
     const renderTime = scenePerfMetrics.renderTotal || 0;
-    const renderBarHeight = Math.min((renderTime / 16.67) * 80, 80);
-    const renderColor = renderTime < 8 ? { r: 0, g: 255, b: 0 } : renderTime < 12 ? { r: 255, g: 255, b: 0 } : { r: 255, g: 0, b: 0 };
-    renderer.drawRect(panelX + 140, panelY + panelHeight - 120 - renderBarHeight, 40, renderBarHeight, renderColor, 0.8);
+    textRenderer.drawText(`${renderTime.toFixed(2)}ms`, panelX + panelWidth - 80, yPos + 5, { fontSize: 14, color: '#f0f' });
+    const renderBarWidth = Math.min((renderTime / 16.67) * (panelWidth - 60), panelWidth - 60);
+    const renderColor = renderTime < 8 ? { r: 0, g: 1, b: 0 } : renderTime < 12 ? { r: 1, g: 1, b: 0 } : { r: 1, g: 0, b: 0 };
+    renderer.drawRect(panelX + 30, yPos + 30, renderBarWidth, 20, renderColor, 0.9);
   }
   
   private renderGraphs(renderer: WebGLBatchRenderer): void {
     const graphX = 20;
-    const graphY = this.canvasHeight - 150;
-    const graphWidth = 300;
-    const graphHeight = 100;
+    const graphY = this.canvasHeight - 170;
+    const graphWidth = 400;
+    const graphHeight = 140;
     
-    // FPS Graph
+    // FPS Graph with border
+    renderer.drawRect(graphX - 3, graphY - 3, graphWidth + 6, graphHeight + 6, { r: 0, g: 1, b: 0 }, 1.0);
     this.drawGraph(renderer, graphX, graphY, graphWidth, graphHeight, 
-      this.fpsHistory, 0, 120, 0, 1, 0, 0.5);
+      this.fpsHistory, 0, 120, 0, 1, 0, 1.0);
     
-    // Update Time Graph  
-    this.drawGraph(renderer, graphX + graphWidth + 20, graphY, graphWidth, graphHeight,
-      this.updateTimeHistory, 0, 20, 1, 0.5, 0, 0.5);
+    // Update Time Graph with border
+    const graphX2 = graphX + graphWidth + 30;
+    renderer.drawRect(graphX2 - 3, graphY - 3, graphWidth + 6, graphHeight + 6, { r: 0, g: 1, b: 1 }, 1.0);
+    this.drawGraph(renderer, graphX2, graphY, graphWidth, graphHeight,
+      this.updateTimeHistory, 0, 20, 1, 1, 0, 0.9);
   }
   
   private drawGraph(renderer: WebGLBatchRenderer, x: number, y: number, width: number, height: number,
@@ -341,24 +372,24 @@ class ImmersiveScene extends Scene {
     // Background
     renderer.drawRect(x, y, width, height, { r: 0, g: 0, b: 0 }, 0.7);
     
-    // Draw lines
-    const step = width / (this.graphMaxSamples - 1);
-    for (let i = 0; i < data.length - 1; i++) {
-      const x1 = x + i * step;
-      const y1 = y + height - ((data[i] - min) / (max - min)) * height;
-      const x2 = x + (i + 1) * step;
-      const nextY = y + height - ((data[i + 1] - min) / (max - min)) * height;
-      
-      // Draw line as thin rect from (x1,y1) to (x2,nextY)
-      const len = Math.sqrt((x2 - x1) ** 2 + (nextY - y1) ** 2);
-      renderer.drawRect(x1, y1 - 1, len, 2, { r, g, b }, alpha);
+    // Draw data points as connected lines
+    if (data.length > 1) {
+      const step = width / (this.graphMaxSamples - 1);
+      for (let i = 0; i < data.length - 1; i++) {
+        const x1 = x + i * step;
+        const normalizedY1 = Math.max(0, Math.min(1, (data[i] - min) / (max - min)));
+        const y1 = y + height - (normalizedY1 * height);
+        
+        const x2 = x + (i + 1) * step;
+        const normalizedY2 = Math.max(0, Math.min(1, (data[i + 1] - min) / (max - min)));
+        const y2 = y + height - (normalizedY2 * height);
+        
+        // Draw vertical line segment (thicker for visibility)
+        const lineHeight = Math.abs(y2 - y1) + 3;
+        const lineY = Math.min(y1, y2);
+        renderer.drawRect(x1, lineY, 3, lineHeight, { r, g, b }, alpha);
+      }
     }
-    
-    // Border
-    renderer.drawRect(x, y, width, 2, { r, g, b }, 0.8);
-    renderer.drawRect(x, y + height - 2, width, 2, { r, g, b }, 0.8);
-    renderer.drawRect(x, y, 2, height, { r, g, b }, 0.8);
-    renderer.drawRect(x + width - 2, y, 2, height, { r, g, b }, 0.8);
   }
   
   private renderControls(textRenderer: TextRenderer, renderer: WebGLBatchRenderer): void {
@@ -491,7 +522,7 @@ function init() {
     debugMode: false
   });
   
-  const scene = new ImmersiveScene('main', 1000000);
+  const scene = new ImmersiveScene('main', 2000000);
   engine.registerScene('main', scene);
   
   engine.loadScene('main').then(() => {

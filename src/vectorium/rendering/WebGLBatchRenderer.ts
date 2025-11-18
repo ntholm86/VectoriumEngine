@@ -103,29 +103,41 @@ export class WebGLBatchRenderer {
   private initialize(): void {
     const gl = this.gl;
     
-    // Vertex shader (optimized for color-only rendering)
+    // Vertex shader (supports both colors and textures)
     const vertexShaderSource = `
       attribute vec2 a_position;
+      attribute vec2 a_texCoord;
       attribute vec4 a_color;
       
       uniform mat4 u_projection;
       
+      varying vec2 v_texCoord;
       varying vec4 v_color;
       
       void main() {
         gl_Position = u_projection * vec4(a_position, 0.0, 1.0);
+        v_texCoord = a_texCoord;
         v_color = a_color;
       }
     `;
     
-    // Fragment shader (optimized for color-only rendering)
+    // Fragment shader (supports both colors and textures)
     const fragmentShaderSource = `
       precision mediump float;
       
+      uniform sampler2D u_texture;
+      uniform float u_useTexture;
+      
+      varying vec2 v_texCoord;
       varying vec4 v_color;
       
       void main() {
-        gl_FragColor = v_color;
+        if (u_useTexture > 0.5) {
+          vec4 texColor = texture2D(u_texture, v_texCoord);
+          gl_FragColor = texColor * v_color;
+        } else {
+          gl_FragColor = v_color;
+        }
       }
     `;
     
@@ -196,6 +208,7 @@ export class WebGLBatchRenderer {
     
     // Setup attributes
     const positionLoc = gl.getAttribLocation(this.program!, 'a_position');
+    const texCoordLoc = gl.getAttribLocation(this.program!, 'a_texCoord');
     const colorLoc = gl.getAttribLocation(this.program!, 'a_color');
     
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
@@ -203,6 +216,11 @@ export class WebGLBatchRenderer {
     const stride = 24; // pos(8) + uv(8) + color(4) + padding(4)
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, stride, 0);
+    
+    if (texCoordLoc >= 0) {
+      gl.enableVertexAttribArray(texCoordLoc);
+      gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, stride, 8);
+    }
     
     gl.enableVertexAttribArray(colorLoc);
     gl.vertexAttribPointer(colorLoc, 4, gl.UNSIGNED_BYTE, true, stride, 16);
@@ -364,6 +382,16 @@ export class WebGLBatchRenderer {
     if (this.vertexCount === 0) return;
     
     const gl = this.gl;
+    
+    // Bind texture if available
+    if (this.currentTexture) {
+      gl.bindTexture(gl.TEXTURE_2D, this.currentTexture);
+      const useTextureLoc = gl.getUniformLocation(this.program!, 'u_useTexture');
+      gl.uniform1f(useTextureLoc, 1.0);
+    } else {
+      const useTextureLoc = gl.getUniformLocation(this.program!, 'u_useTexture');
+      gl.uniform1f(useTextureLoc, 0.0);
+    }
     
     // Upload vertex data (6 floats per vertex = 24 bytes)
     const vertexDataSize = this.vertexCount * 6 * 4; // 6 floats per vertex * 4 bytes per float

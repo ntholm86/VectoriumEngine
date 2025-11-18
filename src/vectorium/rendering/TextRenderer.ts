@@ -32,6 +32,7 @@ export class TextRenderer {
   private drawCallCount = 0;
   private textCache: Map<string, { texture: WebGLTexture; width: number; height: number }> = new Map();
   private gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
+  private batchRenderer: any = null; // WebGLBatchRenderer reference
 
   constructor(_width: number, _height: number) {
     // Create small offscreen canvas for text rasterization (NOT added to DOM)
@@ -64,6 +65,13 @@ export class TextRenderer {
   }
 
   /**
+   * Set batch renderer reference for rendering text quads
+   */
+  setBatchRenderer(renderer: any): void {
+    this.batchRenderer = renderer;
+  }
+
+  /**
    * No-op for compatibility (no overlay canvas to attach)
    */
   attachTo(_parent: HTMLElement): void {
@@ -86,13 +94,103 @@ export class TextRenderer {
 
   /**
    * Draw text as textured quad (rendered through WebGL batch)
-   * NOTE: Actual rendering must be done by caller using batch renderer
+   * Fully integrated with the optimization pipeline
    */
-  drawText(_text: string, _x: number, _y: number, _style?: TextStyle): void {
-    if (!this.gl) return;
+  drawText(text: string, x: number, y: number, style?: TextStyle): void {
+    if (!this.gl || !this.batchRenderer) return;
     
-    // For now, this is a simplified stub
-    // The actual implementation would rasterize text to texture and queue it
+    const fontSize = style?.fontSize || this.defaultStyle.fontSize;
+    const fontFamily = style?.fontFamily || this.defaultStyle.fontFamily;
+    const color = style?.color || this.defaultStyle.color;
+    const font = `${fontSize}px ${fontFamily}`;
+    
+    // Create cache key
+    const cacheKey = `${text}_${font}_${color}`;
+    
+    // Check cache
+    let textureInfo = this.textCache.get(cacheKey);
+    
+    if (!textureInfo) {
+      // Set up canvas for text rendering
+      this.ctx.font = font;
+      this.ctx.textAlign = 'left';
+      this.ctx.textBaseline = 'top';
+      
+      // Measure text
+      const metrics = this.ctx.measureText(text);
+      const textWidth = Math.ceil(metrics.width) + 4;
+      const textHeight = Math.ceil(fontSize * 1.5) + 4;
+      
+      // Resize canvas
+      this.offscreenCanvas.width = Math.max(textWidth, 16);
+      this.offscreenCanvas.height = Math.max(textHeight, 16);
+      
+      // Re-apply font after canvas resize
+      this.ctx.font = font;
+      this.ctx.textAlign = 'left';
+      this.ctx.textBaseline = 'top';
+      
+      // Clear background
+      this.ctx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+      
+      // Draw text
+      this.ctx.fillStyle = color;
+      this.ctx.fillText(text, 2, 2);
+      
+      // Create WebGL texture
+      const texture = this.gl.createTexture();
+      if (!texture) return;
+      
+      this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+      this.gl.texImage2D(
+        this.gl.TEXTURE_2D,
+        0,
+        this.gl.RGBA,
+        this.gl.RGBA,
+        this.gl.UNSIGNED_BYTE,
+        this.offscreenCanvas
+      );
+      
+      // Set texture parameters for crisp text
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+      
+      // Cache texture info
+      textureInfo = {
+        texture,
+        width: this.offscreenCanvas.width,
+        height: this.offscreenCanvas.height
+      };
+      
+      this.textCache.set(cacheKey, textureInfo);
+      
+      // Limit cache size
+      if (this.textCache.size > 100) {
+        const firstKey = this.textCache.keys().next().value as string;
+        const oldTexture = this.textCache.get(firstKey);
+        if (oldTexture && this.gl) {
+          this.gl.deleteTexture(oldTexture.texture);
+        }
+        this.textCache.delete(firstKey);
+      }
+    }
+    
+    // Render text quad through batch renderer (uses same optimization pipeline as sprites)
+    this.batchRenderer.drawSprite({
+      x: x + textureInfo.width / 2,
+      y: y + textureInfo.height / 2,
+      width: textureInfo.width,
+      height: textureInfo.height,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      alpha: 1,
+      texture: textureInfo.texture,
+      color: { r: 1, g: 1, b: 1 }
+    });
+    
     this.drawCallCount++;
   }
 
