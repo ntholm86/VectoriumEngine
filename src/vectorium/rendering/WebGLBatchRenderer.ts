@@ -26,9 +26,9 @@ export class WebGLBatchRenderer {
   private currentTexture: WebGLTexture | null = null;
   private batchVertices: Float32Array;
   private batchVerticesU8: Uint8Array;  // Uint8 view for byte-level color writes
-  private batchIndices: Uint16Array;
+  private batchIndices: Uint16Array | Uint32Array;
   private vertexCount = 0;
-  private maxBatchSize = 65000; // Configurable: 65k (max), 48k, 32k, 16k for testing
+  private maxBatchSize = 32768; // 32k quads = 128k vertices (sweet spot for performance)
   private drawCallCount = 0;
   
   // Optimization warnings
@@ -56,12 +56,19 @@ export class WebGLBatchRenderer {
     
     this.gl = gl as WebGLRenderingContext;
     
+    // Use Uint32Array for WebGL2 to support more than 16k quads per batch
+    const useUint32Indices = useWebGL2;
+    
     // Optimized format: 24 bytes per vertex (pos 8 + uv 8 + color 4 + padding 4)
     const bytesPerVertex = 24;
     const arrayBuffer = new ArrayBuffer(this.maxBatchSize * 4 * bytesPerVertex);
     this.batchVertices = new Float32Array(arrayBuffer);
     this.batchVerticesU8 = new Uint8Array(arrayBuffer);
-    this.batchIndices = new Uint16Array(this.maxBatchSize * 6);
+    
+    // Use Uint32Array for WebGL2 to support >65k vertices (16k+ quads)
+    this.batchIndices = useUint32Indices 
+      ? new Uint32Array(this.maxBatchSize * 6)
+      : new Uint16Array(this.maxBatchSize * 6);
     
     // Pre-fill indices (never changes)
     for (let i = 0; i < this.maxBatchSize; i++) {
@@ -134,7 +141,9 @@ export class WebGLBatchRenderer {
       void main() {
         if (u_useTexture > 0.5) {
           vec4 texColor = texture2D(u_texture, v_texCoord);
-          gl_FragColor = texColor * v_color;
+          // For text, use texture color directly (text is pre-colored)
+          // Multiply by v_color.a for alpha blending support
+          gl_FragColor = vec4(texColor.rgb, texColor.a * v_color.a);
         } else {
           gl_FragColor = v_color;
         }
@@ -405,7 +414,8 @@ export class WebGLBatchRenderer {
     }
     
     const indexCount = (this.vertexCount / 4) * 6;
-    gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
+    const indexType = this.batchIndices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+    gl.drawElements(gl.TRIANGLES, indexCount, indexType, 0);
     
     // Record rendering metrics
     if (this.perfMonitor) {

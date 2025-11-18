@@ -156,14 +156,17 @@ class ImmersiveScene extends Scene {
   }
   
   spawnParticles(count: number, x?: number, y?: number, effect?: string): void {
+    let successCount = 0;
+    
     for (let i = 0; i < count; i++) {
-      const particle = new Particle();
-      const px = x ?? Math.random() * this.canvasWidth;
-      const py = y ?? Math.random() * this.canvasHeight;
+      try {
+        const particle = new Particle();
+        const px = x ?? Math.random() * this.canvasWidth;
+        const py = y ?? Math.random() * this.canvasHeight;
+        
+        let angle, speed, size, color, lifetime;
       
-      let angle, speed, size, color, lifetime;
-      
-      switch (effect) {
+        switch (effect) {
         case 'flamethrower':
           angle = Math.random() * Math.PI * 0.5 - Math.PI * 0.25; // Cone shape
           speed = 300 + Math.random() * 400;
@@ -239,10 +242,19 @@ class ImmersiveScene extends Scene {
           size = 4 + Math.random() * 12;
           color = { r: Math.random(), g: Math.random(), b: Math.random() };
           lifetime = -1;
-      }
+        }
       
-      particle.spawn(px, py, Math.cos(angle) * speed, Math.sin(angle) * speed, size, color, lifetime);
-      this.addEntity(particle);
+        particle.spawn(px, py, Math.cos(angle) * speed, Math.sin(angle) * speed, size, color, lifetime);
+        this.addEntity(particle);
+        successCount++;
+      } catch (error: any) {
+        console.error(`❌ Failed to spawn particle ${i + 1}/${count}:`, error.message);
+        break; // Stop trying if we hit capacity
+      }
+    }
+    
+    if (successCount < count) {
+      console.warn(`⚠️ Only spawned ${successCount}/${count} particles. Total: ${this.entities.length}`);
     }
   }
   
@@ -282,70 +294,181 @@ class ImmersiveScene extends Scene {
     
     const panelX = 20;
     const panelY = 20;
-    const panelWidth = 350;
-    const panelHeight = 400;
+    const panelWidth = 280;
+    const panelHeight = 680;
     
     // Draw semi-transparent background panel
-    renderer.drawRect(panelX, panelY, panelWidth, panelHeight, { r: 0, g: 0, b: 0 }, 0.7);
+    renderer.drawRect(panelX, panelY, panelWidth, panelHeight, { r: 0, g: 0, b: 0 }, 0.75);
     
-    // Bright green border (top, bottom, left, right)
-    renderer.drawRect(panelX, panelY, panelWidth, 4, { r: 0, g: 1, b: 0 }, 1.0);
-    renderer.drawRect(panelX, panelY + panelHeight - 4, panelWidth, 4, { r: 0, g: 1, b: 0 }, 1.0);
-    renderer.drawRect(panelX, panelY, 4, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
-    renderer.drawRect(panelX + panelWidth - 4, panelY, 4, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
+    // Green border
+    renderer.drawRect(panelX, panelY, panelWidth, 3, { r: 0, g: 1, b: 0 }, 1.0);
+    renderer.drawRect(panelX, panelY + panelHeight - 3, panelWidth, 3, { r: 0, g: 1, b: 0 }, 1.0);
+    renderer.drawRect(panelX, panelY, 3, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
+    renderer.drawRect(panelX + panelWidth - 3, panelY, 3, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
     
-    let yPos = panelY + 30;
+    let yPos = panelY + 15;
+    const leftCol = panelX + 10;
+    const rightCol = panelX + panelWidth - 75;
+    const lineHeight = 20;
+    const sectionGap = 10;
     
-    // Title bar with indicator dots (green = FPS, cyan = entities, yellow = update, magenta = render)
-    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 30, { r: 0, g: 0.5, b: 0 }, 0.9);
-    textRenderer.drawText('VECTORIUM ENGINE', panelX + 100, yPos + 7, { fontSize: 14, color: '#0f0' });
-    renderer.drawRect(panelX + 20, yPos + 10, 10, 10, { r: 0, g: 1, b: 0 }, 1.0); // Green dot
-    renderer.drawRect(panelX + 40, yPos + 10, 10, 10, { r: 0, g: 0.8, b: 1 }, 1.0); // Cyan dot
-    renderer.drawRect(panelX + 60, yPos + 10, 10, 10, { r: 1, g: 1, b: 0 }, 1.0); // Yellow dot
-    renderer.drawRect(panelX + 80, yPos + 10, 10, 10, { r: 1, g: 0, b: 1 }, 1.0); // Magenta dot
-    yPos += 50;
+    // Title
+    textRenderer.drawText('VECTORIUM ENGINE', leftCol + 50, yPos, { fontSize: 12, color: '#0f0' });
+    yPos += 30;
     
-    // FPS Section (GREEN)
-    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
-    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 0, g: 1, b: 0 }, 1.0); // Label indicator
-    textRenderer.drawText('FPS', panelX + 30, yPos + 5, { fontSize: 11, color: '#0f0' });
+    // Frame Metrics Section
+    renderer.drawRect(leftCol, yPos - 5, panelWidth - 20, 2, { r: 0, g: 1, b: 0 }, 0.5);
+    yPos += 5;
+    textRenderer.drawText('FRAME METRICS', leftCol, yPos, { fontSize: 11, color: '#ff0' });
+    yPos += lineHeight;
+    
     const fps = Math.round(metrics.fps);
-    textRenderer.drawText(fps.toString(), panelX + panelWidth - 60, yPos + 5, { fontSize: 14, color: '#0f0' });
-    const fpsBarWidth = Math.min((fps / 60) * (panelWidth - 60), panelWidth - 60);
-    const fpsColor = fps >= 55 ? { r: 0, g: 1, b: 0 } : fps >= 30 ? { r: 1, g: 1, b: 0 } : { r: 1, g: 0, b: 0 };
-    renderer.drawRect(panelX + 30, yPos + 30, fpsBarWidth, 20, fpsColor, 0.9);
-    yPos += 70;
+    const fpsColor = fps >= 58 ? '#0f0' : fps >= 45 ? '#ff0' : '#f00';
+    textRenderer.drawText('FPS:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(fps.toString(), rightCol + 20, yPos, { fontSize: 10, color: fpsColor });
+    yPos += lineHeight;
     
-    // Entity Count Section (CYAN)
-    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
-    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 0, g: 0.8, b: 1 }, 1.0); // Label indicator
-    textRenderer.drawText('Entities', panelX + 30, yPos + 5, { fontSize: 11, color: '#0cf' });
-    const entityCount = scenePerfMetrics.ecsActiveEntities || 0;
-    textRenderer.drawText(entityCount.toLocaleString(), panelX + panelWidth - 100, yPos + 5, { fontSize: 14, color: '#0cf' });
-    const entityBarWidth = Math.min((entityCount / 100000) * (panelWidth - 60), panelWidth - 60);
-    renderer.drawRect(panelX + 30, yPos + 30, entityBarWidth, 20, { r: 0, g: 0.8, b: 1 }, 0.9);
-    yPos += 70;
+    textRenderer.drawText('Frame Time:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${metrics.frameTime.toFixed(2)}ms`, rightCol, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
     
-    // Update Time Section (YELLOW)
-    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
-    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 1, g: 1, b: 0 }, 1.0); // Label indicator
-    textRenderer.drawText('Update', panelX + 30, yPos + 5, { fontSize: 11, color: '#ff0' });
-    const updateTime = scenePerfMetrics.updateTotal || 0;
-    textRenderer.drawText(`${updateTime.toFixed(2)}ms`, panelX + panelWidth - 80, yPos + 5, { fontSize: 14, color: '#ff0' });
-    const updateBarWidth = Math.min((updateTime / 16.67) * (panelWidth - 60), panelWidth - 60);
-    const updateColor = updateTime < 8 ? { r: 0, g: 1, b: 0 } : updateTime < 12 ? { r: 1, g: 1, b: 0 } : { r: 1, g: 0, b: 0 };
-    renderer.drawRect(panelX + 30, yPos + 30, updateBarWidth, 20, updateColor, 0.9);
-    yPos += 70;
+    textRenderer.drawText('Quality:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(metrics.quality.toUpperCase(), rightCol + 10, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight + sectionGap;
     
-    // Render Time Section (MAGENTA)
-    renderer.drawRect(panelX + 10, yPos, panelWidth - 20, 60, { r: 0.1, g: 0.1, b: 0.1 }, 0.6);
-    renderer.drawRect(panelX + 15, yPos + 5, 8, 8, { r: 1, g: 0, b: 1 }, 1.0); // Label indicator
-    textRenderer.drawText('Render', panelX + 30, yPos + 5, { fontSize: 11, color: '#f0f' });
-    const renderTime = scenePerfMetrics.renderTotal || 0;
-    textRenderer.drawText(`${renderTime.toFixed(2)}ms`, panelX + panelWidth - 80, yPos + 5, { fontSize: 14, color: '#f0f' });
-    const renderBarWidth = Math.min((renderTime / 16.67) * (panelWidth - 60), panelWidth - 60);
-    const renderColor = renderTime < 8 ? { r: 0, g: 1, b: 0 } : renderTime < 12 ? { r: 1, g: 1, b: 0 } : { r: 1, g: 0, b: 0 };
-    renderer.drawRect(panelX + 30, yPos + 30, renderBarWidth, 20, renderColor, 0.9);
+    // Update Breakdown Section
+    renderer.drawRect(leftCol, yPos - 5, panelWidth - 20, 2, { r: 0, g: 1, b: 1 }, 0.5);
+    yPos += 5;
+    textRenderer.drawText('UPDATE BREAKDOWN', leftCol, yPos, { fontSize: 11, color: '#0ff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Total:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${(scenePerfMetrics.updateTotal || 0).toFixed(2)}ms`, rightCol, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Physics:', leftCol + 10, yPos, { fontSize: 9, color: '#aaa' });
+    textRenderer.drawText(`${(scenePerfMetrics.updatePhysics || 0).toFixed(2)}ms`, rightCol, yPos, { fontSize: 9, color: '#aaa' });
+    yPos += lineHeight - 3;
+    
+    textRenderer.drawText('Animation:', leftCol + 10, yPos, { fontSize: 9, color: '#aaa' });
+    textRenderer.drawText(`${(scenePerfMetrics.updateAnimation || 0).toFixed(2)}ms`, rightCol, yPos, { fontSize: 9, color: '#aaa' });
+    yPos += lineHeight - 3;
+    
+    textRenderer.drawText('Entity Sync:', leftCol + 10, yPos, { fontSize: 9, color: '#aaa' });
+    textRenderer.drawText(`${(scenePerfMetrics.updateEntitySync || 0).toFixed(2)}ms`, rightCol, yPos, { fontSize: 9, color: '#aaa' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Custom Updates:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText((scenePerfMetrics.customUpdateCount || 0).toString(), rightCol + 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight + sectionGap;
+    
+    // Render Breakdown Section
+    renderer.drawRect(leftCol, yPos - 5, panelWidth - 20, 2, { r: 1, g: 0, b: 1 }, 0.5);
+    yPos += 5;
+    textRenderer.drawText('RENDER BREAKDOWN', leftCol, yPos, { fontSize: 11, color: '#f0f' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Total:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${(scenePerfMetrics.renderTotal || 0).toFixed(2)}ms`, rightCol, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Batch:', leftCol + 10, yPos, { fontSize: 9, color: '#aaa' });
+    textRenderer.drawText(`${(scenePerfMetrics.renderBatch || 0).toFixed(2)}ms`, rightCol, yPos, { fontSize: 9, color: '#aaa' });
+    yPos += lineHeight - 3;
+    
+    textRenderer.drawText('Custom:', leftCol + 10, yPos, { fontSize: 9, color: '#aaa' });
+    textRenderer.drawText(`${(scenePerfMetrics.renderCustom || 0).toFixed(2)}ms`, rightCol, yPos, { fontSize: 9, color: '#aaa' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Draw Calls:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(metrics.drawCalls.toString(), rightCol + 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight + sectionGap;
+    
+    // ECS Stats Section
+    renderer.drawRect(leftCol, yPos - 5, panelWidth - 20, 2, { r: 1, g: 1, b: 0 }, 0.5);
+    yPos += 5;
+    textRenderer.drawText('ECS STATS', leftCol, yPos, { fontSize: 11, color: '#ff0' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Active:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText((scenePerfMetrics.ecsActiveEntities || 0).toLocaleString(), rightCol - 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Total:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText((scenePerfMetrics.ecsTotalEntities || 0).toLocaleString(), rightCol - 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    const ecsEff = scenePerfMetrics.ecsTotalEntities > 0 
+      ? (scenePerfMetrics.ecsActiveEntities / scenePerfMetrics.ecsTotalEntities * 100).toFixed(0)
+      : '100';
+    textRenderer.drawText('Efficiency:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${ecsEff}%`, rightCol + 15, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Memory:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${metrics.memory.toFixed(1)}MB`, rightCol, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight + sectionGap;
+    
+    // Advanced Metrics Section
+    renderer.drawRect(leftCol, yPos - 5, panelWidth - 20, 2, { r: 0, g: 1, b: 0.5 }, 0.5);
+    yPos += 5;
+    textRenderer.drawText('ADVANCED METRICS', leftCol, yPos, { fontSize: 11, color: '#0f8' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Vertices:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(metrics.verticesRendered.toLocaleString(), rightCol - 30, yPos, { fontSize: 9, color: '#fff' });
+    yPos += lineHeight - 3;
+    
+    textRenderer.drawText('Triangles:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(metrics.trianglesRendered.toLocaleString(), rightCol - 30, yPos, { fontSize: 9, color: '#fff' });
+    yPos += lineHeight - 3;
+    
+    textRenderer.drawText('Batch Eff:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${(metrics.batchEfficiency * 100).toFixed(1)}%`, rightCol + 10, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Buffer Upload:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${metrics.bufferUploadSize.toFixed(1)}MB`, rightCol, yPos, { fontSize: 9, color: '#fff' });
+    yPos += lineHeight - 3;
+    
+    textRenderer.drawText('State Changes:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(metrics.stateChanges.toString(), rightCol + 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Time/Entity:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${metrics.timePerEntity.toFixed(3)}ms`, rightCol, yPos, { fontSize: 9, color: '#fff' });
+    yPos += lineHeight;
+    
+    const bottleneckColor = metrics.bottleneck === 'balanced' ? '#0f0' : metrics.bottleneck === 'cpu' ? '#ff0' : '#f80';
+    textRenderer.drawText('Bottleneck:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(metrics.bottleneck.toUpperCase(), rightCol + 5, yPos, { fontSize: 10, color: bottleneckColor });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Perf Score:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(Math.round(metrics.performanceScore).toString(), rightCol + 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight + sectionGap;
+    
+    // Culling Metrics Section
+    const inFrustum = metrics.entitiesInFrustum || 0;
+    const culled = metrics.entitiesCulled || 0;
+    const cullingEff = metrics.cullingEfficiency || 0;
+    
+    renderer.drawRect(leftCol, yPos - 5, panelWidth - 20, 2, { r: 1, g: 0.5, b: 0 }, 0.5);
+    yPos += 5;
+    textRenderer.drawText('CULLING METRICS', leftCol, yPos, { fontSize: 11, color: '#f80' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('In Frustum:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(inFrustum.toLocaleString(), rightCol - 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    textRenderer.drawText('Culled:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(culled.toLocaleString(), rightCol - 20, yPos, { fontSize: 10, color: '#fff' });
+    yPos += lineHeight;
+    
+    const cullingColor = cullingEff > 50 ? '#0f0' : cullingEff > 20 ? '#ff0' : '#f80';
+    textRenderer.drawText('Efficiency:', leftCol + 5, yPos, { fontSize: 10, color: '#fff' });
+    textRenderer.drawText(`${cullingEff.toFixed(1)}%`, rightCol + 10, yPos, { fontSize: 10, color: cullingColor });
   }
   
   private renderGraphs(renderer: WebGLBatchRenderer): void {
@@ -545,11 +668,22 @@ function setupControls(engine: Vectorium, scene: ImmersiveScene, canvas: HTMLCan
   let mouseY = 0;
   let currentEffect = 'normal';
   
+  // Convert screen coordinates to canvas-relative coordinates
+  const screenToCanvas = (screenX: number, screenY: number) => {
+    const rect = canvas.getBoundingClientRect();
+    return { 
+      x: screenX - rect.left, 
+      y: screenY - rect.top 
+    };
+  };
+  
   // Mouse tracking
   canvas.addEventListener('mousedown', (e) => {
     mouseDown = true;
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+    const canvasPos = screenToCanvas(e.clientX, e.clientY);
+    mouseX = canvasPos.x;
+    mouseY = canvasPos.y;
+    console.log(`Mouse down at canvas: (${mouseX.toFixed(1)}, ${mouseY.toFixed(1)})`);
   });
   
   canvas.addEventListener('mouseup', () => {
@@ -557,8 +691,9 @@ function setupControls(engine: Vectorium, scene: ImmersiveScene, canvas: HTMLCan
   });
   
   canvas.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+    const canvasPos = screenToCanvas(e.clientX, e.clientY);
+    mouseX = canvasPos.x;
+    mouseY = canvasPos.y;
   });
   
   // Mouse spray effect
