@@ -713,6 +713,13 @@ export class Vectorium {
       this.currentScene.setWarningsEnabled(enabled);
     }
   }
+  
+  /**
+   * Get the WebGL renderer instance for advanced configuration
+   */
+  getRenderer(): WebGLBatchRenderer {
+    return this.renderer;
+  }
 
   destroy(): void {
     this.stop();

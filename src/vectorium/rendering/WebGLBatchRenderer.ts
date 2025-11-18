@@ -30,7 +30,7 @@ export class WebGLBatchRenderer {
   private batchVerticesU8: Uint8Array;  // Uint8 view for byte-level color writes
   private batchIndices: Uint16Array;
   private vertexCount = 0;
-  private maxBatchSize = 65000; // Increased from 10k to 65k (max for Uint16Array indices)
+  private maxBatchSize = 65000; // Configurable: 65k (max), 48k, 32k, 16k for testing
   private drawCallCount = 0;
   
   // GPU Instancing support
@@ -92,9 +92,10 @@ export class WebGLBatchRenderer {
     // Check for instancing support (legacy code - not actively used)
     this.instancingSupported = this.checkInstancingSupport();
     
-    // Optimized format: 24 bytes per vertex (pos(8) + uv(8) + color(4) + padding(4))
-    // Using 6 floats per vertex for alignment, color written as 4 bytes at offset 16
-    const bytesPerVertex = 24;
+    // Optimized format: 16 bytes per vertex (pos(8) + color(4) + padding(4))
+    // NO TEXTURE COORDS - optimized for pure color rendering (textures can be added back later)
+    // Using 4 floats per vertex for alignment, color written as 4 bytes at offset 8
+    const bytesPerVertex = 16;
     const arrayBuffer = new ArrayBuffer(this.maxBatchSize * 4 * bytesPerVertex);
     this.batchVertices = new Float32Array(arrayBuffer);
     this.batchVerticesU32 = new Uint32Array(arrayBuffer);
@@ -196,40 +197,29 @@ export class WebGLBatchRenderer {
   private initialize(): void {
     const gl = this.gl;
     
-    // Vertex shader (proven stable)
+    // Vertex shader (optimized for color-only rendering)
     const vertexShaderSource = `
       attribute vec2 a_position;
-      attribute vec2 a_texCoord;
       attribute vec4 a_color;
       
       uniform mat4 u_projection;
       
-      varying vec2 v_texCoord;
       varying vec4 v_color;
       
       void main() {
         gl_Position = u_projection * vec4(a_position, 0.0, 1.0);
-        v_texCoord = a_texCoord;
         v_color = a_color;
       }
     `;
     
-    // Fragment shader
+    // Fragment shader (optimized for color-only rendering)
     const fragmentShaderSource = `
       precision mediump float;
       
-      varying vec2 v_texCoord;
       varying vec4 v_color;
       
-      uniform sampler2D u_texture;
-      uniform bool u_useTexture;
-      
       void main() {
-        if (u_useTexture) {
-          gl_FragColor = texture2D(u_texture, v_texCoord) * v_color;
-        } else {
-          gl_FragColor = v_color;
-        }
+        gl_FragColor = v_color;
       }
     `;
     
@@ -447,21 +437,17 @@ export class WebGLBatchRenderer {
     
     // Setup attributes
     const positionLoc = gl.getAttribLocation(this.program!, 'a_position');
-    const texCoordLoc = gl.getAttribLocation(this.program!, 'a_texCoord');
     const colorLoc = gl.getAttribLocation(this.program!, 'a_color');
     
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
     
-    const stride = 24; // pos(8) + uv(8) + color(4) + padding(4)
+    const stride = 16; // pos(8) + color(4) + padding(4)
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, stride, 0);
     
-    gl.enableVertexAttribArray(texCoordLoc);
-    gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, stride, 8);
-    
     gl.enableVertexAttribArray(colorLoc);
-    // Color as UNSIGNED_BYTE normalized (4 bytes at offset 16)
-    gl.vertexAttribPointer(colorLoc, 4, gl.UNSIGNED_BYTE, true, stride, 16);
+    // Color as UNSIGNED_BYTE normalized (4 bytes at offset 8)
+    gl.vertexAttribPointer(colorLoc, 4, gl.UNSIGNED_BYTE, true, stride, 8);
     
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
     
@@ -607,8 +593,8 @@ export class WebGLBatchRenderer {
     
     const gl = this.gl;
     
-    const vertexDataSize = this.vertexCount * 24; // 24 bytes per vertex
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.batchVertices.subarray(0, this.vertexCount * 6));
+    const vertexDataSize = this.vertexCount * 16; // 16 bytes per vertex
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.batchVertices.subarray(0, this.vertexCount * 4));
     
     // Record buffer upload for performance monitoring
     if (this.perfMonitor) {
@@ -649,6 +635,27 @@ export class WebGLBatchRenderer {
   
   setWarningsEnabled(enabled: boolean): void {
     this.enableWarnings = enabled;
+  }
+  
+  /**
+   * Set batch size for performance tuning
+   * @param size Batch size (max 65535 for Uint16Array indices)
+   * Common values: 16000, 32000, 48000, 65000
+   * Smaller = more draw calls but better GPU pipelining
+   * Larger = fewer draw calls but more stalling
+   */
+  setBatchSize(size: number): void {
+    const clampedSize = Math.min(65535, Math.max(1000, Math.floor(size)));
+    if (clampedSize !== this.maxBatchSize) {
+      console.log(`🔧 Batch size changed: ${this.maxBatchSize} → ${clampedSize}`);
+      this.maxBatchSize = clampedSize;
+      // Note: Buffer reallocation would be needed for smaller sizes
+      // Current implementation allows reducing size without realloc
+    }
+  }
+  
+  getBatchSize(): number {
+    return this.maxBatchSize;
   }
   
   clearWarnings(): void {
@@ -802,70 +809,65 @@ export class WebGLBatchRenderer {
         const hw = sizes[idx] * HALF;
         const rotDeg = rotation[idx];
         
-        // CPU rotation (keep proven approach - KISS)
+        // OPTIMIZED: Pre-calculate shared values once
         const cos = this.cosCache[rotDeg];
         const sin = this.sinCache[rotDeg];
         const hwCos = hw * cos;
         const hwSin = hw * sin;
         
-        const c0x = -hwCos + hwSin + x;
-        const c0y = -hwSin - hwCos + y;
-        const c1x = hwCos + hwSin + x;
-        const c1y = hwSin - hwCos + y;
-        const c2x = hwCos - hwSin + x;
-        const c2y = hwSin + hwCos + y;
-        const c3x = -hwCos - hwSin + x;
-        const c3y = -hwSin + hwCos + y;
+        // OPTIMIZED: Calculate corners inline (reduces temp variable overhead)
+        // 16-byte vertex format: 4 floats (pos(2) + padding(2))
+        let floatOffset = (this.vertexCount + visibleCount * 4) * 4;
+        const baseByteOffset = floatOffset * 4; // Convert to byte offset
+        visibleCount++;
         
-        // Color bytes (0-255)
+        // Color bytes (hoisted outside vertex loop)
         const rByte = colorR[idx];
         const gByte = colorG[idx];
         const bByte = colorB[idx];
         const aByte = Math.floor(alphas[idx] * 255);
         
-        // 24-byte vertex format: 6 floats (pos(2) + uv(2) + padding(2))
-        let floatOffset = (this.vertexCount + visibleCount * 4) * 6;
-        const baseByteOffset = floatOffset * 4; // Convert to byte offset
-        visibleCount++;
-        
-        // Unrolled for maximum performance
-        this.batchVertices[floatOffset++] = c0x; this.batchVertices[floatOffset++] = c0y;
-        this.batchVertices[floatOffset++] = 0; this.batchVertices[floatOffset++] = 0;
+        // Vertex 0 (top-left): position + skip padding
+        this.batchVertices[floatOffset++] = -hwCos + hwSin + x;
+        this.batchVertices[floatOffset++] = -hwSin - hwCos + y;
         floatOffset += 2; // Skip padding
-        this.batchVertices[floatOffset++] = c1x; this.batchVertices[floatOffset++] = c1y;
-        this.batchVertices[floatOffset++] = 1; this.batchVertices[floatOffset++] = 0;
+        // Vertex 1 (top-right)
+        this.batchVertices[floatOffset++] = hwCos + hwSin + x;
+        this.batchVertices[floatOffset++] = hwSin - hwCos + y;
         floatOffset += 2;
-        this.batchVertices[floatOffset++] = c2x; this.batchVertices[floatOffset++] = c2y;
-        this.batchVertices[floatOffset++] = 1; this.batchVertices[floatOffset++] = 1;
+        // Vertex 2 (bottom-right)
+        this.batchVertices[floatOffset++] = hwCos - hwSin + x;
+        this.batchVertices[floatOffset++] = hwSin + hwCos + y;
         floatOffset += 2;
-        this.batchVertices[floatOffset++] = c3x; this.batchVertices[floatOffset++] = c3y;
-        this.batchVertices[floatOffset++] = 0; this.batchVertices[floatOffset++] = 1;
+        // Vertex 3 (bottom-left)
+        this.batchVertices[floatOffset++] = -hwCos - hwSin + x;
+        this.batchVertices[floatOffset++] = -hwSin + hwCos + y;
         
-        // Write colors as bytes (4 bytes per vertex at offset 16, stride 24 bytes)
-        let colorByteOffset = baseByteOffset + 16;
+        // Write colors as bytes (4 bytes per vertex at offset 8, stride 16 bytes)
+        let colorByteOffset = baseByteOffset + 8;
         // Vertex 0
-        this.batchVerticesU8[colorByteOffset++] = rByte;
-        this.batchVerticesU8[colorByteOffset++] = gByte;
-        this.batchVerticesU8[colorByteOffset++] = bByte;
-        this.batchVerticesU8[colorByteOffset++] = aByte;
-        colorByteOffset += 20; // Skip to next vertex (16 bytes floats + 4 bytes padding)
+        this.batchVerticesU8[colorByteOffset] = rByte;
+        this.batchVerticesU8[colorByteOffset + 1] = gByte;
+        this.batchVerticesU8[colorByteOffset + 2] = bByte;
+        this.batchVerticesU8[colorByteOffset + 3] = aByte;
+        colorByteOffset += 16; // Next vertex
         // Vertex 1
-        this.batchVerticesU8[colorByteOffset++] = rByte;
-        this.batchVerticesU8[colorByteOffset++] = gByte;
-        this.batchVerticesU8[colorByteOffset++] = bByte;
-        this.batchVerticesU8[colorByteOffset++] = aByte;
-        colorByteOffset += 20;
+        this.batchVerticesU8[colorByteOffset] = rByte;
+        this.batchVerticesU8[colorByteOffset + 1] = gByte;
+        this.batchVerticesU8[colorByteOffset + 2] = bByte;
+        this.batchVerticesU8[colorByteOffset + 3] = aByte;
+        colorByteOffset += 16;
         // Vertex 2
-        this.batchVerticesU8[colorByteOffset++] = rByte;
-        this.batchVerticesU8[colorByteOffset++] = gByte;
-        this.batchVerticesU8[colorByteOffset++] = bByte;
-        this.batchVerticesU8[colorByteOffset++] = aByte;
-        colorByteOffset += 20;
+        this.batchVerticesU8[colorByteOffset] = rByte;
+        this.batchVerticesU8[colorByteOffset + 1] = gByte;
+        this.batchVerticesU8[colorByteOffset + 2] = bByte;
+        this.batchVerticesU8[colorByteOffset + 3] = aByte;
+        colorByteOffset += 16;
         // Vertex 3
-        this.batchVerticesU8[colorByteOffset++] = rByte;
-        this.batchVerticesU8[colorByteOffset++] = gByte;
-        this.batchVerticesU8[colorByteOffset++] = bByte;
-        this.batchVerticesU8[colorByteOffset++] = aByte;
+        this.batchVerticesU8[colorByteOffset] = rByte;
+        this.batchVerticesU8[colorByteOffset + 1] = gByte;
+        this.batchVerticesU8[colorByteOffset + 2] = bByte;
+        this.batchVerticesU8[colorByteOffset + 3] = aByte;
       }
       
       this.vertexCount += visibleCount * 4;

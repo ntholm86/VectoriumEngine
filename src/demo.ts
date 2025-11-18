@@ -305,6 +305,23 @@ class UIControls {
         </button>
       </div>
       
+      <div style="margin-bottom: 12px; padding: 10px; background: rgba(255, 165, 0, 0.1); border-radius: 4px; border-left: 3px solid #FFA500;">
+        <h3 style="margin: 0 0 8px 0; color: #FFA500; font-size: 13px; font-weight: bold;">🔧 Batch Size Tuning</h3>
+        <div style="margin-bottom: 6px; font-size: 10px; color: #FFCC00; line-height: 1.4;">
+          Smaller = More draw calls, better GPU pipelining<br>
+          Larger = Fewer draw calls, possible stalling
+        </div>
+        <select id="batchSizeSelect" style="width: 100%; padding: 8px; background: #000; color: #FFA500; border: 1px solid #FFA500; border-radius: 4px; font-family: inherit; margin-bottom: 6px; font-size: 12px;">
+          <option value="16000">16K sprites/batch (more calls)</option>
+          <option value="32000">32K sprites/batch</option>
+          <option value="48000">48K sprites/batch</option>
+          <option value="65000" selected>65K sprites/batch (default)</option>
+        </select>
+        <div style="font-size: 10px; color: #AAA; text-align: center;">
+          Current: <span id="currentBatchSize" style="color: #FFA500; font-weight: bold;">65000</span>
+        </div>
+      </div>
+      
       <div style="margin-bottom: 12px;">
         <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">Entity Controls</h3>
         <div style="margin-bottom: 6px; font-size: 11px; color: #FFFF00;">
@@ -370,6 +387,19 @@ class UIControls {
         setTimeout(() => {
           this.engine.resize(window.screen.width, window.screen.height);
         }, 100);
+      }
+    });
+    
+    const batchSizeSelect = container.querySelector('#batchSizeSelect') as HTMLSelectElement;
+    batchSizeSelect.addEventListener('change', () => {
+      const batchSize = parseInt(batchSizeSelect.value, 10);
+      const renderer = this.engine.getRenderer();
+      if (renderer && 'setBatchSize' in renderer) {
+        (renderer as WebGLBatchRenderer).setBatchSize(batchSize);
+        const currentBatchSizeSpan = container.querySelector('#currentBatchSize');
+        if (currentBatchSizeSpan) {
+          currentBatchSizeSpan.textContent = batchSize.toString();
+        }
       }
     });
     
