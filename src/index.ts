@@ -7,6 +7,8 @@
 export { Vectorium, Scene } from './vectorium/core/Engine';
 export type { Entity } from './vectorium/core/Engine';
 
+export { Viewport } from './vectorium/core/Viewport';
+
 export { FeatureDetector } from './vectorium/core/FeatureDetector';
 export type { EngineConfig, BrowserCapabilities } from './vectorium/core/FeatureDetector';
 

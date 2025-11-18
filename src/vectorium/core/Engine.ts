@@ -10,6 +10,10 @@ import { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { BufferPool } from '../memory/Pooling';
 import { World, EntityId } from './World';
 import { Camera } from './Camera';
+import { Viewport } from './Viewport';
+
+// Re-export Viewport for convenience
+export { Viewport };
 
 export interface Entity {
   x: number;
@@ -34,16 +38,14 @@ export class Scene {
   // Track entities with custom render logic (rare!)
   private entitiesWithCustomRender: Entity[] = [];
   
-  // Canvas dimensions for camera and base physics bounds
-  protected canvasWidth = 1920;
-  protected canvasHeight = 1080;
+  // Viewport manages all resolution and world bounds
+  protected viewport: Viewport = Viewport.FullHD();
   
-  // World bounds multiplier (1.0 = viewport only, 10.0 = 10x world for frustum culling)
-  protected worldBoundsMultiplier = 1.0;
-  
-  // Computed world dimensions (canvas * multiplier)
-  protected get worldWidth(): number { return this.canvasWidth * this.worldBoundsMultiplier; }
-  protected get worldHeight(): number { return this.canvasHeight * this.worldBoundsMultiplier; }
+  // Convenience accessors (delegate to Viewport)
+  protected get canvasWidth(): number { return this.viewport.width; }
+  protected get canvasHeight(): number { return this.viewport.height; }
+  protected get worldWidth(): number { return this.viewport.worldWidth; }
+  protected get worldHeight(): number { return this.viewport.worldHeight; }
   
   // Camera for frustum culling
   private camera: Camera;
@@ -86,7 +88,7 @@ export class Scene {
     this.name = name;
     this.maxEntities = maxEntities;
     this.world = new World(maxEntities);
-    this.camera = new Camera(1920, 1080); // Default viewport
+    this.camera = new Camera(this.viewport.width, this.viewport.height); // Use Viewport dimensions
     
     // 🚀 Allocate culling buffers once (reused every frame!)
     this.visibleIndices = new Uint32Array(maxEntities);
@@ -285,13 +287,16 @@ export class Scene {
   }
   
   /**
-   * Update canvas dimensions for physics bounds and camera
+   * Update canvas/viewport dimensions
    * Should be called when canvas is resized
-   * Automatically updates world bounds based on current multiplier
+   * Preserves current world scale multiplier
    */
   setCanvasDimensions(width: number, height: number): void {
-    this.canvasWidth = width;
-    this.canvasHeight = height;
+    const worldScale = this.viewport.worldScale;
+    this.viewport = this.viewport.resize(width, height);
+    if (worldScale !== 1.0) {
+      this.viewport = this.viewport.setWorldScale(worldScale);
+    }
     this.camera.resize(width, height);
   }
   
@@ -301,7 +306,7 @@ export class Scene {
    * 10.0 = 10x world (entities can move offscreen, requires frustum culling)
    */
   setWorldBoundsMultiplier(multiplier: number): void {
-    this.worldBoundsMultiplier = multiplier;
+    this.viewport = this.viewport.setWorldScale(multiplier);
   }
   
   /**

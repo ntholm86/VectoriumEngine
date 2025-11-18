@@ -3,7 +3,7 @@
  * Showcases all engine capabilities with detailed metrics
  */
 
-import { Vectorium, Scene, Entity } from './vectorium/core/Engine';
+import { Vectorium, Scene, Entity, Viewport } from './vectorium/core/Engine';
 import { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';
 import { TextRenderer } from './vectorium/rendering/TextRenderer';
 
@@ -626,22 +626,13 @@ function initDemo() {
     border-radius: 4px;
   `;
   
-  // Calculate optimal canvas size based on viewport
+  // Calculate optimal canvas size based on viewport using Viewport helper
   const maxWidth = window.innerWidth - 450; // Account for UI panel
   const maxHeight = window.innerHeight - 40; // Account for margins
-  const aspectRatio = 16 / 9;
   
-  let canvasWidth = maxWidth;
-  let canvasHeight = maxWidth / aspectRatio;
-  
-  if (canvasHeight > maxHeight) {
-    canvasHeight = maxHeight;
-    canvasWidth = maxHeight * aspectRatio;
-  }
-  
-  // Round to integers to prevent canvas/wrapper size mismatches
-  canvasWidth = Math.floor(canvasWidth);
-  canvasHeight = Math.floor(canvasHeight);
+  const viewport = Viewport.fromAspectRatio(16 / 9, maxWidth, maxHeight);
+  const canvasWidth = viewport.width;
+  const canvasHeight = viewport.height;
   
   const canvasWrapper = document.createElement('div');
   canvasWrapper.style.cssText = `
