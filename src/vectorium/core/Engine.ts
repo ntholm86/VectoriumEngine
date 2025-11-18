@@ -51,8 +51,18 @@ export class Scene {
   private camera: Camera;
   private cullingEnabled = true;
   
-  // 🚀 PRE-ALLOCATED INDEX BUFFER (zero allocations per frame!)
+  // 🚀 PRE-ALLOCATED BUFFERS (zero allocations per frame!)
+  private maxEntities: number;
   private visibleIndices: Uint32Array;
+  private visPosX: Float32Array;
+  private visPosY: Float32Array;
+  private visRot: Uint16Array;
+  private visSizes: Float32Array;
+  private visColorR: Uint8Array;
+  private visColorG: Uint8Array;
+  private visColorB: Uint8Array;
+  private visAlphas: Float32Array;
+  private visFlags: Uint32Array;
   
   // Performance monitoring
   private enableWarnings = true;
@@ -196,20 +206,12 @@ export class Scene {
     const totalCount = this.world.getActiveCount();
     
     if (!this.cullingEnabled) {
-      // No culling - render all entities using best available method
-      if (renderer.isInstancingActive()) {
-        renderer.drawInstanced(
-          posX, posY, rotation, sizes,
-          colorR, colorG, colorB, alphas,
-          flags, totalCount, this.world.FLAG_VISIBLE
-        );
-      } else {
-        renderer.drawBulk(
-          posX, posY, rotation, sizes,
-          colorR, colorG, colorB, alphas,
-          flags, totalCount, this.world.FLAG_VISIBLE
-        );
-      }
+      // No culling - render all entities using batch rendering
+      renderer.drawBulk(
+        posX, posY, rotation, sizes,
+        colorR, colorG, colorB, alphas,
+        flags, totalCount, this.world.FLAG_VISIBLE
+      );
       return;
     }
     
@@ -224,28 +226,12 @@ export class Scene {
     );
     
     // 🔥 ZERO COPY: Render directly from source arrays using indices!
-    if (renderer.isGPURotationActive()) {
-      // GPU Rotation: Rotation calculated in vertex shader (70% less data transfer)
-      renderer.drawBulkGPURotation(
-        posX, posY, rotation, sizes,
-        colorR, colorG, colorB, alphas,
-        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
-      );
-    } else if (renderer.isInstancingActive()) {
-      // Use drawInstancedIndexed for optimal instanced rendering with culling
-      renderer.drawInstancedIndexed(
-        posX, posY, rotation, sizes,
-        colorR, colorG, colorB, alphas,
-        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
-      );
-    } else {
-      // CPU Rotation: Pre-calculated rotation on CPU (current default)
-      renderer.drawBulkIndexed(
-        posX, posY, rotation, sizes,
-        colorR, colorG, colorB, alphas,
-        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
-      );
-    }
+    // Batch rendering with frustum culling
+    renderer.drawBulkIndexed(
+      posX, posY, rotation, sizes,
+      colorR, colorG, colorB, alphas,
+      flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
+    );
     
     // Track culling stats (stored on scene for perf monitor access)
     (this as any).culledCount = totalCount - visibleCount;

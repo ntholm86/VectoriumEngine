@@ -127,7 +127,7 @@ export class FeatureDetector {
     try {
       const canvas = document.createElement('canvas');
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      if (gl) {
+      if (gl && 'getExtension' in gl) {
         const ext = gl.getExtension('ANGLE_instanced_arrays');
         return ext !== null;
       }

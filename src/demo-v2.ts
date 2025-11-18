@@ -536,6 +536,7 @@ class ImmersiveScene extends Scene {
       'C - Clear All Particles',
       'T - Toggle Throttling',
       'F - Toggle Frustum Culling',
+      'G - Toggle Vertex Pulling',
       'SPACE - Pause/Resume'
     ];
     
@@ -716,6 +717,14 @@ function setupControls(engine: Vectorium, scene: ImmersiveScene, canvas: HTMLCan
         const isLargeWorld = currentWorld > scene.canvasWidth * 2;
         scene.toggleFrustumCulling(!isLargeWorld);
         console.log(`Frustum culling ${!isLargeWorld ? 'ENABLED' : 'DISABLED'} - World: ${(scene as any).worldWidth}x${(scene as any).worldHeight}`);
+        break;
+      
+      // Toggle vertex pulling
+      case 'g':
+        const renderer = (engine as any).renderer;
+        const currentlyEnabled = renderer.isVertexPullingActive();
+        renderer.setVertexPullingEnabled(!currentlyEnabled);
+        console.log(`🚀 Vertex Pulling ${!currentlyEnabled ? 'ENABLED' : 'DISABLED'} - GPU-side vertex generation`);
         break;
       
       // Pause/Resume
