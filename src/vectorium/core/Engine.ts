@@ -51,18 +51,8 @@ export class Scene {
   private camera: Camera;
   private cullingEnabled = true;
   
-  // 🚀 PRE-ALLOCATED CULLING BUFFERS (zero allocations per frame!)
-  private maxEntities: number;
+  // 🚀 PRE-ALLOCATED INDEX BUFFER (zero allocations per frame!)
   private visibleIndices: Uint32Array;
-  private visPosX: Float32Array;
-  private visPosY: Float32Array;
-  private visRot: Uint16Array;
-  private visSizes: Float32Array;
-  private visColorR: Uint8Array;
-  private visColorG: Uint8Array;
-  private visColorB: Uint8Array;
-  private visAlphas: Float32Array;
-  private visFlags: Uint32Array;
   
   // Performance monitoring
   private enableWarnings = true;
@@ -233,29 +223,16 @@ export class Scene {
       this.visibleIndices
     );
     
-    // Render directly from source arrays using indices (NO COPY!)
+    // 🔥 ZERO COPY: Render directly from source arrays using indices!
     if (renderer.isInstancingActive()) {
-      // TODO: Add drawInstancedIndexed if needed
-      // For now, fall back to copy-based approach for instancing
-      for (let i = 0; i < visibleCount; i++) {
-        const idx = this.visibleIndices[i];
-        this.visPosX[i] = posX[idx];
-        this.visPosY[i] = posY[idx];
-        this.visRot[i] = rotation[idx];
-        this.visSizes[i] = sizes[idx];
-        this.visColorR[i] = colorR[idx];
-        this.visColorG[i] = colorG[idx];
-        this.visColorB[i] = colorB[idx];
-        this.visAlphas[i] = alphas[idx];
-        this.visFlags[i] = flags[idx];
-      }
-      renderer.drawInstanced(
-        this.visPosX, this.visPosY, this.visRot, this.visSizes,
-        this.visColorR, this.visColorG, this.visColorB, this.visAlphas,
-        this.visFlags, visibleCount, this.world.FLAG_VISIBLE
+      // Use drawInstancedIndexed for optimal instanced rendering with culling
+      renderer.drawInstancedIndexed(
+        posX, posY, rotation, sizes,
+        colorR, colorG, colorB, alphas,
+        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
       );
     } else {
-      // 🔥 ZERO COPY: Render directly using indices!
+      // Use indexed batch rendering for non-instanced path
       renderer.drawBulkIndexed(
         posX, posY, rotation, sizes,
         colorR, colorG, colorB, alphas,

@@ -899,6 +899,146 @@ export class WebGLBatchRenderer {
   }
 
   /**
+   * 🔥 ZERO-COPY INSTANCED RENDERING WITH INDEXED CULLING
+   * Renders visible entities directly using indices - no array copying!
+   * This is the fastest rendering path for culled entities.
+   */
+  drawInstancedIndexed(
+    posX: Float32Array,
+    posY: Float32Array,
+    rotation: Uint16Array,
+    sizes: Float32Array,
+    colorR: Uint8Array,
+    colorG: Uint8Array,
+    colorB: Uint8Array,
+    alphas: Float32Array,
+    flags: Uint32Array,
+    indices: Uint32Array,
+    indexCount: number,
+    FLAG_VISIBLE: number
+  ): void {
+    if (!this.isInstancingActive()) {
+      // Fallback to indexed batch rendering
+      this.drawBulkIndexed(posX, posY, rotation, sizes, colorR, colorG, colorB, alphas, flags, indices, indexCount, FLAG_VISIBLE);
+      return;
+    }
+    
+    const gl = this.gl;
+    const COLOR_NORM = 1.0 / 255.0;
+    const MAX_INSTANCES_PER_CALL = 65000;
+    
+    // Pre-allocate temp arrays (reuse across chunks if possible)
+    const tempPositions = new Float32Array(indexCount * 2);
+    const tempRotations = new Float32Array(indexCount);
+    const tempSizes = new Float32Array(indexCount);
+    const tempColors = new Float32Array(indexCount * 4);
+    
+    // Gather visible entity data using indices (single pass)
+    let visibleCount = 0;
+    for (let i = 0; i < indexCount; i++) {
+      const idx = indices[i];
+      if ((flags[idx] & FLAG_VISIBLE) === 0) continue;
+      
+      const offset2 = visibleCount * 2;
+      const offset4 = visibleCount * 4;
+      
+      tempPositions[offset2] = posX[idx];
+      tempPositions[offset2 + 1] = posY[idx];
+      tempRotations[visibleCount] = rotation[idx];
+      tempSizes[visibleCount] = sizes[idx];
+      tempColors[offset4] = colorR[idx] * COLOR_NORM;
+      tempColors[offset4 + 1] = colorG[idx] * COLOR_NORM;
+      tempColors[offset4 + 2] = colorB[idx] * COLOR_NORM;
+      tempColors[offset4 + 3] = alphas[idx];
+      
+      visibleCount++;
+    }
+    
+    if (visibleCount === 0) return;
+    
+    // Use instanced program
+    gl.useProgram(this.instancedProgram);
+    
+    // Setup projection
+    const width = gl.canvas.width;
+    const height = gl.canvas.height;
+    const projectionMatrix = new Float32Array([
+      2 / width, 0, 0, 0,
+      0, -2 / height, 0, 0,
+      0, 0, 1, 0,
+      -1, 1, 0, 1
+    ]);
+    const projLoc = gl.getUniformLocation(this.instancedProgram!, 'u_projection');
+    gl.uniformMatrix4fv(projLoc, false, projectionMatrix);
+    
+    // Bind quad vertices
+    const vertexLoc = gl.getAttribLocation(this.instancedProgram!, 'a_vertex');
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.instancedVertexBuffer);
+    gl.enableVertexAttribArray(vertexLoc);
+    gl.vertexAttribPointer(vertexLoc, 2, gl.FLOAT, false, 0, 0);
+    
+    // Get attribute locations
+    const posLoc = gl.getAttribLocation(this.instancedProgram!, 'a_position');
+    const rotLoc = gl.getAttribLocation(this.instancedProgram!, 'a_rotation');
+    const sizeLoc = gl.getAttribLocation(this.instancedProgram!, 'a_size');
+    const colorLoc = gl.getAttribLocation(this.instancedProgram!, 'a_color');
+    
+    // Enable attributes and set divisors
+    gl.enableVertexAttribArray(posLoc);
+    gl.enableVertexAttribArray(rotLoc);
+    gl.enableVertexAttribArray(sizeLoc);
+    gl.enableVertexAttribArray(colorLoc);
+    
+    this.setVertexAttribDivisor(posLoc, 1);
+    this.setVertexAttribDivisor(rotLoc, 1);
+    this.setVertexAttribDivisor(sizeLoc, 1);
+    this.setVertexAttribDivisor(colorLoc, 1);
+    
+    // Render in chunks
+    let totalDrawCalls = 0;
+    for (let start = 0; start < visibleCount; start += MAX_INSTANCES_PER_CALL) {
+      const end = Math.min(start + MAX_INSTANCES_PER_CALL, visibleCount);
+      const chunkSize = end - start;
+      
+      // Upload chunk data
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.instancePositionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, tempPositions.subarray(start * 2, end * 2), gl.STREAM_DRAW);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+      
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceRotationBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, tempRotations.subarray(start, end), gl.STREAM_DRAW);
+      gl.vertexAttribPointer(rotLoc, 1, gl.FLOAT, false, 0, 0);
+      
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceSizeBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, tempSizes.subarray(start, end), gl.STREAM_DRAW);
+      gl.vertexAttribPointer(sizeLoc, 1, gl.FLOAT, false, 0, 0);
+      
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceColorBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, tempColors.subarray(start * 4, end * 4), gl.STREAM_DRAW);
+      gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 0, 0);
+      
+      // Draw chunk
+      this.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, chunkSize);
+      totalDrawCalls++;
+    }
+    
+    // Track performance
+    this.drawCallCount += totalDrawCalls;
+    if (this.perfMonitor) {
+      this.perfMonitor.recordVertices(visibleCount * 4);
+      this.perfMonitor.recordIndices(visibleCount * 6);
+      this.perfMonitor.recordBatch(visibleCount);
+    }
+    
+    // Clean up
+    gl.disableVertexAttribArray(vertexLoc);
+    gl.disableVertexAttribArray(posLoc);
+    gl.disableVertexAttribArray(rotLoc);
+    gl.disableVertexAttribArray(sizeLoc);
+    gl.disableVertexAttribArray(colorLoc);
+  }
+
+  /**
    * Wrapper for vertex attrib divisor (WebGL2 vs WebGL1 extension)
    */
   private setVertexAttribDivisor(location: number, divisor: number): void {

@@ -55,6 +55,12 @@ export class World {
   // 🚀 WASM Physics Engine
   private wasmPhysics: WasmPhysics;
   
+  // 🚀 Pre-calculated sin/cos lookup tables (0-3599 = 0.0° to 359.9° in 0.1° increments)
+  // Eliminates expensive Math.sin/cos calls during animation updates
+  private static readonly SIN_TABLE_SIZE = 3600;
+  private static sinTable: Float32Array;
+  private static cosTable: Float32Array;
+  
   // Component flags (bitmask)
   readonly FLAG_ACTIVE = 1 << 0;
   readonly FLAG_VISIBLE = 1 << 1;
@@ -72,6 +78,17 @@ export class World {
   constructor(maxEntities: number = 200000) {
     this.maxEntities = maxEntities;
     this.wasmPhysics = new WasmPhysics();
+    
+    // Initialize sin/cos lookup tables (once per class)
+    if (!World.sinTable) {
+      World.sinTable = new Float32Array(World.SIN_TABLE_SIZE);
+      World.cosTable = new Float32Array(World.SIN_TABLE_SIZE);
+      for (let i = 0; i < World.SIN_TABLE_SIZE; i++) {
+        const rad = (i * 0.1 * Math.PI) / 180;
+        World.sinTable[i] = Math.sin(rad);
+        World.cosTable[i] = Math.cos(rad);
+      }
+    }
     
     // Allocate all arrays upfront (zero allocation during runtime)
     this.positionX = new Float32Array(maxEntities);
@@ -200,20 +217,42 @@ export class World {
     }
   }
   
+  /**
+   * Fast sin lookup using pre-calculated table
+   * @param radians Input in radians
+   */
+  private fastSin(radians: number): number {
+    // Convert radians to table index (0.1° increments)
+    const degrees = (radians * 180 / Math.PI) % 360;
+    const index = Math.floor((degrees < 0 ? degrees + 360 : degrees) * 10) % World.SIN_TABLE_SIZE;
+    return World.sinTable[index];
+  }
+  
+  /**
+   * Fast cos lookup using pre-calculated table
+   * @param radians Input in radians
+   */
+  private fastCos(radians: number): number {
+    // Convert radians to table index (0.1° increments)
+    const degrees = (radians * 180 / Math.PI) % 360;
+    const index = Math.floor((degrees < 0 ? degrees + 360 : degrees) * 10) % World.SIN_TABLE_SIZE;
+    return World.cosTable[index];
+  }
+  
   private handleComplexAnimation(i: number, dt: number, animType: number): void {
     switch (animType) {
       case this.ANIM_PULSE:
         this.pulseTime[i] += this.pulseSpeed[i] * dt;
-        this.size[i] = this.baseSize[i] + Math.sin(this.pulseTime[i]) * this.baseSize[i] * 0.5;
+        this.size[i] = this.baseSize[i] + this.fastSin(this.pulseTime[i]) * this.baseSize[i] * 0.5;
         break;
       case this.ANIM_WOBBLE:
         this.wobbleOffset[i] += this.wobbleSpeed[i] * dt;
-        this.velocityX[i] += Math.sin(this.wobbleOffset[i]) * 50 * dt;
-        this.velocityY[i] += Math.cos(this.wobbleOffset[i]) * 50 * dt;
+        this.velocityX[i] += this.fastSin(this.wobbleOffset[i]) * 50 * dt;
+        this.velocityY[i] += this.fastCos(this.wobbleOffset[i]) * 50 * dt;
         break;
       case this.ANIM_SPIN:
         const rotRad = (this.rotation[i] * Math.PI) / 180;
-        this.size[i] = this.baseSize[i] + Math.sin(rotRad) * this.baseSize[i] * 0.3;
+        this.size[i] = this.baseSize[i] + this.fastSin(rotRad) * this.baseSize[i] * 0.3;
         break;
       case this.ANIM_FADE:
         this.alpha[i] += this.fadeDirection[i] * 2 * dt;
