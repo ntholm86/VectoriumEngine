@@ -67,13 +67,8 @@ export class WebGLBatchRenderer {
     
     this.gl = gl as WebGLRenderingContext;
     
-    // Check for GPU instancing support
+    // Check for instancing support (legacy code - not actively used)
     this.instancingSupported = this.checkInstancingSupport();
-    if (this.instancingSupported) {
-      console.log('✅ GPU Instancing supported - will use single draw call for all entities!');
-    } else {
-      console.log('⚠️ GPU Instancing not supported - using batch rendering fallback');
-    }
     
     // Pre-allocate batch buffers (8 floats per vertex, 4 vertices per sprite)
     // Format: position(2) + texCoord(2) + color(4) = 8 floats
@@ -142,7 +137,6 @@ export class WebGLBatchRenderer {
       return;
     }
     this.instancingEnabled = enabled;
-    console.log(`GPU Instancing ${enabled ? 'ENABLED' : 'DISABLED'}`);
   }
 
   /**
@@ -320,8 +314,6 @@ export class WebGLBatchRenderer {
     this.instanceRotationBuffer = gl.createBuffer();
     this.instanceColorBuffer = gl.createBuffer();
     this.instanceSizeBuffer = gl.createBuffer();
-    
-    console.log('✅ GPU Instancing initialized successfully');
   }
 
   begin(width: number, height: number): void {
@@ -948,6 +940,10 @@ export class WebGLBatchRenderer {
 
   resize(width: number, height: number): void {
     this.gl.viewport(0, 0, width, height);
+  }
+
+  getContext(): WebGLRenderingContext | WebGL2RenderingContext {
+    return this.gl;
   }
 
   destroy(): void {

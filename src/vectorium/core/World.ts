@@ -159,6 +159,7 @@ export class World {
    * Expected: 20-40% faster than standard JavaScript
    */
   updatePhysics(dt: number, boundsWidth: number, boundsHeight: number): void {
+    // Update all entities via WASM-optimized physics
     this.wasmPhysics.updatePhysicsOptimized(
       this.entityCount,
       dt,
@@ -242,7 +243,9 @@ export class World {
   getTotalCount(): number {
     return this.entityCount;
   }
-  
+
+
+
   /**
    * Direct component access (read-only for rendering)
    */

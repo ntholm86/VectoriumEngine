@@ -34,13 +34,16 @@ export class Scene {
   // Track entities with custom render logic (rare!)
   private entitiesWithCustomRender: Entity[] = [];
   
-  // World dimensions for physics bounds (can be larger than canvas!)
-  protected worldWidth = 19200;  // 10x canvas
-  protected worldHeight = 10800; // 10x canvas
-  
-  // Canvas dimensions for camera
+  // Canvas dimensions for camera and base physics bounds
   protected canvasWidth = 1920;
   protected canvasHeight = 1080;
+  
+  // World bounds multiplier (1.0 = viewport only, 10.0 = 10x world for frustum culling)
+  protected worldBoundsMultiplier = 1.0;
+  
+  // Computed world dimensions (canvas * multiplier)
+  protected get worldWidth(): number { return this.canvasWidth * this.worldBoundsMultiplier; }
+  protected get worldHeight(): number { return this.canvasHeight * this.worldBoundsMultiplier; }
   
   // Camera for frustum culling
   private camera: Camera;
@@ -108,7 +111,7 @@ export class Scene {
     // CRITICAL OPTIMIZATION: Run ECS systems ONLY
     // Pure data entities don't need update() calls at all!
     const physicsStart = performance.now();
-    this.world.updatePhysics(dt, this.worldWidth, this.worldHeight); // Use world bounds, not canvas!
+    this.world.updatePhysics(dt, this.worldWidth, this.worldHeight);
     this.perfMetrics.updatePhysics = performance.now() - physicsStart;
     
     const animStart = performance.now();
@@ -273,7 +276,7 @@ export class Scene {
   setCullingEnabled(enabled: boolean): void {
     this.cullingEnabled = enabled;
   }
-  
+
   /**
    * Get the camera for manual control
    */
@@ -284,11 +287,32 @@ export class Scene {
   /**
    * Update canvas dimensions for physics bounds and camera
    * Should be called when canvas is resized
+   * Automatically updates world bounds based on current multiplier
    */
   setCanvasDimensions(width: number, height: number): void {
     this.canvasWidth = width;
     this.canvasHeight = height;
     this.camera.resize(width, height);
+  }
+  
+  /**
+   * Set world bounds multiplier for physics
+   * 1.0 = viewport only (entities bounce at screen edges)
+   * 10.0 = 10x world (entities can move offscreen, requires frustum culling)
+   */
+  setWorldBoundsMultiplier(multiplier: number): void {
+    this.worldBoundsMultiplier = multiplier;
+  }
+  
+  /**
+   * Get actual world bounds for physics (canvas * multiplier)
+   */
+  getWorldWidth(): number {
+    return this.worldWidth;
+  }
+  
+  getWorldHeight(): number {
+    return this.worldHeight;
   }
 
   addEntity(entity: Entity): void {
@@ -453,11 +477,9 @@ export class Vectorium {
     const useWebGL2 = this.config.preferWebGL2 && this.featureDetector.capabilities.hasWebGL2;
     this.renderer = new WebGLBatchRenderer(this.canvas, useWebGL2);
     
-    // Initialize text renderer
+    // Initialize text renderer (uses same WebGL context, no overlay canvas)
     this.textRenderer = new TextRenderer(this.config.width, this.config.height);
-    if (this.canvas.parentElement) {
-      this.textRenderer.attachTo(this.canvas.parentElement);
-    }
+    this.textRenderer.setGLContext(this.renderer.getContext());
     
     // Initialize performance monitor
     this.performanceMonitor = new PerformanceMonitor(

@@ -49,34 +49,19 @@ class DemoScene extends Scene {
   private entityCount = 0;
   
   async load(): Promise<void> {
-    // Set world bounds to 10x canvas size for frustum culling demo!
-    (this as any).worldWidth = this.canvasWidth * 10;   // 19,200 pixels
-    (this as any).worldHeight = this.canvasHeight * 10; // 10,800 pixels
+    // World bounds ALWAYS match canvas resolution exactly
+    this.setWorldBoundsMultiplier(1.0);
     
-    this.addEntities(1000);
+    this.addEntities(1000, true); // Spawn in viewport by default
   }
   
-  addEntities(count: number, inViewportOnly: boolean = false): void {
-    // Spawn entities in world or viewport
-    let spawnWidth, spawnHeight;
+  addEntities(count: number, inViewportOnly: boolean = true): void {
+    // Physics bounds ALWAYS match canvas resolution (1.0x)
+    // inViewportOnly only controls WHERE entities spawn, not bounce area
     
-    if (inViewportOnly) {
-      // Spawn in viewport only - see all new entities!
-      spawnWidth = this.canvasWidth;
-      spawnHeight = this.canvasHeight;
-      
-      // Set physics bounds to canvas for viewport entities
-      (this as any).worldWidth = this.canvasWidth;
-      (this as any).worldHeight = this.canvasHeight;
-    } else {
-      // Spawn in the HUGE world (10x canvas size) to test frustum culling!
-      spawnWidth = this.canvasWidth * 10;
-      spawnHeight = this.canvasHeight * 10;
-      
-      // Set physics bounds to 10x world
-      (this as any).worldWidth = spawnWidth;
-      (this as any).worldHeight = spawnHeight;
-    }
+    // Get spawn area
+    const spawnWidth = inViewportOnly ? this.getWorldWidth() : this.getWorldWidth() * 10;
+    const spawnHeight = inViewportOnly ? this.getWorldHeight() : this.getWorldHeight() * 10;
     
     for (let i = 0; i < count; i++) {
       const entity = new BouncingEntity();
@@ -342,15 +327,6 @@ class UIControls {
           <button id="addViewport100000Btn" style="padding: 8px; background: #00AAAA; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100K 👁️</button>
         </div>
         
-        <div style="margin: 12px 0 6px 0; font-size: 11px; color: #FF00FF;">
-          🚀 GPU INSTANCING:
-        </div>
-        <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">
-          <button id="toggleInstancingBtn" style="padding: 8px; flex: 1; background: #FF00FF; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">✓ INSTANCING ON</button>
-        </div>
-        <div style="font-size: 9px; color: #FF00FF;">
-          <div id="instancingStatus">Checking GPU...</div>
-        </div>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px;">
           <button id="remove1000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">-1K</button>
@@ -371,11 +347,15 @@ class UIControls {
     const resolutionSelect = container.querySelector('#resolutionSelect') as HTMLSelectElement;
     resolutionSelect.addEventListener('change', () => {
       const [width, height] = resolutionSelect.value.split('x').map(Number);
+      
+      // Resize engine (this updates both WebGL canvas AND text overlay canvas)
       this.engine.resize(width, height);
+      
+      // Update canvas wrapper size to match exactly (no rounding issues)
       const canvas = this.engine.canvas;
       if (canvas.parentElement) {
-        canvas.parentElement.style.width = width + 'px';
-        canvas.parentElement.style.height = height + 'px';
+        canvas.parentElement.style.width = `${width}px`;
+        canvas.parentElement.style.height = `${height}px`;
       }
     });
     
@@ -391,34 +371,53 @@ class UIControls {
     });
     
     container.querySelector('#add100Btn')?.addEventListener('click', () => {
-      this.scene.addEntities(100);
+      this.scene.addEntities(100, false); // World spawning (10x area)
     });
     
     container.querySelector('#add1000Btn')?.addEventListener('click', () => {
-      this.scene.addEntities(1000);
+      this.scene.addEntities(1000, false); // World spawning (10x area)
     });
     
     container.querySelector('#add10000Btn')?.addEventListener('click', () => {
-      this.scene.addEntities(10000);
+      this.scene.addEntities(10000, false); // World spawning (10x area)
     });
     
     container.querySelector('#add100000Btn')?.addEventListener('click', () => {
       if (confirm('⚠️ Add 100,000 entities? This will stress test the engine!')) {
-        this.scene.addEntities(100000);
+        this.scene.addEntities(100000, false); // World spawning (10x area)
       }
     });
     
     container.querySelector('#add500000Btn')?.addEventListener('click', () => {
       if (confirm('💥 Add 500,000 entities?! This will test frustum culling!\n\nOnly visible entities will be rendered.')) {
-        this.scene.addEntities(500000);
+        this.scene.addEntities(500000, false); // World spawning (10x area)
       }
     });
     
     container.querySelector('#add1000000Btn')?.addEventListener('click', () => {
       if (confirm('☢️ Add 1,000,000 entities?!?!\n\nThis is EXTREME and may take a moment to spawn.\nFrustum culling will only render visible entities.')) {
         console.log('Spawning 1 million entities...');
-        this.scene.addEntities(1000000);
+        this.scene.addEntities(1000000, false); // World spawning (10x area)
         console.log('Spawn complete!');
+      }
+    });
+    
+    // Viewport spawning buttons (all visible)
+    container.querySelector('#addViewport100Btn')?.addEventListener('click', () => {
+      this.scene.addEntities(100, true); // Viewport only
+    });
+    
+    container.querySelector('#addViewport1000Btn')?.addEventListener('click', () => {
+      this.scene.addEntities(1000, true); // Viewport only
+    });
+    
+    container.querySelector('#addViewport10000Btn')?.addEventListener('click', () => {
+      this.scene.addEntities(10000, true); // Viewport only
+    });
+    
+    container.querySelector('#addViewport100000Btn')?.addEventListener('click', () => {
+      if (confirm('⚠️ Add 100,000 visible entities? This will fill the screen!')) {
+        this.scene.addEntities(100000, true); // Viewport only
       }
     });
     
@@ -462,36 +461,6 @@ class UIControls {
       }
       toggleCullingBtn.textContent = cullingEnabled ? '✓ Culling ON' : '✗ Culling OFF';
       toggleCullingBtn.style.background = cullingEnabled ? '#8000FF' : '#666';
-    });
-    
-    // Instancing toggle button
-    const renderer = (this.engine as any).renderer;
-    let instancingEnabled = renderer.isInstancingActive();
-    const toggleInstancingBtn = container.querySelector('#toggleInstancingBtn') as HTMLButtonElement;
-    const instancingStatus = container.querySelector('#instancingStatus') as HTMLDivElement;
-    
-    if (renderer.instancingSupported) {
-      instancingStatus.textContent = instancingEnabled ? 
-        '✅ GPU Instancing Active (Single Draw Call!)' : 
-        '⚠️ Batch Rendering (Fallback)';
-      toggleInstancingBtn.textContent = instancingEnabled ? '✓ INSTANCING ON' : '✗ INSTANCING OFF';
-      toggleInstancingBtn.style.background = instancingEnabled ? '#FF00FF' : '#666';
-    } else {
-      instancingStatus.textContent = '❌ GPU does not support instancing';
-      toggleInstancingBtn.textContent = '✗ NOT SUPPORTED';
-      toggleInstancingBtn.disabled = true;
-      toggleInstancingBtn.style.background = '#333';
-      toggleInstancingBtn.style.cursor = 'not-allowed';
-    }
-    
-    toggleInstancingBtn?.addEventListener('click', () => {
-      instancingEnabled = !instancingEnabled;
-      renderer.setInstancingEnabled(instancingEnabled);
-      toggleInstancingBtn.textContent = instancingEnabled ? '✓ INSTANCING ON' : '✗ INSTANCING OFF';
-      toggleInstancingBtn.style.background = instancingEnabled ? '#FF00FF' : '#666';
-      instancingStatus.textContent = instancingEnabled ? 
-        '✅ GPU Instancing Active (Single Draw Call!)' : 
-        '⚠️ Batch Rendering (Fallback)';
     });
   }
   
@@ -571,7 +540,7 @@ class UIControls {
     document.getElementById('cullingEfficiency')!.textContent = cullingEff.toFixed(1);
     
     // Color code culling efficiency
-    const cullingEffElement = document.getElementById('cullingEfficiency')!;
+    const cullingEffElement = document.getElementById('cullingEfficiency')!;;
     if (cullingEff > 50) {
       cullingEffElement.style.color = '#00FF00'; // Green = great culling
     } else if (cullingEff > 20) {
@@ -649,15 +618,35 @@ function initDemo() {
   
   const canvas = document.createElement('canvas');
   canvas.style.cssText = `
+    display: block;
+    width: 100%;
+    height: 100%;
     border: 3px solid #00FF00;
     box-shadow: 0 0 30px rgba(0, 255, 0, 0.5), 0 0 60px rgba(0, 255, 0, 0.3);
     border-radius: 4px;
   `;
   
+  // Calculate optimal canvas size based on viewport
+  const maxWidth = window.innerWidth - 450; // Account for UI panel
+  const maxHeight = window.innerHeight - 40; // Account for margins
+  const aspectRatio = 16 / 9;
+  
+  let canvasWidth = maxWidth;
+  let canvasHeight = maxWidth / aspectRatio;
+  
+  if (canvasHeight > maxHeight) {
+    canvasHeight = maxHeight;
+    canvasWidth = maxHeight * aspectRatio;
+  }
+  
+  // Round to integers to prevent canvas/wrapper size mismatches
+  canvasWidth = Math.floor(canvasWidth);
+  canvasHeight = Math.floor(canvasHeight);
+  
   const canvasWrapper = document.createElement('div');
   canvasWrapper.style.cssText = `
-    width: 1920px;
-    height: 1080px;
+    width: ${canvasWidth}px;
+    height: ${canvasHeight}px;
     position: relative;
   `;
   canvasWrapper.appendChild(canvas);
@@ -665,8 +654,8 @@ function initDemo() {
   
   const engine = new Vectorium({
     canvas,
-    width: 1920,
-    height: 1080,
+    width: canvasWidth,
+    height: canvasHeight,
     preferWebGL2: true,
     targetFPS: 60,
     enableAdaptiveQuality: true,

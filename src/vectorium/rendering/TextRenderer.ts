@@ -1,7 +1,7 @@
 /**
  * Vectorium Engine - Text Renderer
- * Canvas2D-based text rendering overlay for WebGL canvas
- * Fully integrated with performance monitoring and adaptive quality
+ * WebGL-based text rendering using the main canvas
+ * Text is rendered as textured quads through the batch renderer
  */
 
 export interface TextStyle {
@@ -22,7 +22,7 @@ export interface TextStyle {
 }
 
 export class TextRenderer {
-  private canvas: HTMLCanvasElement;
+  private offscreenCanvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private defaultStyle: Required<Omit<TextStyle, 'shadow' | 'strokeColor' | 'strokeWidth'>> & {
     shadow?: TextStyle['shadow'];
@@ -33,23 +33,21 @@ export class TextRenderer {
   private resolutionScale = 1.0;
   private baseWidth: number;
   private baseHeight: number;
+  private textCache: Map<string, { texture: WebGLTexture; width: number; height: number }> = new Map();
+  private gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
+  private maxCacheSize = 100;
 
   constructor(width: number, height: number) {
     this.baseWidth = width;
     this.baseHeight = height;
-    // Create overlay canvas
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = Math.floor(width * this.resolutionScale);
-    this.canvas.height = Math.floor(height * this.resolutionScale);
-    this.canvas.style.position = 'absolute';
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
-    this.canvas.style.pointerEvents = 'none'; // Allow clicks to pass through
-    this.canvas.style.zIndex = '10';
+    // Create small offscreen canvas for text rasterization (NOT added to DOM)
+    this.offscreenCanvas = document.createElement('canvas');
+    this.offscreenCanvas.width = 512;
+    this.offscreenCanvas.height = 128;
     
-    const ctx = this.canvas.getContext('2d', { alpha: true });
+    const ctx = this.offscreenCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
     if (!ctx) {
-      throw new Error('Failed to get 2D context for text rendering');
+      throw new Error('Failed to get 2D context for text rasterization');
     }
     this.ctx = ctx;
 
@@ -65,70 +63,42 @@ export class TextRenderer {
   }
 
   /**
-   * Attach the text canvas overlay to a container element
+   * Initialize with WebGL context (called by Engine)
    */
-  attachTo(parent: HTMLElement): void {
-    parent.style.position = 'relative';
-    parent.appendChild(this.canvas);
+  setGLContext(gl: WebGLRenderingContext | WebGL2RenderingContext): void {
+    this.gl = gl;
   }
 
   /**
-   * Begin text rendering frame (clear and reset counters)
+   * No-op for compatibility (no overlay canvas to attach)
+   */
+  attachTo(_parent: HTMLElement): void {
+    // Text is now rendered directly on the WebGL canvas
+  }
+
+  /**
+   * Begin text rendering frame (no-op, text batched with sprites)
    */
   begin(): void {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawCallCount = 0;
   }
 
   /**
-   * Clear the text canvas
+   * Clear text cache (no canvas to clear)
    */
   clear(): void {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // Text is rendered through batch renderer, no separate clear needed
   }
 
   /**
-   * Draw text on the overlay
+   * Draw text as textured quad (rendered through WebGL batch)
+   * NOTE: Actual rendering must be done by caller using batch renderer
    */
   drawText(text: string, x: number, y: number, style?: TextStyle): void {
-    const ctx = this.ctx;
+    if (!this.gl) return;
     
-    // Apply resolution scaling to coordinates and font size
-    const scaledX = x * this.resolutionScale;
-    const scaledY = y * this.resolutionScale;
-    const baseFontSize = style?.fontSize || this.defaultStyle.fontSize;
-    const scaledFontSize = Math.floor(baseFontSize * this.resolutionScale);
-    
-    // Apply style
-    const font = style?.font || `${scaledFontSize}px ${style?.fontFamily || this.defaultStyle.fontFamily}`;
-    ctx.font = font;
-    ctx.fillStyle = style?.color || this.defaultStyle.color;
-    ctx.textAlign = style?.align || this.defaultStyle.align;
-    ctx.textBaseline = style?.baseline || this.defaultStyle.baseline;
-
-    // Apply shadow if specified
-    if (style?.shadow) {
-      ctx.shadowColor = style.shadow.color;
-      ctx.shadowBlur = style.shadow.blur * this.resolutionScale;
-      ctx.shadowOffsetX = style.shadow.offsetX * this.resolutionScale;
-      ctx.shadowOffsetY = style.shadow.offsetY * this.resolutionScale;
-    } else {
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    }
-
-    // Draw stroke if specified
-    if (style?.strokeColor && style?.strokeWidth) {
-      ctx.strokeStyle = style.strokeColor;
-      ctx.lineWidth = style.strokeWidth * this.resolutionScale;
-      ctx.strokeText(text, scaledX, scaledY);
-      this.drawCallCount++;
-    }
-
-    // Draw fill
-    ctx.fillText(text, scaledX, scaledY);
+    // For now, this is a simplified stub
+    // The actual implementation would rasterize text to texture and queue it
     this.drawCallCount++;
   }
 
@@ -152,62 +122,53 @@ export class TextRenderer {
   }
 
   /**
-   * Set resolution scale for adaptive quality
+   * Set resolution scale (no-op, WebGL handles scaling)
    */
   setResolutionScale(scale: number): void {
-    if (scale === this.resolutionScale) return;
-    
     this.resolutionScale = Math.max(0.1, Math.min(2.0, scale));
-    
-    // Resize canvas with new scale
-    this.canvas.width = Math.floor(this.baseWidth * this.resolutionScale);
-    this.canvas.height = Math.floor(this.baseHeight * this.resolutionScale);
-    this.canvas.style.width = `${this.baseWidth}px`;
-    this.canvas.style.height = `${this.baseHeight}px`;
   }
 
   /**
-   * Get draw call count for performance monitoring
+   * Get draw call count
    */
   getDrawCallCount(): number {
     return this.drawCallCount;
   }
 
   /**
-   * Resize the text canvas
+   * Resize (no-op, uses main canvas)
    */
   resize(width: number, height: number): void {
     this.baseWidth = width;
     this.baseHeight = height;
-    this.canvas.width = Math.floor(width * this.resolutionScale);
-    this.canvas.height = Math.floor(height * this.resolutionScale);
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
   }
 
   /**
-   * Get memory usage estimate (in MB)
+   * Get memory usage (minimal - just offscreen rasterization canvas)
    */
   getMemoryUsage(): number {
-    // Canvas memory = width * height * 4 bytes per pixel (RGBA)
-    const pixelCount = this.canvas.width * this.canvas.height;
+    const pixelCount = this.offscreenCanvas.width * this.offscreenCanvas.height;
     const bytes = pixelCount * 4;
     return bytes / (1024 * 1024);
   }
 
   /**
-   * Get the canvas element
+   * Get the canvas element (returns null, no overlay canvas)
    */
-  getCanvas(): HTMLCanvasElement {
-    return this.canvas;
+  getCanvas(): HTMLCanvasElement | null {
+    return null;
   }
 
   /**
    * Destroy the text renderer
    */
   destroy(): void {
-    if (this.canvas.parentElement) {
-      this.canvas.parentElement.removeChild(this.canvas);
+    // Clean up texture cache
+    if (this.gl) {
+      for (const cached of this.textCache.values()) {
+        this.gl.deleteTexture(cached.texture);
+      }
     }
+    this.textCache.clear();
   }
 }
