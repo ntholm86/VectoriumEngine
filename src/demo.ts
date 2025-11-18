@@ -281,8 +281,11 @@ class UIControls {
           <span>Culling Efficiency:</span> <span id="cullingEfficiency" style="font-weight: bold;">0.0</span>%
         </div>
         <div style="padding-top: 6px; border-top: 1px solid rgba(128,0,255,0.3); font-size: 11px;">
-          <button id="toggleCullingBtn" style="width: 100%; padding: 6px; background: #8000FF; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">
+          <button id="toggleCullingBtn" style="width: 100%; padding: 6px; background: #8000FF; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px; margin-bottom: 6px;">
             ✓ Culling ON
+          </button>
+          <button id="toggleGPURotationBtn" style="width: 100%; padding: 6px; background: #666; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;" title="Experimental: GPU-side rotation (has rendering artifacts)">
+            🧪 GPU Rotation (OFF)
           </button>
         </div>
       </div>
@@ -461,6 +464,20 @@ class UIControls {
       }
       toggleCullingBtn.textContent = cullingEnabled ? '✓ Culling ON' : '✗ Culling OFF';
       toggleCullingBtn.style.background = cullingEnabled ? '#8000FF' : '#666';
+    });
+    
+    // GPU Rotation toggle button (EXPERIMENTAL - has rendering artifacts)
+    let gpuRotationEnabled = false;
+    const toggleGPURotationBtn = container.querySelector('#toggleGPURotationBtn') as HTMLButtonElement;
+    toggleGPURotationBtn?.addEventListener('click', () => {
+      gpuRotationEnabled = !gpuRotationEnabled;
+      const renderer = (this.engine as any).renderer;
+      if (renderer) {
+        renderer.setGPURotationEnabled(gpuRotationEnabled);
+        console.warn(`🧪 GPU Rotation ${gpuRotationEnabled ? 'ENABLED' : 'DISABLED'} - Experimental feature with known rendering artifacts`);
+      }
+      toggleGPURotationBtn.textContent = gpuRotationEnabled ? '🧪 GPU Rotation (ON)' : '🧪 GPU Rotation (OFF)';
+      toggleGPURotationBtn.style.background = gpuRotationEnabled ? '#FFAA00' : '#666';
     });
   }
   

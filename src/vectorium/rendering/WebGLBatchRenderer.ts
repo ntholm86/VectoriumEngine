@@ -904,6 +904,29 @@ export class WebGLBatchRenderer {
     
     const HALF = 0.5;
     const DEG_TO_RAD = Math.PI / 180;
+    const ext = this.ext || (gl as any);
+    
+    // Setup GL state ONCE (not per batch!)
+    gl.useProgram(this.gpuRotationProgram);
+    
+    // Setup projection matrix ONCE
+    const projectionMatrix = new Float32Array([
+      2 / this.gl.canvas.width, 0, 0, 0,
+      0, -2 / this.gl.canvas.height, 0, 0,
+      0, 0, 1, 0,
+      -1, 1, 0, 1
+    ]);
+    gl.uniformMatrix4fv(this.gpuRotationUniformProjection, false, projectionMatrix);
+    gl.uniform1i(this.gpuRotationUniformTexture, 0);
+    
+    // Setup vertex attributes ONCE (use cached locations!)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationQuadBuffer);
+    gl.enableVertexAttribArray(this.gpuRotationAttrCorner);
+    gl.vertexAttribPointer(this.gpuRotationAttrCorner, 2, gl.FLOAT, false, 0, 0);
+    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gpuRotationIndexBuffer);
+    
+    const stride = this.gpuRotationLayout.getStride();
     
     // Process in batches
     for (let start = 0; start < indexCount; start += this.maxBatchSize) {
@@ -929,9 +952,9 @@ export class WebGLBatchRenderer {
           instanceOffset,
           posX[idx],
           posY[idx],
-          sizes[idx] * HALF,  // halfWidth
-          sizes[idx] * HALF,  // halfHeight
-          rotation[idx] * DEG_TO_RAD,  // Convert degrees to radians
+          sizes[idx] * HALF,
+          sizes[idx] * HALF,
+          rotation[idx] * DEG_TO_RAD,
           packedColor
         );
         
@@ -940,78 +963,38 @@ export class WebGLBatchRenderer {
       
       if (instanceCount === 0) continue;
       
-      // Upload instance data
+      // Upload instance data and draw
       gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationInstanceBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, this.gpuRotationInstances.subarray(0, instanceCount * 6), gl.STREAM_DRAW);
       
-      // Use GPU rotation shader
-      gl.useProgram(this.gpuRotationProgram);
+      // Setup per-instance attributes (cached locations!)
+      gl.enableVertexAttribArray(this.gpuRotationAttrPosition);
+      gl.vertexAttribPointer(this.gpuRotationAttrPosition, 2, gl.FLOAT, false, stride, this.gpuRotationLayout.getPositionByteOffset());
+      ext.vertexAttribDivisor(this.gpuRotationAttrPosition, 1);
       
-      // Setup projection matrix
-      const projectionMatrix = new Float32Array([
-        2 / this.gl.canvas.width, 0, 0, 0,
-        0, -2 / this.gl.canvas.height, 0, 0,
-        0, 0, 1, 0,
-        -1, 1, 0, 1
-      ]);
-      const projectionLoc = gl.getUniformLocation(this.gpuRotationProgram!, 'u_projection');
-      gl.uniformMatrix4fv(projectionLoc, false, projectionMatrix);
+      gl.enableVertexAttribArray(this.gpuRotationAttrSize);
+      gl.vertexAttribPointer(this.gpuRotationAttrSize, 2, gl.FLOAT, false, stride, this.gpuRotationLayout.getSizeByteOffset());
+      ext.vertexAttribDivisor(this.gpuRotationAttrSize, 1);
       
-      // Setup texture uniform
-      const useTextureLoc = gl.getUniformLocation(this.gpuRotationProgram!, 'u_useTexture');
-      gl.uniform1i(useTextureLoc, 0); // No texture for now
+      gl.enableVertexAttribArray(this.gpuRotationAttrRotation);
+      gl.vertexAttribPointer(this.gpuRotationAttrRotation, 1, gl.FLOAT, false, stride, this.gpuRotationLayout.getRotationByteOffset());
+      ext.vertexAttribDivisor(this.gpuRotationAttrRotation, 1);
       
-      // Bind quad corners (shared vertices)
-      const cornerLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_corner');
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationQuadBuffer);
-      gl.enableVertexAttribArray(cornerLoc);
-      gl.vertexAttribPointer(cornerLoc, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(this.gpuRotationAttrColor);
+      gl.vertexAttribPointer(this.gpuRotationAttrColor, 4, gl.UNSIGNED_BYTE, true, stride, this.gpuRotationLayout.getColorByteOffset());
+      ext.vertexAttribDivisor(this.gpuRotationAttrColor, 1);
       
-      // Bind instance buffer
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.gpuRotationInstanceBuffer);
-      const stride = this.gpuRotationLayout.getStride();
-      
-      // Setup per-instance attributes
-      const positionLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_position');
-      gl.enableVertexAttribArray(positionLoc);
-      gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, stride, this.gpuRotationLayout.getPositionByteOffset());
-      
-      const sizeLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_size');
-      gl.enableVertexAttribArray(sizeLoc);
-      gl.vertexAttribPointer(sizeLoc, 2, gl.FLOAT, false, stride, this.gpuRotationLayout.getSizeByteOffset());
-      
-      const rotationLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_rotation');
-      gl.enableVertexAttribArray(rotationLoc);
-      gl.vertexAttribPointer(rotationLoc, 1, gl.FLOAT, false, stride, this.gpuRotationLayout.getRotationByteOffset());
-      
-      const colorLoc = gl.getAttribLocation(this.gpuRotationProgram!, 'a_color');
-      gl.enableVertexAttribArray(colorLoc);
-      gl.vertexAttribPointer(colorLoc, 4, gl.UNSIGNED_BYTE, true, stride, this.gpuRotationLayout.getColorByteOffset());
-      
-      // Enable instancing for per-instance attributes
-      const ext = this.ext || (gl as any);
-      ext.vertexAttribDivisor(positionLoc, 1);
-      ext.vertexAttribDivisor(sizeLoc, 1);
-      ext.vertexAttribDivisor(rotationLoc, 1);
-      ext.vertexAttribDivisor(colorLoc, 1);
-      
-      // Draw instanced
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gpuRotationIndexBuffer);
+      // Draw instanced!
       ext.drawElementsInstanced(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0, instanceCount);
       
-      // Reset divisors
-      ext.vertexAttribDivisor(positionLoc, 0);
-      ext.vertexAttribDivisor(sizeLoc, 0);
-      ext.vertexAttribDivisor(rotationLoc, 0);
-      ext.vertexAttribDivisor(colorLoc, 0);
-      
       this.drawCallCount++;
-      
-      // Performance tracking
-      if (this.perfMonitor) {
-        this.perfMonitor.recordGPURotationBatch(instanceCount);
-      }
     }
+    
+    // Reset divisors
+    ext.vertexAttribDivisor(this.gpuRotationAttrPosition, 0);
+    ext.vertexAttribDivisor(this.gpuRotationAttrSize, 0);
+    ext.vertexAttribDivisor(this.gpuRotationAttrRotation, 0);
+    ext.vertexAttribDivisor(this.gpuRotationAttrColor, 0);
     
     // Log GPU rotation stats for debugging
     if (this.enableWarnings && !this.warnedAbout.has('gpu_rotation_stats')) {
