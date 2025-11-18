@@ -30,16 +30,10 @@ export class TextRenderer {
     strokeWidth?: number;
   };
   private drawCallCount = 0;
-  private resolutionScale = 1.0;
-  private baseWidth: number;
-  private baseHeight: number;
   private textCache: Map<string, { texture: WebGLTexture; width: number; height: number }> = new Map();
   private gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
-  private maxCacheSize = 100;
 
-  constructor(width: number, height: number) {
-    this.baseWidth = width;
-    this.baseHeight = height;
+  constructor(_width: number, _height: number) {
     // Create small offscreen canvas for text rasterization (NOT added to DOM)
     this.offscreenCanvas = document.createElement('canvas');
     this.offscreenCanvas.width = 512;
@@ -94,7 +88,7 @@ export class TextRenderer {
    * Draw text as textured quad (rendered through WebGL batch)
    * NOTE: Actual rendering must be done by caller using batch renderer
    */
-  drawText(text: string, x: number, y: number, style?: TextStyle): void {
+  drawText(_text: string, _x: number, _y: number, _style?: TextStyle): void {
     if (!this.gl) return;
     
     // For now, this is a simplified stub
@@ -124,8 +118,8 @@ export class TextRenderer {
   /**
    * Set resolution scale (no-op, WebGL handles scaling)
    */
-  setResolutionScale(scale: number): void {
-    this.resolutionScale = Math.max(0.1, Math.min(2.0, scale));
+  setResolutionScale(_scale: number): void {
+    // No-op: resolution scaling handled by WebGL viewport
   }
 
   /**
@@ -138,9 +132,8 @@ export class TextRenderer {
   /**
    * Resize (no-op, uses main canvas)
    */
-  resize(width: number, height: number): void {
-    this.baseWidth = width;
-    this.baseHeight = height;
+  resize(_width: number, _height: number): void {
+    // No-op: dimensions managed by main canvas
   }
 
   /**

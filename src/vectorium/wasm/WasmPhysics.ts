@@ -6,23 +6,8 @@
  */
 
 export class WasmPhysics {
-  private wasmModule: WebAssembly.Instance | null = null;
-  private memory: WebAssembly.Memory | null = null;
-  private updatePhysicsFunc: Function | null = null;
-  private updateAnimationsFunc: Function | null = null;
-  
   async initialize(): Promise<boolean> {
     try {
-      // Create shared memory (16MB = 256 pages)
-      this.memory = new WebAssembly.Memory({ initial: 256, maximum: 256 });
-      
-      // Simplified WASM module (handwritten binary)
-      // This is much simpler than full WAT - just the core physics loop
-      const wasmCode = new Uint8Array([
-        0x00, 0x61, 0x73, 0x6d, // Magic number '\0asm'
-        0x01, 0x00, 0x00, 0x00, // Version 1
-      ]);
-      
       // For now, return false - we'll use a hybrid approach
       console.log('⚠️ WASM: Full WASM implementation requires external compilation');
       console.log('💡 WASM: Using optimized JavaScript fallback instead');

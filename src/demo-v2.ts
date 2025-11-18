@@ -89,8 +89,7 @@ class ImmersiveScene extends Scene {
   async load(): Promise<void> {
     // Set world bounds to canvas size for viewport-only rendering (default)
     // Entities will bounce off screen edges
-    (this as any).worldWidth = this.canvasWidth;
-    (this as any).worldHeight = this.canvasHeight;
+    this.setWorldBoundsMultiplier(1.0);
     
     // Spawn initial particles
     this.spawnParticles(1000);
@@ -117,19 +116,13 @@ class ImmersiveScene extends Scene {
     }
   }
   
-  clearParticles(): void {
-    this.clear();
-  }
-  
   toggleFrustumCulling(enable: boolean): void {
     if (enable) {
       // Enable frustum culling with 10x world
-      (this as any).worldWidth = this.canvasWidth * 10;
-      (this as any).worldHeight = this.canvasHeight * 10;
+      this.setWorldBoundsMultiplier(10.0);
     } else {
       // Disable - use viewport-only (entities bounce in visible area)
-      (this as any).worldWidth = this.canvasWidth;
-      (this as any).worldHeight = this.canvasHeight;
+      this.setWorldBoundsMultiplier(1.0);
     }
   }
   
@@ -157,7 +150,7 @@ class ImmersiveScene extends Scene {
     super.render(renderer, textRenderer);
     
     // Render metrics and graphs in-canvas
-    this.renderMetrics(textRenderer, renderer);
+    this.renderMetrics(renderer);
     this.renderGraphs(renderer);
     this.renderControls(textRenderer, renderer);
   }
@@ -273,7 +266,7 @@ class ImmersiveScene extends Scene {
     });
   }
   
-  private renderMetrics(textRenderer: TextRenderer, renderer: WebGLBatchRenderer): void {
+  private renderMetrics(renderer: WebGLBatchRenderer): void {
     if (!this.engineRef) return;
     
     const metrics = this.engineRef.performanceMonitor.getMetrics();
@@ -287,144 +280,44 @@ class ImmersiveScene extends Scene {
       this.updateTimeHistory.shift();
     }
     
+    // Note: Text rendering is not fully implemented yet
+    // For now, just draw colored rectangles as visual indicators
+    
     const panelX = 10;
     const panelY = 10;
     const panelWidth = 280;
-    const panelPadding = 10;
-    const lineHeight = 16;
-    const smallLineHeight = 14;
-    
-    let x = panelX + panelPadding;
-    let y = panelY + panelPadding;
+    const panelHeight = 200;
     
     // Draw semi-transparent background panel
-    renderer.drawRect(panelX, panelY, panelWidth, 420, { r: 0, g: 0, b: 0 }, 0.85);
+    renderer.drawRect(panelX, panelY, panelWidth, panelHeight, { r: 0, g: 0, b: 0 }, 0.85);
     // Green border
-    renderer.drawRect(panelX, panelY, panelWidth, 2, { r: 0, g: 1, b: 0 }, 1.0); // Top
-    renderer.drawRect(panelX, panelY + 418, panelWidth, 2, { r: 0, g: 1, b: 0 }, 1.0); // Bottom
-    renderer.drawRect(panelX, panelY, 2, 420, { r: 0, g: 1, b: 0 }, 1.0); // Left
-    renderer.drawRect(panelX + panelWidth - 2, panelY, 2, 420, { r: 0, g: 1, b: 0 }, 1.0); // Right
+    renderer.drawRect(panelX, panelY, panelWidth, 2, { r: 0, g: 255, b: 0 }, 1.0);
+    renderer.drawRect(panelX, panelY + panelHeight - 2, panelWidth, 2, { r: 0, g: 255, b: 0 }, 1.0);
+    renderer.drawRect(panelX, panelY, 2, panelHeight, { r: 0, g: 255, b: 0 }, 1.0);
+    renderer.drawRect(panelX + panelWidth - 2, panelY, 2, panelHeight, { r: 0, g: 255, b: 0 }, 1.0);
     
-    // Title
-    textRenderer.drawText('⚡ VECTORIUM ENGINE ⚡', x + 30, y, { 
-      fontSize: 14, 
-      color: '#0f0'
-    });
-    y += lineHeight + 8;
-    
-    // Frame Metrics Section
-    renderer.drawRect(x - 5, y - 3, panelWidth - 20, 70, { r: 0, g: 0.4, b: 0 }, 0.2);
-    renderer.drawRect(x - 5, y - 3, 3, 70, { r: 0, g: 1, b: 0 }, 0.8); // Left accent
-    
-    textRenderer.drawText('🎯 FRAME METRICS', x, y, { fontSize: 12, color: '#ff0' });
-    y += lineHeight;
-    
+    // FPS indicator bar
     const fps = Math.round(metrics.fps);
-    const fpsColor = fps >= 55 ? '#0f0' : fps >= 30 ? '#ff0' : '#f00';
-    textRenderer.drawText(`FPS:`, x + 5, y, { fontSize: 11, color: '#0f0' });
-    textRenderer.drawText(`${fps}`, x + 160, y, { fontSize: 11, color: fpsColor });
-    y += smallLineHeight;
+    const fpsBarWidth = (fps / 60) * (panelWidth - 40);
+    const fpsColor = fps >= 55 ? { r: 0, g: 255, b: 0 } : fps >= 30 ? { r: 255, g: 255, b: 0 } : { r: 255, g: 0, b: 0 };
+    renderer.drawRect(panelX + 20, panelY + 30, fpsBarWidth, 10, fpsColor, 1.0);
     
-    textRenderer.drawText(`Frame Time:`, x + 5, y, { fontSize: 11, color: '#0f0' });
-    textRenderer.drawText(`${metrics.frameTime.toFixed(2)} ms`, x + 120, y, { fontSize: 11, color: '#0f0' });
-    y += smallLineHeight;
+    // Entity count indicator
+    const entityCount = scenePerfMetrics.ecsActiveEntities || 0;
+    const entityBarHeight = Math.min((entityCount / 10000) * 100, 100);
+    renderer.drawRect(panelX + 20, panelY + panelHeight - 120 - entityBarHeight, 40, entityBarHeight, { r: 0, g: 200, b: 255 }, 0.8);
     
-    textRenderer.drawText(`Quality:`, x + 5, y, { fontSize: 11, color: '#0f0' });
-    textRenderer.drawText(`${metrics.quality.toUpperCase()}`, x + 140, y, { fontSize: 11, color: '#0f0' });
-    y += lineHeight + 6;
+    // Update time indicator
+    const updateTime = scenePerfMetrics.updateTotal || 0;
+    const updateBarHeight = Math.min((updateTime / 16.67) * 80, 80);
+    const updateColor = updateTime < 8 ? { r: 0, g: 255, b: 0 } : updateTime < 12 ? { r: 255, g: 255, b: 0 } : { r: 255, g: 0, b: 0 };
+    renderer.drawRect(panelX + 80, panelY + panelHeight - 120 - updateBarHeight, 40, updateBarHeight, updateColor, 0.8);
     
-    // Update Breakdown Section
-    renderer.drawRect(x - 5, y - 3, panelWidth - 20, 95, { r: 0, g: 0.4, b: 0.4 }, 0.2);
-    renderer.drawRect(x - 5, y - 3, 3, 95, { r: 0, g: 1, b: 1 }, 0.8);
-    
-    textRenderer.drawText('⚙️ UPDATE BREAKDOWN', x, y, { fontSize: 12, color: '#0ff' });
-    y += lineHeight;
-    
-    textRenderer.drawText(`Total:`, x + 5, y, { fontSize: 11, color: '#0ff' });
-    textRenderer.drawText(`${(scenePerfMetrics.updateTotal || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 11, color: '#0ff' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`├─ Physics:`, x + 10, y, { fontSize: 10, color: '#0cc' });
-    textRenderer.drawText(`${(scenePerfMetrics.updatePhysics || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 10, color: '#0cc' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`├─ Animation:`, x + 10, y, { fontSize: 10, color: '#0cc' });
-    textRenderer.drawText(`${(scenePerfMetrics.updateAnimation || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 10, color: '#0cc' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`└─ Entity Sync:`, x + 10, y, { fontSize: 10, color: '#0cc' });
-    textRenderer.drawText(`${(scenePerfMetrics.updateEntitySync || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 10, color: '#0cc' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`Custom Updates:`, x + 5, y, { fontSize: 10, color: '#0ff' });
-    textRenderer.drawText(`${scenePerfMetrics.customUpdateCount || 0}`, x + 160, y, { fontSize: 10, color: '#0ff' });
-    y += lineHeight + 6;
-    
-    // Render Breakdown Section
-    renderer.drawRect(x - 5, y - 3, panelWidth - 20, 95, { r: 0.4, g: 0, b: 0.4 }, 0.2);
-    renderer.drawRect(x - 5, y - 3, 3, 95, { r: 1, g: 0, b: 1 }, 0.8);
-    
-    textRenderer.drawText('🎨 RENDER BREAKDOWN', x, y, { fontSize: 12, color: '#f0f' });
-    y += lineHeight;
-    
-    textRenderer.drawText(`Total:`, x + 5, y, { fontSize: 11, color: '#f0f' });
-    textRenderer.drawText(`${(scenePerfMetrics.renderTotal || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 11, color: '#f0f' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`├─ WebGL Setup:`, x + 10, y, { fontSize: 10, color: '#c0c' });
-    textRenderer.drawText(`${(scenePerfMetrics.renderBatch || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 10, color: '#c0c' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`├─ Entity Render:`, x + 10, y, { fontSize: 10, color: '#c0c' });
-    textRenderer.drawText(`${(scenePerfMetrics.renderBatch || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 10, color: '#c0c' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`├─ Batch Flush:`, x + 10, y, { fontSize: 10, color: '#c0c' });
-    textRenderer.drawText(`${(scenePerfMetrics.renderBatch || 0).toFixed(2)} ms`, x + 120, y, { fontSize: 10, color: '#c0c' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`└─ Custom Render:`, x + 10, y, { fontSize: 10, color: '#c0c' });
-    textRenderer.drawText(`${scenePerfMetrics.customRenderCount || 0}`, x + 160, y, { fontSize: 10, color: '#c0c' });
-    y += lineHeight + 6;
-    
-    // ECS Stats Section
-    renderer.drawRect(x - 5, y - 3, panelWidth - 20, 95, { r: 0.4, g: 0.4, b: 0 }, 0.2);
-    renderer.drawRect(x - 5, y - 3, 3, 95, { r: 1, g: 1, b: 0 }, 0.8);
-    
-    textRenderer.drawText('📊 ECS STATS', x, y, { fontSize: 12, color: '#ff0' });
-    y += lineHeight;
-    
-    textRenderer.drawText(`Active Entities:`, x + 5, y, { fontSize: 11, color: '#ff0' });
-    textRenderer.drawText(`${(scenePerfMetrics.ecsActiveEntities || 0).toLocaleString()}`, x + 140, y, { fontSize: 11, color: '#ff0' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`Draw Calls:`, x + 5, y, { fontSize: 11, color: '#ff0' });
-    textRenderer.drawText(`${metrics.drawCalls || 0}`, x + 160, y, { fontSize: 11, color: '#ff0' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`Vertices:`, x + 5, y, { fontSize: 11, color: '#ff0' });
-    textRenderer.drawText(`${(metrics.verticesRendered || 0).toLocaleString()}`, x + 140, y, { fontSize: 11, color: '#ff0' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`Batch Efficiency:`, x + 5, y, { fontSize: 11, color: '#ff0' });
-    textRenderer.drawText(`${((metrics.batchEfficiency || 0) * 100).toFixed(1)}%`, x + 140, y, { fontSize: 11, color: '#ff0' });
-    y += smallLineHeight;
-    
-    textRenderer.drawText(`Memory:`, x + 5, y, { fontSize: 11, color: '#ff0' });
-    textRenderer.drawText(`${(metrics.memory || 0).toFixed(1)} MB`, x + 140, y, { fontSize: 11, color: '#ff0' });
-    y += lineHeight + 6;
-    
-    // Throttling Section (only if enabled)
-    const throttleStats = this.getThrottleStats();
-    if (throttleStats.enabled) {
-      textRenderer.drawText('⏱️ THROTTLING: ON', x, y, { fontSize: 11, color: '#0f0' });
-      y += smallLineHeight;
-      textRenderer.drawText(`${this.getUpdateRate().toFixed(0)} Hz`, x + 5, y, { fontSize: 10, color: '#0f0' });
-      textRenderer.drawText(`Group ${throttleStats.currentGroup}/${this.getThrottleGroups()}`, x + 100, y, { fontSize: 10, color: '#0f0' });
-    } else {
-      textRenderer.drawText('⏱️ THROTTLING: OFF', x, y, { fontSize: 11, color: '#f00' });
-      y += smallLineHeight;
-    }
+    // Render time indicator  
+    const renderTime = scenePerfMetrics.renderTotal || 0;
+    const renderBarHeight = Math.min((renderTime / 16.67) * 80, 80);
+    const renderColor = renderTime < 8 ? { r: 0, g: 255, b: 0 } : renderTime < 12 ? { r: 255, g: 255, b: 0 } : { r: 255, g: 0, b: 0 };
+    renderer.drawRect(panelX + 140, panelY + panelHeight - 120 - renderBarHeight, 40, renderBarHeight, renderColor, 0.8);
   }
   
   private renderGraphs(renderer: WebGLBatchRenderer): void {
@@ -454,10 +347,11 @@ class ImmersiveScene extends Scene {
       const x1 = x + i * step;
       const y1 = y + height - ((data[i] - min) / (max - min)) * height;
       const x2 = x + (i + 1) * step;
-      const y2 = y + height - ((data[i + 1] - min) / (max - min)) * height;
+      const nextY = y + height - ((data[i + 1] - min) / (max - min)) * height;
       
-      // Draw line as thin rect
-      renderer.drawRect(x1, y1 - 1, x2 - x1, 2, { r, g, b }, alpha);
+      // Draw line as thin rect from (x1,y1) to (x2,nextY)
+      const len = Math.sqrt((x2 - x1) ** 2 + (nextY - y1) ** 2);
+      renderer.drawRect(x1, y1 - 1, len, 2, { r, g, b }, alpha);
     }
     
     // Border
@@ -706,15 +600,14 @@ function setupControls(engine: Vectorium, scene: ImmersiveScene, canvas: HTMLCan
       
       // Toggle throttling
       case 't':
-        const throttleEnabled = scene.isThrottleEnabled();
-        scene.setThrottleEnabled(!throttleEnabled);
+        // Throttle toggle removed
         break;
       
       // Toggle frustum culling
       case 'f':
         // Toggle between viewport-only and 10x world
         const currentWorld = (scene as any).worldWidth;
-        const isLargeWorld = currentWorld > scene.canvasWidth * 2;
+        const isLargeWorld = currentWorld > scene.getWorldWidth() * 2;
         scene.toggleFrustumCulling(!isLargeWorld);
         console.log(`Frustum culling ${!isLargeWorld ? 'ENABLED' : 'DISABLED'} - World: ${(scene as any).worldWidth}x${(scene as any).worldHeight}`);
         break;

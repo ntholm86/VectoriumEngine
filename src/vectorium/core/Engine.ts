@@ -52,17 +52,7 @@ export class Scene {
   private cullingEnabled = true;
   
   // 🚀 PRE-ALLOCATED BUFFERS (zero allocations per frame!)
-  private maxEntities: number;
   private visibleIndices: Uint32Array;
-  private visPosX: Float32Array;
-  private visPosY: Float32Array;
-  private visRot: Uint16Array;
-  private visSizes: Float32Array;
-  private visColorR: Uint8Array;
-  private visColorG: Uint8Array;
-  private visColorB: Uint8Array;
-  private visAlphas: Float32Array;
-  private visFlags: Uint32Array;
   
   // Performance monitoring
   private enableWarnings = true;
@@ -86,21 +76,11 @@ export class Scene {
 
   constructor(name: string, maxEntities = 2000000) { // Increased to 2M for extreme testing
     this.name = name;
-    this.maxEntities = maxEntities;
     this.world = new World(maxEntities);
     this.camera = new Camera(this.viewport.width, this.viewport.height); // Use Viewport dimensions
     
     // 🚀 Allocate culling buffers once (reused every frame!)
     this.visibleIndices = new Uint32Array(maxEntities);
-    this.visPosX = new Float32Array(maxEntities);
-    this.visPosY = new Float32Array(maxEntities);
-    this.visRot = new Uint16Array(maxEntities);
-    this.visSizes = new Float32Array(maxEntities);
-    this.visColorR = new Uint8Array(maxEntities);
-    this.visColorG = new Uint8Array(maxEntities);
-    this.visColorB = new Uint8Array(maxEntities);
-    this.visAlphas = new Float32Array(maxEntities);
-    this.visFlags = new Uint32Array(maxEntities);
   }
 
   async load(): Promise<void> {

@@ -282,52 +282,67 @@ export class WebGLBatchRenderer {
     const c3x = -hwCos - hhSin + x;
     const c3y = -hwSin + hhCos + y;
     
-    const r = color.r / 255;
-    const g = color.g / 255;
-    const b = color.b / 255;
-    const a = alpha;
+    const r = Math.floor(color.r);
+    const g = Math.floor(color.g);
+    const b = Math.floor(color.b);
+    const a = Math.floor(alpha * 255);
     
-    let offset = this.vertexCount * 8;
+    // 24-byte vertex format: 6 floats (pos(2) + uv(2) + padding(2))
+    let offset = this.vertexCount * 6;
+    const baseByteOffset = this.vertexCount * 24;
     
+    // Vertex 0
     this.batchVertices[offset++] = c0x;
     this.batchVertices[offset++] = c0y;
     this.batchVertices[offset++] = 0;
     this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = r;
-    this.batchVertices[offset++] = g;
-    this.batchVertices[offset++] = b;
-    this.batchVertices[offset++] = a;
+    offset += 2; // Skip padding
     this.vertexCount++;
     
+    // Vertex 1
     this.batchVertices[offset++] = c1x;
     this.batchVertices[offset++] = c1y;
     this.batchVertices[offset++] = 1;
     this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = r;
-    this.batchVertices[offset++] = g;
-    this.batchVertices[offset++] = b;
-    this.batchVertices[offset++] = a;
+    offset += 2;
     this.vertexCount++;
     
+    // Vertex 2
     this.batchVertices[offset++] = c2x;
     this.batchVertices[offset++] = c2y;
     this.batchVertices[offset++] = 1;
     this.batchVertices[offset++] = 1;
-    this.batchVertices[offset++] = r;
-    this.batchVertices[offset++] = g;
-    this.batchVertices[offset++] = b;
-    this.batchVertices[offset++] = a;
+    offset += 2;
     this.vertexCount++;
     
+    // Vertex 3
     this.batchVertices[offset++] = c3x;
     this.batchVertices[offset++] = c3y;
     this.batchVertices[offset++] = 0;
     this.batchVertices[offset++] = 1;
-    this.batchVertices[offset++] = r;
-    this.batchVertices[offset++] = g;
-    this.batchVertices[offset++] = b;
-    this.batchVertices[offset++] = a;
+    offset += 2;
     this.vertexCount++;
+    
+    // Write colors as packed bytes
+    this.batchVerticesU8[baseByteOffset + 16] = r;
+    this.batchVerticesU8[baseByteOffset + 17] = g;
+    this.batchVerticesU8[baseByteOffset + 18] = b;
+    this.batchVerticesU8[baseByteOffset + 19] = a;
+    
+    this.batchVerticesU8[baseByteOffset + 24 + 16] = r;
+    this.batchVerticesU8[baseByteOffset + 24 + 17] = g;
+    this.batchVerticesU8[baseByteOffset + 24 + 18] = b;
+    this.batchVerticesU8[baseByteOffset + 24 + 19] = a;
+    
+    this.batchVerticesU8[baseByteOffset + 48 + 16] = r;
+    this.batchVerticesU8[baseByteOffset + 48 + 17] = g;
+    this.batchVerticesU8[baseByteOffset + 48 + 18] = b;
+    this.batchVerticesU8[baseByteOffset + 48 + 19] = a;
+    
+    this.batchVerticesU8[baseByteOffset + 72 + 16] = r;
+    this.batchVerticesU8[baseByteOffset + 72 + 17] = g;
+    this.batchVerticesU8[baseByteOffset + 72 + 18] = b;
+    this.batchVerticesU8[baseByteOffset + 72 + 19] = a;
   }
 
   drawRect(x: number, y: number, width: number, height: number, color: { r: number; g: number; b: number }, alpha: number = 1): void {
@@ -475,36 +490,52 @@ export class WebGLBatchRenderer {
         const aByte = Math.floor(alphas[i] * 255);
         
         // 24-byte vertex format: 6 floats (pos(2) + uv(2) + padding(2))
-        let floatOffset = (this.vertexCount + visibleCount * 4) * 6;
-        const baseByteOffset = floatOffset * 4;
+        const vertexBaseOffset = (this.vertexCount + visibleCount * 4) * 6;
         visibleCount++;
         
-        // Write positions and UVs as floats
+        // Write positions and UVs as floats (4 floats per vertex, skip 2 for padding)
+        let floatOffset = vertexBaseOffset;
+        
+        // Vertex 0
         this.batchVertices[floatOffset++] = c0x; this.batchVertices[floatOffset++] = c0y;
         this.batchVertices[floatOffset++] = 0; this.batchVertices[floatOffset++] = 0;
-        floatOffset += 2;
+        floatOffset += 2; // Skip padding
+        
+        // Vertex 1
         this.batchVertices[floatOffset++] = c1x; this.batchVertices[floatOffset++] = c1y;
         this.batchVertices[floatOffset++] = 1; this.batchVertices[floatOffset++] = 0;
         floatOffset += 2;
+        
+        // Vertex 2
         this.batchVertices[floatOffset++] = c2x; this.batchVertices[floatOffset++] = c2y;
         this.batchVertices[floatOffset++] = 1; this.batchVertices[floatOffset++] = 1;
         floatOffset += 2;
+        
+        // Vertex 3
         this.batchVertices[floatOffset++] = c3x; this.batchVertices[floatOffset++] = c3y;
         this.batchVertices[floatOffset++] = 0; this.batchVertices[floatOffset++] = 1;
         
-        // Write colors as packed bytes (4 bytes at offset 16, stride 24)
-        let colorOffset = baseByteOffset + 16;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
-        colorOffset += 20;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
-        colorOffset += 20;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
-        colorOffset += 20;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
+        // Write colors as packed bytes (4 bytes at offset 16 in each 24-byte vertex)
+        const baseByteOffset = vertexBaseOffset * 4; // Convert to byte offset
+        this.batchVerticesU8[baseByteOffset + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 19] = aByte;
+        
+        this.batchVerticesU8[baseByteOffset + 24 + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 24 + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 24 + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 24 + 19] = aByte;
+        
+        this.batchVerticesU8[baseByteOffset + 48 + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 48 + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 48 + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 48 + 19] = aByte;
+        
+        this.batchVerticesU8[baseByteOffset + 72 + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 72 + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 72 + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 72 + 19] = aByte;
       }
       
       this.vertexCount += visibleCount * 4;  // Use actual visible count, not chunk size
@@ -559,40 +590,56 @@ export class WebGLBatchRenderer {
         const aByte = Math.floor(alphas[idx] * 255);
         
         // 24-byte vertex format: 6 floats (pos(2) + uv(2) + padding(2))
-        let floatOffset = (this.vertexCount + visibleCount * 4) * 6;
-        const baseByteOffset = floatOffset * 4;
+        const vertexBaseOffset = (this.vertexCount + visibleCount * 4) * 6;
         visibleCount++;
         
-        // Write positions and UVs as floats
+        // Write positions and UVs as floats (4 floats per vertex, skip 2 for padding)
+        let floatOffset = vertexBaseOffset;
+        
+        // Vertex 0
         this.batchVertices[floatOffset++] = -hwCos + hwSin + x;
         this.batchVertices[floatOffset++] = -hwSin - hwCos + y;
         this.batchVertices[floatOffset++] = 0; this.batchVertices[floatOffset++] = 0;
         floatOffset += 2;
+        
+        // Vertex 1
         this.batchVertices[floatOffset++] = hwCos + hwSin + x;
         this.batchVertices[floatOffset++] = hwSin - hwCos + y;
         this.batchVertices[floatOffset++] = 1; this.batchVertices[floatOffset++] = 0;
         floatOffset += 2;
+        
+        // Vertex 2
         this.batchVertices[floatOffset++] = hwCos - hwSin + x;
         this.batchVertices[floatOffset++] = hwSin + hwCos + y;
         this.batchVertices[floatOffset++] = 1; this.batchVertices[floatOffset++] = 1;
         floatOffset += 2;
+        
+        // Vertex 3
         this.batchVertices[floatOffset++] = -hwCos - hwSin + x;
         this.batchVertices[floatOffset++] = -hwSin + hwCos + y;
         this.batchVertices[floatOffset++] = 0; this.batchVertices[floatOffset++] = 1;
         
-        // Write colors as packed bytes (4 bytes at offset 16, stride 24)
-        let colorOffset = baseByteOffset + 16;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
-        colorOffset += 20;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
-        colorOffset += 20;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
-        colorOffset += 20;
-        this.batchVerticesU8[colorOffset++] = rByte; this.batchVerticesU8[colorOffset++] = gByte;
-        this.batchVerticesU8[colorOffset++] = bByte; this.batchVerticesU8[colorOffset++] = aByte;
+        // Write colors as packed bytes (4 bytes at offset 16 in each 24-byte vertex)
+        const baseByteOffset = vertexBaseOffset * 4; // Convert to byte offset
+        this.batchVerticesU8[baseByteOffset + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 19] = aByte;
+        
+        this.batchVerticesU8[baseByteOffset + 24 + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 24 + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 24 + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 24 + 19] = aByte;
+        
+        this.batchVerticesU8[baseByteOffset + 48 + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 48 + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 48 + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 48 + 19] = aByte;
+        
+        this.batchVerticesU8[baseByteOffset + 72 + 16] = rByte;
+        this.batchVerticesU8[baseByteOffset + 72 + 17] = gByte;
+        this.batchVerticesU8[baseByteOffset + 72 + 18] = bByte;
+        this.batchVerticesU8[baseByteOffset + 72 + 19] = aByte;
       }
       
       this.vertexCount += visibleCount * 4;
