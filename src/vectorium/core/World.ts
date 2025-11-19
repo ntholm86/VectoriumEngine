@@ -25,6 +25,7 @@ export interface EntityFlags {
 
 export class World {
   private entityCount = 0;
+  private activeEntityCount = 0;  // Cached count of active entities
   private readonly maxEntities: number;
   private freeList: EntityId[] = [];  // Recycled entity IDs
   
@@ -148,6 +149,7 @@ export class World {
     this.colorB[id] = Math.floor(Math.random() * 256);
     this.alpha[id] = 1.0;
     this.flags[id] = this.FLAG_ACTIVE | this.FLAG_VISIBLE | this.FLAG_PHYSICS | this.FLAG_ROTATING;
+    this.activeEntityCount++;
     
     // Random animation type
     this.animationType[id] = Math.floor(Math.random() * 5);
@@ -166,6 +168,9 @@ export class World {
    * Destroy entity - mark inactive and add to free list for reuse
    */
   destroyEntity(id: EntityId): void {
+    if (this.flags[id] & this.FLAG_ACTIVE) {
+      this.activeEntityCount--;
+    }
     this.flags[id] = 0;
     this.freeList.push(id);
   }
@@ -266,14 +271,10 @@ export class World {
         break;
     }
   }  /**
-   * Get active entity count
+   * Get active entity count (cached for O(1) performance)
    */
   getActiveCount(): number {
-    let count = 0;
-    for (let i = 0; i < this.entityCount; i++) {
-      if (this.flags[i] & this.FLAG_ACTIVE) count++;
-    }
-    return count;
+    return this.activeEntityCount;
   }
   
   /**

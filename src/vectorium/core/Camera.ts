@@ -64,24 +64,22 @@ export class Camera {
     count: number,
     visibleIndices: Uint32Array
   ): number {
-    const bounds = this.getBounds();
+    // Calculate bounds once (inline, no object allocation)
+    const left = this.x - this.cullingMargin;
+    const right = this.x + this.width + this.cullingMargin;
+    const top = this.y - this.cullingMargin;
+    const bottom = this.y + this.height + this.cullingMargin;
+    
     let visibleCount = 0;
     
     for (let i = 0; i < count; i++) {
       const x = posX[i];
       const y = posY[i];
-      const size = scaleX[i] * 8; // Assuming 8px base size
+      const size = scaleX[i] * 8;
       const halfSize = size * 0.5;
       
-      // AABB overlap test
-      const isVisible = !(
-        x + halfSize < bounds.left ||
-        x - halfSize > bounds.right ||
-        y + halfSize < bounds.top ||
-        y - halfSize > bounds.bottom
-      );
-      
-      if (isVisible) {
+      // AABB overlap test - entity is visible if NOT outside all bounds
+      if (!(x + halfSize < left || x - halfSize > right || y + halfSize < top || y - halfSize > bottom)) {
         visibleIndices[visibleCount++] = i;
       }
     }

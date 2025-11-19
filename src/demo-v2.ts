@@ -81,6 +81,7 @@ class ImmersiveScene extends Scene {
   private updateTimeHistory: number[] = [];
   private graphMaxSamples = 60;
   private engineRef: Vectorium | null = null;
+  private renderText = true;  // Toggle for benchmarking
   
   setEngineRef(engine: Vectorium): void {
     this.engineRef = engine;
@@ -306,6 +307,9 @@ class ImmersiveScene extends Scene {
     renderer.drawRect(panelX, panelY, 3, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
     renderer.drawRect(panelX + panelWidth - 3, panelY, 3, panelHeight, { r: 0, g: 1, b: 0 }, 1.0);
     
+    // Skip text rendering if disabled (for benchmarking)
+    if (!this.renderText) return;
+    
     let yPos = panelY + 15;
     const leftCol = panelX + 10;
     const rightCol = panelX + panelWidth - 75;
@@ -516,6 +520,8 @@ class ImmersiveScene extends Scene {
   }
   
   private renderControls(textRenderer: TextRenderer, renderer: WebGLBatchRenderer): void {
+    // Skip text rendering if disabled (for benchmarking)
+    if (!this.renderText) return;
     const panelX = this.canvasWidth - 290;
     const panelY = 10;
     const panelWidth = 280;
@@ -762,6 +768,12 @@ function setupControls(engine: Vectorium, scene: ImmersiveScene, canvas: HTMLCan
       // Clear particles
       case 'c':
         scene.clearParticles();
+        break;
+      
+      // Toggle text rendering (for benchmarking)
+      case 'h':
+        (scene as any).renderText = !(scene as any).renderText;
+        console.log(`📝 Text rendering ${(scene as any).renderText ? 'ENABLED' : 'DISABLED'}`);
         break;
       
       // Toggle throttling
