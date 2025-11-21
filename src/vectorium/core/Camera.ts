@@ -55,11 +55,28 @@ export class Camera {
   private worldBoundsW: number = 0;
   private worldBoundsH: number = 0;
   
-  constructor(width: number, height: number) {
+  constructor(width: number, height: number, options?: { x?: number; y?: number; zoom?: number }) {
     this.width = width;
     this.height = height;
-    this.targetX = this.x;
-    this.targetY = this.y;
+    
+    // Set initial position if provided
+    if (options) {
+      if (options.x !== undefined) {
+        this.x = options.x;
+        this.targetX = options.x;
+      }
+      if (options.y !== undefined) {
+        this.y = options.y;
+        this.targetY = options.y;
+      }
+      if (options.zoom !== undefined) {
+        this.zoom = options.zoom;
+      }
+    } else {
+      this.targetX = this.x;
+      this.targetY = this.y;
+    }
+    
     this.updateWorldDimensions();
   }
 
@@ -98,11 +115,14 @@ export class Camera {
    * Get the camera's visible bounds (frustum)
    */
   getBounds(): CameraBounds {
+    // Camera position is CENTER of viewport, so calculate bounds accordingly
+    const halfWidth = this.width / 2;
+    const halfHeight = this.height / 2;
     return {
-      left: this.x - this.cullingMargin,
-      right: this.x + this.width + this.cullingMargin,
-      top: this.y - this.cullingMargin,
-      bottom: this.y + this.height + this.cullingMargin
+      left: this.x - halfWidth - this.cullingMargin,
+      right: this.x + halfWidth + this.cullingMargin,
+      top: this.y - halfHeight - this.cullingMargin,
+      bottom: this.y + halfHeight + this.cullingMargin
     };
   }
 
@@ -256,9 +276,11 @@ export class Camera {
    * Returns object - use for dev/debug code only (allocates)
    */
   worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
+    // Convert world coordinates to screen coordinates (0,0 = top-left)
+    // Account for camera being centered on the viewport
     return {
-      x: (worldX - this.x) * this.zoom,
-      y: (worldY - this.y) * this.zoom
+      x: (worldX - this.x) * this.zoom + this.width / 2,
+      y: (worldY - this.y) * this.zoom + this.height / 2
     };
   }
   
@@ -267,9 +289,11 @@ export class Camera {
    * Returns object - use for dev/debug code only (allocates)
    */
   screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    // Convert screen coordinates (0,0 = top-left) to world coordinates
+    // Account for camera being centered on the viewport
     return {
-      x: screenX / this.zoom + this.x,
-      y: screenY / this.zoom + this.y
+      x: (screenX - this.width / 2) / this.zoom + this.x,
+      y: (screenY - this.height / 2) / this.zoom + this.y
     };
   }
   
@@ -283,8 +307,8 @@ export class Camera {
     out: Float32Array,
     index: number
   ): void {
-    out[index] = (worldX - this.x) * this.zoom;
-    out[index + 1] = (worldY - this.y) * this.zoom;
+    out[index] = (worldX - this.x) * this.zoom + this.width / 2;
+    out[index + 1] = (worldY - this.y) * this.zoom + this.height / 2;
   }
   
   /**
@@ -297,8 +321,8 @@ export class Camera {
     out: Float32Array,
     index: number
   ): void {
-    out[index] = screenX / this.zoom + this.x;
-    out[index + 1] = screenY / this.zoom + this.y;
+    out[index] = (screenX - this.width / 2) / this.zoom + this.x;
+    out[index + 1] = (screenY - this.height / 2) / this.zoom + this.y;
   }
   
   // ========================================

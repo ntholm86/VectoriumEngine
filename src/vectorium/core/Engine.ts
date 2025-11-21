@@ -275,6 +275,12 @@ export class Vectorium {
     this.performanceMonitor.recordTextDrawCalls(this.textRenderer.getDrawCallCount());
     this.performanceMonitor.recordTextMemory(this.textRenderer.getMemoryUsage());
     
+    // Record physics metrics
+    if (this.currentScene) {
+      const physicsMetrics = this.currentScene.world.getPhysicsMetrics();
+      this.performanceMonitor.recordPhysicsMetrics(physicsMetrics);
+    }
+    
     // End performance monitoring (includes both WebGL and text rendering)
     this.performanceMonitor.endFrame();
     

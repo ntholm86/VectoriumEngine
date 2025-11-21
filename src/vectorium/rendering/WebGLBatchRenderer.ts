@@ -523,9 +523,10 @@ export class WebGLBatchRenderer {
         const floatOffset = (this.vertexCount + visibleCount * 4) * 3;
         visibleCount++;
         
-        // Apply camera transformation: (world - camera) * zoom
-        const screenX = (x - cameraX) * cameraZoom;
-        const screenY = (y - cameraY) * cameraZoom;
+        // Apply camera transformation: camera is CENTER of viewport
+        // (world - camera) * zoom + viewport_center
+        const screenX = (x - cameraX) * cameraZoom + this.gl.canvas.width / 2;
+        const screenY = (y - cameraY) * cameraZoom + this.gl.canvas.height / 2;
         const screenHw = hw * cameraZoom;
         const screenHwCos = screenHw * cos;
         const screenHwSin = screenHw * sin;
@@ -613,9 +614,10 @@ export class WebGLBatchRenderer {
         const floatOffset = (this.vertexCount + visibleCount * 4) * 3;
         visibleCount++;
         
-        // Apply camera transformation: (world - camera) * zoom
-        const screenX = (x - cameraX) * cameraZoom;
-        const screenY = (y - cameraY) * cameraZoom;
+        // Apply camera transformation: camera is CENTER of viewport
+        // (world - camera) * zoom + viewport_center
+        const screenX = (x - cameraX) * cameraZoom + this.gl.canvas.width / 2;
+        const screenY = (y - cameraY) * cameraZoom + this.gl.canvas.height / 2;
         const screenHw = hw * cameraZoom;
         const screenHwCos = screenHw * cos;
         const screenHwSin = screenHw * sin;

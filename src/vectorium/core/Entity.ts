@@ -40,6 +40,12 @@ export class BouncingEntity implements Entity {
   color: { r: number; g: number; b: number };
   animationType: 'rotate' | 'pulse' | 'wobble' | 'spin' | 'fade';
   
+  // Physics properties
+  mass: number = 1;
+  restitution: number = 1; // Bounciness (0-1)
+  enableGravity: boolean = false;
+  enableCollisions: boolean = false;
+  
   constructor(options: {
     x?: number;
     y?: number;
@@ -157,4 +163,141 @@ export class BouncingEntity implements Entity {
   update(_dt: number): void {}
   render(_renderer: WebGLBatchRenderer, _textRenderer: TextRenderer): void {}
   destroy(): void {}
+}
+
+/**
+ * PhysicsEntity - Entity with gravity
+ */
+export class PhysicsEntity extends BouncingEntity {
+  constructor(options: ConstructorParameters<typeof BouncingEntity>[0] = {}) {
+    super(options);
+    this.enableGravity = true;
+    this.restitution = 0.8; // 80% energy retained on bounce
+  }
+  
+  static createAt(x: number, y: number, options: Parameters<typeof BouncingEntity.createAt>[2] = {}): PhysicsEntity {
+    const entity = new PhysicsEntity({ x, y, size: options.size, color: options.color });
+    entity.setRandomVelocity(options.minSpeed ?? 100, options.maxSpeed ?? 300);
+    return entity;
+  }
+}
+
+/**
+ * CollisionEntity - Entity with entity-to-entity collisions
+ */
+export class CollisionEntity extends BouncingEntity {
+  constructor(options: ConstructorParameters<typeof BouncingEntity>[0] = {}) {
+    super(options);
+    this.enableCollisions = true;
+    this.restitution = 1.0; // Full elastic collision
+  }
+  
+  static createAt(x: number, y: number, options: Parameters<typeof BouncingEntity.createAt>[2] = {}): CollisionEntity {
+    const entity = new CollisionEntity({ x, y, size: options.size, color: options.color });
+    entity.setRandomVelocity(options.minSpeed ?? 100, options.maxSpeed ?? 300);
+    return entity;
+  }
+  
+  static createBurst(x: number, y: number, count: number, options: Parameters<typeof BouncingEntity.createBurst>[3] = {}): CollisionEntity[] {
+    const entities: CollisionEntity[] = [];
+    const minSpeed = options.minSpeed ?? 200;
+    const maxSpeed = options.maxSpeed ?? 500;
+    
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+      
+      let color: { r: number; g: number; b: number };
+      if (options.rainbow) {
+        const h = (i / count) * 360;
+        const s = 1, l = 0.5;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = l - c / 2;
+        let r = 0, g = 0, b = 0;
+        if (h < 60) { r = c; g = x; }
+        else if (h < 120) { r = x; g = c; }
+        else if (h < 180) { g = c; b = x; }
+        else if (h < 240) { g = x; b = c; }
+        else if (h < 300) { r = x; b = c; }
+        else { r = c; b = x; }
+        color = { r: r + m, g: g + m, b: b + m };
+      } else {
+        color = { r: Math.random(), g: Math.random(), b: Math.random() };
+      }
+      
+      const entity = new CollisionEntity({ 
+        x, 
+        y, 
+        size: options.size ?? (6 + Math.random() * 8),
+        color 
+      });
+      entity.setVelocityAngle(angle, speed);
+      entities.push(entity);
+    }
+    
+    return entities;
+  }
+}
+
+/**
+ * GravityCollisionEntity - Entity with both gravity AND collisions
+ */
+export class GravityCollisionEntity extends BouncingEntity {
+  constructor(options: ConstructorParameters<typeof BouncingEntity>[0] = {}) {
+    super(options);
+    this.enableGravity = true;
+    this.enableCollisions = true;
+    this.restitution = 0.3; // 30% energy retained (more realistic)
+    this.mass = 1 + Math.random() * 2; // Variable mass (1-3)
+  }
+  
+  static createAt(x: number, y: number, options: Parameters<typeof BouncingEntity.createAt>[2] = {}): GravityCollisionEntity {
+    const entity = new GravityCollisionEntity({ x, y, size: options.size, color: options.color });
+    if (options.minSpeed !== undefined || options.maxSpeed !== undefined) {
+      entity.setRandomVelocity(options.minSpeed ?? 100, options.maxSpeed ?? 300);
+    }
+    return entity;
+  }
+  
+  static createBurst(x: number, y: number, count: number, options: Parameters<typeof BouncingEntity.createBurst>[3] = {}): GravityCollisionEntity[] {
+    const entities: GravityCollisionEntity[] = [];
+    const minSpeed = options.minSpeed ?? 50;
+    const maxSpeed = options.maxSpeed ?? 200;
+    
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+      
+      let color: { r: number; g: number; b: number };
+      if (options.rainbow) {
+        const h = (i / count) * 360;
+        const s = 1, l = 0.5;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = l - c / 2;
+        let r = 0, g = 0, b = 0;
+        if (h < 60) { r = c; g = x; }
+        else if (h < 120) { r = x; g = c; }
+        else if (h < 180) { g = c; b = x; }
+        else if (h < 240) { g = x; b = c; }
+        else if (h < 300) { r = x; b = c; }
+        else { r = c; b = x; }
+        color = { r: r + m, g: g + m, b: b + m };
+      } else {
+        color = { r: Math.random(), g: Math.random(), b: Math.random() };
+      }
+      
+      const entity = new GravityCollisionEntity({ 
+        x, 
+        y, 
+        size: options.size ?? (8 + Math.random() * 12), // Slightly larger
+        color 
+      });
+      entity.setVelocityAngle(angle, speed);
+      entities.push(entity);
+    }
+    
+    return entities;
+  }
 }

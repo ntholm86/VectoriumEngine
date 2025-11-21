@@ -64,7 +64,12 @@ export class Scene {
   constructor(name: string, maxEntities = 2000000) { // Increased to 2M for extreme testing
     this.name = name;
     this.world = new World(maxEntities);
-    this.camera = new Camera(this.viewport.width, this.viewport.height); // Use Viewport dimensions
+    // Initialize camera centered on viewport
+    this.camera = new Camera(
+      this.viewport.width, 
+      this.viewport.height,
+      { x: this.viewport.width / 2, y: this.viewport.height / 2, zoom: 1 }
+    );
     
     // 🚀 Allocate culling buffers once (reused every frame!)
     this.visibleIndices = new Uint32Array(maxEntities);
@@ -354,6 +359,25 @@ export class Scene {
     // Optional alpha
     if (typeof anyEntity.alpha === 'number') {
       alphas[id] = anyEntity.alpha;
+    }
+    
+    // Sync physics properties
+    const mass = this.world.getMass();
+    const restitution = this.world.getRestitution();
+    const gravityEnabled = this.world.getGravityEnabled();
+    const collisionsEnabled = this.world.getCollisionsEnabled();
+    
+    if (typeof anyEntity.mass === 'number') {
+      mass[id] = anyEntity.mass;
+    }
+    if (typeof anyEntity.restitution === 'number') {
+      restitution[id] = anyEntity.restitution;
+    }
+    if (typeof anyEntity.enableGravity === 'boolean') {
+      gravityEnabled[id] = anyEntity.enableGravity ? 1 : 0;
+    }
+    if (typeof anyEntity.enableCollisions === 'boolean') {
+      collisionsEnabled[id] = anyEntity.enableCollisions ? 1 : 0;
     }
     
     // Note: Velocity, rotation speed, animation type are set by createEntity()

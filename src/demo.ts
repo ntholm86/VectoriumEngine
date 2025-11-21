@@ -3,7 +3,8 @@
  */
 
 import { Vectorium, Scene } from './vectorium/core/Engine';
-import { BouncingEntity } from './vectorium/core/Entity';
+import { BouncingEntity, PhysicsEntity, CollisionEntity, GravityCollisionEntity } from './vectorium/core/Entity';
+import { hslToRgb } from './vectorium/utils/ColorUtils';
 
 class DemoScene extends Scene {
   async load(): Promise<void> {
@@ -26,7 +27,9 @@ function initDemo() {
   
   // Click to spawn entities with automatic camera shake
   engine.onClick((x, y) => {
-    const count = engine.getEntitySpawner()?.getClickSpawnCount() ?? 100;
+    const spawner = engine.getEntitySpawner();
+    const count = spawner?.getClickSpawnCount() ?? 100;
+    const entityType = spawner?.getEntityType() ?? 'bouncing';
     
     // Conditional shake based on spawn count
     engine.getCamera()?.shakeIf(count, [
@@ -34,8 +37,31 @@ function initDemo() {
       { min: 10000, intensity: 10, duration: 300 }
     ]);
     
-    // Spawn burst and add all at once
-    const entities = BouncingEntity.createBurst(x, y, count, { rainbow: true });
+    // Spawn burst based on selected entity type
+    let entities;
+    switch (entityType) {
+      case 'bouncing':
+        entities = BouncingEntity.createBurst(x, y, count, { rainbow: true });
+        break;
+      case 'gravity':
+        entities = Array.from({ length: count }, (_, i) => {
+          const angle = (i / count) * Math.PI * 2;
+          const speed = 200 + Math.random() * 300;
+          const hue = (i / count) * 360;
+          const color = hslToRgb(hue, 1, 0.5);
+          const entity = new PhysicsEntity({ x, y, size: 8 + Math.random() * 8, color });
+          entity.setVelocityAngle(angle, speed);
+          return entity;
+        });
+        break;
+      case 'collision':
+        entities = CollisionEntity.createBurst(x, y, count, { rainbow: true });
+        break;
+      case 'full':
+        entities = GravityCollisionEntity.createBurst(x, y, count, { rainbow: true, minSpeed: 50, maxSpeed: 200 });
+        break;
+    }
+    
     scene.addBatch(entities);
   });
   

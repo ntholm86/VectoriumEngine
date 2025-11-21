@@ -12,6 +12,7 @@ export class EntitySpawner {
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
   private clickSpawnCount = 100; // Number of entities to spawn per click
   private activeButton: string = 'spawn100';
+  private entityType: 'bouncing' | 'gravity' | 'collision' | 'full' = 'bouncing';
   
   constructor(_scene: Scene) {
     this.loadVisibility();
@@ -24,6 +25,13 @@ export class EntitySpawner {
    */
   getClickSpawnCount(): number {
     return this.clickSpawnCount;
+  }
+  
+  /**
+   * Get the current entity type to spawn
+   */
+  getEntityType(): 'bouncing' | 'gravity' | 'collision' | 'full' {
+    return this.entityType;
   }
   
   /**
@@ -58,8 +66,22 @@ export class EntitySpawner {
       <div class="spawner-content">
         <div class="spawn-section">
           <div class="spawn-mode-hint">CLICK CANVAS TO SPAWN</div>
+          <div class="entity-type-section">
+            <label class="entity-type-label">Entity Type:</label>
+            <select id="entityType" class="entity-type-select">
+              <option value="bouncing">🎾 Bouncing (No Physics)</option>
+              <option value="gravity">⬇️ Gravity (Falls)</option>
+              <option value="collision">💥 Collision (Bounce Together)</option>
+              <option value="full">🌍 Full Physics (Gravity + Collision)</option>
+            </select>
+          </div>
           <div class="button-grid">
+            <button id="spawn10" class="spawn-btn">10</button>
+            <button id="spawn50" class="spawn-btn">50</button>
             <button id="spawn100" class="spawn-btn spawn-btn-active">100</button>
+            <button id="spawn500" class="spawn-btn">500</button>
+          </div>
+          <div class="button-grid">
             <button id="spawn1K" class="spawn-btn">1K</button>
             <button id="spawn10K" class="spawn-btn">10K</button>
             <button id="spawn100K" class="spawn-btn spawn-btn-hot">100K 🔥</button>
@@ -95,10 +117,31 @@ export class EntitySpawner {
     const collapseBtn = this.container.querySelector('.panel-collapse-btn');
     collapseBtn?.addEventListener('click', () => this.toggleCollapse());
     
+    // Entity type selector
+    const entityTypeSelect = this.container.querySelector('#entityType') as HTMLSelectElement;
+    entityTypeSelect?.addEventListener('change', (e) => {
+      this.entityType = (e.target as HTMLSelectElement).value as typeof this.entityType;
+    });
+    
     // Spawn buttons set click spawn count
+    this.on('spawn10', 'click', () => {
+      this.setClickSpawnCount(10);
+      this.activeButton = 'spawn10';
+    });
+    
+    this.on('spawn50', 'click', () => {
+      this.setClickSpawnCount(50);
+      this.activeButton = 'spawn50';
+    });
+    
     this.on('spawn100', 'click', () => {
       this.setClickSpawnCount(100);
       this.activeButton = 'spawn100';
+    });
+    
+    this.on('spawn500', 'click', () => {
+      this.setClickSpawnCount(500);
+      this.activeButton = 'spawn500';
     });
     
     this.on('spawn1K', 'click', () => {
@@ -282,6 +325,45 @@ export class EntitySpawner {
         .spawn-section {
           padding: 12px;
         }
+        
+        .entity-type-section {
+          margin-bottom: 12px;
+          padding: 8px;
+          background: rgba(0, 255, 0, 0.05);
+          border: 1px solid rgba(0, 255, 0, 0.2);
+          border-radius: 4px;
+        }
+        
+        .entity-type-label {
+          display: block;
+          font-size: 11px;
+          color: #00FF00;
+          margin-bottom: 4px;
+          font-weight: bold;
+        }
+        
+        .entity-type-select {
+          width: 100%;
+          padding: 6px;
+          background: rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(0, 255, 0, 0.3);
+          border-radius: 4px;
+          color: #00FF00;
+          font-family: 'Courier New', monospace;
+          font-size: 12px;
+          cursor: pointer;
+        }
+        
+        .entity-type-select:hover {
+          background: rgba(0, 255, 0, 0.1);
+          border-color: rgba(0, 255, 0, 0.5);
+        }
+        
+        .entity-type-select option {
+          background: #0a0a0a;
+          color: #00FF00;
+        }
+        
         .button-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;

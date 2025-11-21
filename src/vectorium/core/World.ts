@@ -46,6 +46,12 @@ export class World {
   private fadeDirection: Int8Array;
   private baseSize: Float32Array;
   
+  // Physics property arrays
+  private mass: Float32Array;
+  private restitution: Float32Array;
+  private enableGravity: Uint8Array; // Boolean as 0/1
+  private enableCollisions: Uint8Array; // Boolean as 0/1
+  
   // 🚀 WASM Physics Engine
   private wasmPhysics: WasmPhysics;
   
@@ -107,6 +113,12 @@ export class World {
     this.wobbleSpeed = new Float32Array(maxEntities);
     this.fadeDirection = new Int8Array(maxEntities);
     this.baseSize = new Float32Array(maxEntities);
+    
+    // Initialize physics properties
+    this.mass = new Float32Array(maxEntities).fill(1);
+    this.restitution = new Float32Array(maxEntities).fill(1);
+    this.enableGravity = new Uint8Array(maxEntities);
+    this.enableCollisions = new Uint8Array(maxEntities);
   }
   
   /**
@@ -186,8 +198,19 @@ export class World {
       this.velocityY,
       this.size,
       this.flags,
-      this.FLAG_PHYSICS
+      this.FLAG_PHYSICS,
+      this.enableGravity,
+      this.enableCollisions,
+      this.mass,
+      this.restitution
     );
+  }
+  
+  /**
+   * Get physics metrics for performance monitoring
+   */
+  getPhysicsMetrics(): any {
+    return this.wasmPhysics.getMetrics();
   }
   
   /**
@@ -291,6 +314,10 @@ export class World {
   getColorB(): Uint8Array { return this.colorB; }
   getAlphas(): Float32Array { return this.alpha; }
   getFlags(): Uint32Array { return this.flags; }
+  getMass(): Float32Array { return this.mass; }
+  getRestitution(): Float32Array { return this.restitution; }
+  getGravityEnabled(): Uint8Array { return this.enableGravity; }
+  getCollisionsEnabled(): Uint8Array { return this.enableCollisions; }
   
   /**
    * Viewport culling - returns visible entity IDs

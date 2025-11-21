@@ -53,6 +53,16 @@ export interface PerformanceMetrics {
   indexBufferSize: number; // MB
   textureMemory: number; // MB (when textures implemented)
   
+  // Physics metrics
+  physicsTime: number; // Total physics time (ms)
+  gravityTime: number; // Gravity calculation time (ms)
+  collisionBuildTime: number; // Spatial hash build time (ms)
+  collisionDetectTime: number; // Collision detection time (ms)
+  boundaryTime: number; // Boundary checking time (ms)
+  collisionChecks: number; // Number of collision pairs checked
+  spatialHashCells: number; // Active spatial hash cells
+  spatialHashMaxBucket: number; // Largest bucket size
+  
   // Frame pacing
   frameTimeVariance: number; // Standard deviation
   frameTimeMin: number; // Best frame (1% lows)
@@ -140,6 +150,9 @@ export class PerformanceMonitor {
   private sparklineCtx: CanvasRenderingContext2D | null = null;
   private frameTimeRingBuffer: number[] = []; // Last 60 frames for sparkline
   private readonly SPARKLINE_SIZE = 60;
+
+  // Physics metrics cache
+  private physicsMetrics: any = null;
 
   constructor(targetFPS: number = 60, initialQuality: QualityLevel = 'high') {
     this.targetFPS = targetFPS;
@@ -252,6 +265,17 @@ export class PerformanceMonitor {
     // Store culling stats for this frame
     (this as any).cullingInFrustum = inFrustum;
     (this as any).cullingCulled = culled;
+  }
+
+  recordPhysicsMetrics(metrics: any): void {
+    (this as any).physicsTime = metrics.totalPhysicsTime || 0;
+    (this as any).gravityTime = metrics.gravityTime || 0;
+    (this as any).collisionBuildTime = metrics.collisionBuildTime || 0;
+    (this as any).collisionDetectTime = metrics.collisionDetectTime || 0;
+    (this as any).boundaryTime = metrics.boundaryTime || 0;
+    (this as any).collisionChecks = metrics.totalCollisionChecks || 0;
+    (this as any).spatialHashCells = metrics.spatialHashStats?.cellsUsed || 0;
+    (this as any).spatialHashMaxBucket = metrics.spatialHashStats?.maxBucketSize || 0;
   }
 
   private adjustQuality(): void {
@@ -396,6 +420,16 @@ export class PerformanceMonitor {
       vertexBufferSize: vertexBufferSize,
       indexBufferSize: indexBufferSize,
       textureMemory: 0, // Not yet implemented
+      
+      // Physics metrics (populated from engine)
+      physicsTime: (this as any).physicsTime || 0,
+      gravityTime: (this as any).gravityTime || 0,
+      collisionBuildTime: (this as any).collisionBuildTime || 0,
+      collisionDetectTime: (this as any).collisionDetectTime || 0,
+      boundaryTime: (this as any).boundaryTime || 0,
+      collisionChecks: (this as any).collisionChecks || 0,
+      spatialHashCells: (this as any).spatialHashCells || 0,
+      spatialHashMaxBucket: (this as any).spatialHashMaxBucket || 0,
 
       // Frame pacing
       frameTimeVariance: frameTimeVariance,
@@ -456,14 +490,14 @@ export class PerformanceMonitor {
         <span class="profiler-hint">Press P to hide</span>
       </div>
       <div class="profiler-content">
-        <div class="section-header">🎯 FRAME METRICS</div>
+        <div class="section-header frame-section">🎯 FRAME METRICS</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">FPS</span>
             <span class="metric-value" data-metric="fps">60.0</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">└─ Avg (1s)</span>
+            <span class="metric-label">└─ Average</span>
             <span class="metric-value" data-metric="fpsavg">60.0</span>
           </div>
           <div class="metric-row">
@@ -481,43 +515,11 @@ export class PerformanceMonitor {
         </div>
 
         <div class="sparkline-container">
-          <canvas class="sparkline-canvas" width="296" height="40"></canvas>
-          <div class="sparkline-label">Frame Time (last 60 frames)</div>
+          <canvas class="sparkline-canvas" width="288" height="38"></canvas>
+          <div class="sparkline-label">Frame Time History</div>
         </div>
 
-        <div class="section-header">⚙️ UPDATE/RENDER BREAKDOWN</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">Update Total</span>
-            <span class="metric-value" data-metric="updatetotal">0.00ms</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Physics</span>
-            <span class="metric-value" data-metric="updatephysics">0.00ms</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Animation</span>
-            <span class="metric-value" data-metric="updateanimation">0.00ms</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Entity Sync</span>
-            <span class="metric-value" data-metric="updateentitysync">0.00ms</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Render Total</span>
-            <span class="metric-value" data-metric="rendertotal">0.00ms</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ ECS Batch</span>
-            <span class="metric-value" data-metric="renderbatch">0.00ms</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Custom</span>
-            <span class="metric-value" data-metric="rendercustom">0.00ms</span>
-          </div>
-        </div>
-
-        <div class="section-header">🎨 RENDER PIPELINE</div>
+        <div class="section-header render-section">🎨 RENDER PIPELINE</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">Draw Calls</span>
@@ -537,26 +539,58 @@ export class PerformanceMonitor {
           </div>
           <div class="metric-row">
             <span class="metric-label">Triangles</span>
-            <span class="metric-value" data-metric="triangles">0</span>
+            <span class="metric-value" data-metric="triangles">0K</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Batch Efficiency</span>
+            <span class="metric-label">Batch Eff</span>
             <span class="metric-value" data-metric="batch">0%</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Buffer Upload</span>
+            <span class="metric-label">Upload</span>
             <span class="metric-value" data-metric="upload">0MB</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">State Changes</span>
+            <span class="metric-label">States</span>
             <span class="metric-value" data-metric="states">0</span>
           </div>
         </div>
 
-        <div class="section-header">⚙️ ECS METRICS</div>
+        <div class="section-header physics-section">⚛️ PHYSICS</div>
         <div class="metric-group">
           <div class="metric-row">
-            <span class="metric-label">Entities Active</span>
+            <span class="metric-label">Total Time</span>
+            <span class="metric-value" data-metric="physicstime">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">├─ Gravity</span>
+            <span class="metric-value" data-metric="gravitytime">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">├─ Hash Build</span>
+            <span class="metric-value" data-metric="hashbuild">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">├─ Collision</span>
+            <span class="metric-value" data-metric="collisiontime">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">└─ Boundary</span>
+            <span class="metric-value" data-metric="boundarytime">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Checks</span>
+            <span class="metric-value" data-metric="collisionchecks">0</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Cells/Bucket</span>
+            <span class="metric-value" data-metric="hashcells">0/0</span>
+          </div>
+        </div>
+
+        <div class="section-header ecs-section">⚙️ ECS METRICS</div>
+        <div class="metric-group">
+          <div class="metric-row">
+            <span class="metric-label">Active</span>
             <span class="metric-value" data-metric="active">0</span>
           </div>
           <div class="metric-row">
@@ -577,27 +611,59 @@ export class PerformanceMonitor {
           </div>
         </div>
 
-        <div class="section-header">💾 MEMORY</div>
+        <div class="section-header update-section">⚙️ UPDATE/RENDER</div>
+        <div class="metric-group">
+          <div class="metric-row">
+            <span class="metric-label">Update Total</span>
+            <span class="metric-value" data-metric="updatetotal">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">├─ Physics</span>
+            <span class="metric-value" data-metric="updatephysics">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">├─ Animation</span>
+            <span class="metric-value" data-metric="updateanimation">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">└─ Sync</span>
+            <span class="metric-value" data-metric="updateentitysync">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Render Total</span>
+            <span class="metric-value" data-metric="rendertotal">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">├─ Batch</span>
+            <span class="metric-value" data-metric="renderbatch">0.00ms</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">└─ Custom</span>
+            <span class="metric-value" data-metric="rendercustom">0.00ms</span>
+          </div>
+        </div>
+
+        <div class="section-header memory-section">💾 MEMORY</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">JS Heap</span>
             <span class="metric-value" data-metric="memory">0MB</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Vertex Buffers</span>
+            <span class="metric-label">Vertex Buf</span>
             <span class="metric-value" data-metric="vbuffer">0MB</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Index Buffers</span>
+            <span class="metric-label">Index Buf</span>
             <span class="metric-value" data-metric="ibuffer">0MB</span>
           </div>
           <div class="metric-row">
-            <span class="metric-label">Text Atlases</span>
+            <span class="metric-label">Text Atlas</span>
             <span class="metric-value" data-metric="textatlas">0MB</span>
           </div>
         </div>
 
-        <div class="section-header">📊 PERFORMANCE</div>
+        <div class="section-header perf-section">📊 PERFORMANCE</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">Quality</span>
@@ -621,110 +687,169 @@ export class PerformanceMonitor {
         position: fixed;
         top: 10px;
         right: 10px;
-        width: 320px;
-        max-height: 95vh;
+        width: 305px;
+        max-height: 92vh;
         overflow-y: auto;
-        background: rgba(0, 0, 0, 0.92);
-        color: #00FF00;
-        border: 2px solid #00FF00;
+        background: linear-gradient(135deg, rgba(0, 0, 0, 0.96) 0%, rgba(5, 10, 5, 0.96) 100%);
+        color: #0f0;
+        border: 1px solid rgba(0, 255, 0, 0.3);
         border-radius: 6px;
-        font-family: 'Courier New', Consolas, monospace;
-        font-size: 11px;
-        box-shadow: 0 4px 20px rgba(0, 255, 0, 0.3);
+        font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+        font-size: 9px;
+        box-shadow: 
+          0 0 15px rgba(0, 255, 0, 0.1),
+          0 3px 12px rgba(0, 0, 0, 0.8),
+          inset 0 1px 0 rgba(0, 255, 0, 0.08);
+        backdrop-filter: blur(8px);
         z-index: 10000;
-        transition: opacity 0.3s, transform 0.3s;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .vectorium-profiler.hidden {
         opacity: 0;
-        transform: translateX(360px);
+        transform: translateX(320px) scale(0.97);
         pointer-events: none;
       }
       .profiler-header {
         display: flex;
         justify-content: space-between;
-        padding: 10px 12px;
-        border-bottom: 1px solid rgba(0, 255, 0, 0.3);
-        background: rgba(0, 255, 0, 0.05);
+        align-items: center;
+        padding: 7px 10px;
+        background: linear-gradient(180deg, rgba(0, 255, 0, 0.08) 0%, rgba(0, 255, 0, 0.02) 100%);
+        border-bottom: 1px solid rgba(0, 255, 0, 0.15);
       }
       .profiler-title {
-        font-weight: bold;
-        font-size: 13px;
-        letter-spacing: 0.5px;
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 1.2px;
+        text-shadow: 0 0 10px rgba(0, 255, 0, 0.6);
       }
       .profiler-hint {
-        color: #888;
-        font-size: 10px;
+        color: rgba(255, 255, 255, 0.25);
+        font-size: 8px;
+        font-weight: 400;
       }
       .profiler-content {
         padding: 0;
       }
       .section-header {
-        background: rgba(0, 255, 0, 0.1);
-        padding: 6px 12px;
-        font-weight: bold;
-        font-size: 10px;
-        letter-spacing: 0.5px;
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        color: #4a9eff;
+        padding: 0px 10px;
+        font-weight: 600;
+        font-size: 8px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        border-top: 1px solid rgba(0, 0, 0, 0.3);
+        margin-top: 1px;
+      }
+      .frame-section {
+        background: linear-gradient(90deg, rgba(0, 200, 255, 0.15) 0%, transparent 100%);
+        border-left: 3px solid rgba(0, 220, 255, 0.7);
+        color: #00ddff;
+        text-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
+      }
+      .render-section {
+        background: linear-gradient(90deg, rgba(255, 0, 200, 0.15) 0%, transparent 100%);
+        border-left: 3px solid rgba(255, 0, 220, 0.7);
+        color: #ff00dd;
+        text-shadow: 0 0 8px rgba(255, 0, 220, 0.5);
+      }
+      .physics-section {
+        background: linear-gradient(90deg, rgba(50, 255, 100, 0.15) 0%, transparent 100%);
+        border-left: 3px solid rgba(50, 255, 120, 0.7);
+        color: #33ff77;
+        text-shadow: 0 0 8px rgba(50, 255, 120, 0.5);
+      }
+      .ecs-section {
+        background: linear-gradient(90deg, rgba(255, 180, 0, 0.15) 0%, transparent 100%);
+        border-left: 3px solid rgba(255, 200, 0, 0.7);
+        color: #ffcc00;
+        text-shadow: 0 0 8px rgba(255, 200, 0, 0.5);
+      }
+      .update-section {
+        background: linear-gradient(90deg, rgba(120, 100, 255, 0.15) 0%, transparent 100%);
+        border-left: 3px solid rgba(140, 120, 255, 0.7);
+        color: #8877ff;
+        text-shadow: 0 0 8px rgba(140, 120, 255, 0.5);
+      }
+      .memory-section {
+        background: linear-gradient(90deg, rgba(255, 80, 80, 0.15) 0%, transparent 100%);
+        border-left: 3px solid rgba(255, 100, 100, 0.7);
+        color: #ff6666;
+        text-shadow: 0 0 8px rgba(255, 100, 100, 0.5);
+      }
+      .perf-section {
+        background: linear-gradient(90deg, rgba(100, 255, 100, 0.15) 0%, transparent 100%);
+        border-left: 3px solid rgba(120, 255, 120, 0.7);
+        color: #77ff77;
+        text-shadow: 0 0 8px rgba(120, 255, 120, 0.5);
       }
       .metric-group {
-        padding: 8px 12px;
+        padding: 3px 10px 4px;
       }
       .metric-row {
         display: flex;
         justify-content: space-between;
-        padding: 3px 0;
-        line-height: 1.4;
+        padding: 1.5px 0;
+        line-height: 1.35;
+        transition: background 0.15s;
+      }
+      .metric-row:hover {
+        background: rgba(0, 255, 0, 0.04);
       }
       .metric-label {
-        color: #00FF00;
+        color: rgba(0, 255, 0, 0.65);
+        font-size: 8.5px;
       }
       .metric-value {
-        color: #FFFF00;
-        font-weight: bold;
+        color: #ff0;
+        font-weight: 600;
         text-align: right;
-        min-width: 100px;
-        transition: color 0.2s;
+        font-size: 9px;
+        text-shadow: 0 0 3px rgba(255, 255, 0, 0.25);
+        transition: all 0.2s;
       }
       .metric-value.warning {
-        color: #FFA500;
+        color: #fa0;
+        text-shadow: 0 0 5px rgba(255, 160, 0, 0.4);
       }
       .metric-value.critical {
-        color: #FF0000;
+        color: #f33;
+        text-shadow: 0 0 6px rgba(255, 50, 50, 0.5);
+        animation: pulse 1s ease-in-out infinite;
       }
       .metric-value.good {
-        color: #00FF00;
+        color: #0f0;
+        text-shadow: 0 0 5px rgba(0, 255, 0, 0.35);
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.75; }
       }
       .vectorium-profiler::-webkit-scrollbar {
-        width: 8px;
+        width: 5px;
       }
       .vectorium-profiler::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.3);
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 3px;
       }
       .vectorium-profiler::-webkit-scrollbar-thumb {
-        background: rgba(0, 255, 0, 0.3);
-        border-radius: 4px;
+        background: linear-gradient(180deg, rgba(0, 255, 0, 0.35), rgba(0, 255, 0, 0.15));
+        border-radius: 3px;
       }
       .vectorium-profiler::-webkit-scrollbar-thumb:hover {
-        background: rgba(0, 255, 0, 0.5);
+        background: linear-gradient(180deg, rgba(0, 255, 0, 0.5), rgba(0, 255, 0, 0.25));
       }
       .sparkline-container {
-        padding: 8px 12px;
-        background: rgba(0, 255, 0, 0.03);
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 5px 10px;
+        background: rgba(0, 0, 0, 0.35);
+        border-top: 1px solid rgba(0, 200, 255, 0.1);
+        border-bottom: 1px solid rgba(0, 200, 255, 0.1);
       }
       .sparkline-canvas {
         width: 100%;
-        height: 40px;
+        height: 28px;
         display: block;
-        image-rendering: pixelated;
-      }
-      .sparkline-label {
-        font-size: 9px;
-        color: #888;
-        text-align: center;
-        margin-top: 4px;
+        border-radius: 2px;
+        background: rgba(0, 0, 0, 0.6);
       }
     `;
     container.appendChild(style);
@@ -820,10 +945,31 @@ export class PerformanceMonitor {
     set('fpsavg', this.getAverageFPS().toFixed(1));
     set('frame', `${metrics.frameTime.toFixed(2)}ms`);
     set('minmax', `${metrics.frameTimeMin.toFixed(1)}/${metrics.frameTimeMax.toFixed(1)}ms`);
-    set('variance', `±${metrics.frameTimeVariance.toFixed(2)}ms`);
 
-    // Draw sparkline
-    this.drawSparkline();
+    // Render Pipeline
+    const drawCallClass = metrics.drawCalls > 50 ? 'warning' : metrics.drawCalls > 100 ? 'critical' : '';
+    set('drawcalls', metrics.drawCalls.toString(), drawCallClass);
+    set('webgl', `${metrics.webglDrawCalls}/${metrics.textDrawCalls}`);
+    set('triangles', `${(metrics.trianglesRendered / 1000).toFixed(1)}K`);
+    const batchClass = metrics.batchEfficiency < 0.3 ? 'warning' : metrics.batchEfficiency > 0.7 ? 'good' : '';
+    set('batch', `${(metrics.batchEfficiency * 100).toFixed(0)}%`, batchClass);
+    set('upload', `${metrics.bufferUploadSize.toFixed(2)}MB`);
+
+    // Physics Metrics
+    const physicsClass = metrics.physicsTime > 10 ? 'warning' : metrics.physicsTime > 5 ? '' : 'good';
+    set('physicstime', `${metrics.physicsTime.toFixed(2)}ms`, physicsClass);
+    set('gravitytime', `${metrics.gravityTime.toFixed(2)}ms`);
+    set('hashbuild', `${metrics.collisionBuildTime.toFixed(2)}ms`);
+    set('collisiontime', `${metrics.collisionDetectTime.toFixed(2)}ms`);
+    set('boundarytime', `${metrics.boundaryTime.toFixed(2)}ms`);
+    set('collisionchecks', `${(metrics.collisionChecks / 1000).toFixed(1)}K`);
+    set('hashcells', `${metrics.spatialHashCells}/${metrics.spatialHashMaxBucket}`);
+
+    // ECS Metrics
+    set('active', `${(metrics.entitiesProcessed / 1000).toFixed(1)}K`);
+    set('rendered', `${(metrics.entitiesRendered / 1000).toFixed(1)}K`);
+    set('culled', `${((metrics.entitiesCulled || 0) / 1000).toFixed(1)}K`);
+    set('timeperentity', `${metrics.timePerEntity.toFixed(1)}μs`);
 
     // Update/Render Breakdown (from Scene)
     const scenePerfMetrics = (window as any).vectoriumCurrentScene?.perfMetrics;
@@ -833,29 +979,7 @@ export class PerformanceMonitor {
       set('updateanimation', `${scenePerfMetrics.updateAnimation.toFixed(2)}ms`);
       set('updateentitysync', `${scenePerfMetrics.updateEntitySync.toFixed(2)}ms`);
       set('rendertotal', `${scenePerfMetrics.renderTotal.toFixed(2)}ms`);
-      set('renderbatch', `${scenePerfMetrics.renderBatch.toFixed(2)}ms`);
-      set('rendercustom', `${scenePerfMetrics.renderCustom.toFixed(2)}ms`);
     }
-
-    // Render Pipeline
-    const drawCallClass = metrics.drawCalls > 50 ? 'warning' : metrics.drawCalls > 100 ? 'critical' : '';
-    set('drawcalls', metrics.drawCalls.toString(), drawCallClass);
-    set('webgl', metrics.webglDrawCalls.toString());
-    set('text', metrics.textDrawCalls.toString());
-    set('vertices', (metrics.verticesRendered / 1000).toFixed(1) + 'K');
-    set('triangles', (metrics.trianglesRendered / 1000).toFixed(1) + 'K');
-    
-    const batchClass = metrics.batchEfficiency < 0.3 ? 'warning' : metrics.batchEfficiency > 0.7 ? 'good' : '';
-    set('batch', `${(metrics.batchEfficiency * 100).toFixed(0)}%`, batchClass);
-    set('upload', `${metrics.bufferUploadSize.toFixed(2)}MB`);
-    set('states', metrics.stateChanges.toString());
-
-    // ECS Metrics
-    set('active', metrics.entitiesProcessed.toLocaleString());
-    set('rendered', metrics.entitiesRendered.toLocaleString());
-    set('culled', (metrics.entitiesCulled || 0).toLocaleString());
-    set('cullingeff', `${(metrics.cullingEfficiency || 0).toFixed(0)}%`);
-    set('timeperentity', `${metrics.timePerEntity.toFixed(2)}μs`);
 
     // Memory
     const memClass = metrics.memory > 500 ? 'warning' : metrics.memory > 1000 ? 'critical' : '';
