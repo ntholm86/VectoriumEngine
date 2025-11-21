@@ -12,16 +12,9 @@
  */
 
 import { WasmPhysics } from '../wasm/WasmPhysics.js';
+import type { EntityId, EntityFlags } from './Entity';
 
-export type EntityId = number;
-
-export interface EntityFlags {
-  ACTIVE: number;
-  VISIBLE: number;
-  PHYSICS: number;
-  COLLIDABLE: number;
-  ROTATING: number;
-}
+export type { EntityId, EntityFlags };
 
 export class World {
   private entityCount = 0;

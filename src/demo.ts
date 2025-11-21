@@ -2,28 +2,9 @@
  * Vectorium Engine - Interactive Demo
  */
 
-import { Vectorium, Scene, Entity } from './vectorium/core/Engine';
-import { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';
-import { TextRenderer } from './vectorium/rendering/TextRenderer';
+import { Vectorium, Scene } from './vectorium/core/Engine';
+import { BouncingEntity } from './vectorium/core/Entity';
 import { hslToRgb } from './vectorium/utils/ColorUtils';
-
-class BouncingEntity implements Entity {
-  x = 0; y = 0; vx = 0; vy = 0; size = 8; rotation = 0; rotationSpeed = 0; alpha = 1.0;
-  color = { r: 1, g: 1, b: 1 };
-  animationType: 'rotate' | 'pulse' | 'wobble' | 'spin' | 'fade' = 'rotate';
-  
-  spawn(x: number, y: number, vx: number, vy: number, size: number, color: { r: number; g: number; b: number }): void {
-    Object.assign(this, { x, y, vx, vy, size, color });
-    this.rotation = Math.floor(Math.random() * 360);
-    this.rotationSpeed = Math.floor((Math.random() - 0.5) * 360);
-    this.alpha = 0.8 + Math.random() * 0.2;
-    this.animationType = ['rotate', 'pulse', 'wobble', 'spin', 'fade'][Math.floor(Math.random() * 5)] as any;
-  }
-  
-  update(_dt: number): void {}
-  render(_renderer: WebGLBatchRenderer, _textRenderer: TextRenderer): void {}
-  destroy(): void {}
-}
 
 class DemoScene extends Scene {
   private entityCount = 0;
@@ -79,7 +60,7 @@ function initDemo() {
   container.style.cssText = 'display:flex;justify-content:center;align-items:center;min-height:100vh;background:linear-gradient(135deg,#1a1a2e 0%,#0f0f1e 100%)';
   
   const canvasWrapper = document.createElement('div');
-  canvasWrapper.style.cssText = 'width:800px;height:600px;position:relative';
+  canvasWrapper.style.cssText = 'width:auto;height:auto;position:relative';
   
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'display:block;width:100%;height:100%;border:3px solid #00FF00;box-shadow:0 0 30px rgba(0,255,0,0.5),0 0 60px rgba(0,255,0,0.3);border-radius:4px';
@@ -108,14 +89,17 @@ function initDemo() {
   
   // Click spawner
   canvas.addEventListener('click', (e) => {
-    const camera = engine.getCamera();
-    if (!camera) return;
-    const rect = canvas.getBoundingClientRect();
-    const world = camera.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-    const count = 100; // Default click spawn count
+    const world = engine.getWorldCoordinates(e.clientX, e.clientY);
+    if (!world) return;
     
-    if (count >= 100000) camera.startShake(20, 500);
-    else if (count >= 10000) camera.startShake(10, 300);
+    const camera = engine.getCamera();
+    const entitySpawner = engine.getEntitySpawner();
+    const count = entitySpawner ? entitySpawner.getClickSpawnCount() : 100;
+    
+    if (camera) {
+      if (count >= 100000) camera.startShake(20, 500);
+      else if (count >= 10000) camera.startShake(10, 300);
+    }
     
     for (let i = 0; i < count; i++) {
       const entity = new BouncingEntity();
