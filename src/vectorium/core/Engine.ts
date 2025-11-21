@@ -515,6 +515,9 @@ export class Vectorium {
     
     // Update scene
     if (this.currentScene && this.currentScene.active) {
+      // Expose current scene globally for profiler access
+      (window as any).vectoriumCurrentScene = this.currentScene;
+      
       this.currentScene.update(dt);
       
       // Record entities processed for performance monitoring

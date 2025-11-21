@@ -26,3 +26,9 @@ export { ObjectPool, BufferPool, bufferPool } from './vectorium/memory/Pooling';
 export { PerformanceMonitor } from './vectorium/performance/PerformanceMonitor';
 export type { QualityLevel, QualitySettings, PerformanceMetrics } from './vectorium/performance/PerformanceMonitor';
 
+// Configuration
+export { RuntimeConfig } from './vectorium/core/RuntimeConfig';
+export type { RenderingSettings, PhysicsSettings, DebugSettings, QualitySettings as RuntimeQualitySettings, AnimationSettings } from './vectorium/core/RuntimeConfig';
+
+// Debug Tools
+export { DebugPanel } from './vectorium/debug/DebugPanel';

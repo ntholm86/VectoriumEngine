@@ -4,6 +4,8 @@
  */
 
 import { Vectorium, Scene, Entity, Viewport } from './vectorium/core/Engine';
+import { RuntimeConfig } from './vectorium/core/RuntimeConfig';
+import { DebugPanel } from './vectorium/debug/DebugPanel';
 import { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';
 import { TextRenderer } from './vectorium/rendering/TextRenderer';
 
@@ -52,7 +54,7 @@ class DemoScene extends Scene {
     // World bounds ALWAYS match canvas resolution exactly
     this.setWorldBoundsMultiplier(1.0);
     
-    this.addEntities(1000, true); // Spawn in viewport by default
+    this.addEntities(10, true); // Spawn in viewport by default
   }
   
   addEntities(count: number, inViewportOnly: boolean = true): void {
@@ -102,9 +104,9 @@ class DemoScene extends Scene {
 }
 
 /**
- * Enhanced UI Controls with Detailed Performance Metrics
+ * Demo Controls - Entity spawning and configuration
  */
-class UIControls {
+class DemoControls {
   private engine: Vectorium;
   private scene: DemoScene;
   private container: HTMLDivElement;
@@ -114,9 +116,6 @@ class UIControls {
     this.scene = scene;
     this.container = this.createUI();
     document.body.appendChild(this.container);
-    
-    this.updateMetrics();
-    setInterval(() => this.updateMetrics(), 100);
   }
   
   private createUI(): HTMLDivElement {
@@ -124,16 +123,14 @@ class UIControls {
     container.style.cssText = `
       position: fixed;
       top: 10px;
-      right: 10px;
+      left: 10px;
       background: rgba(0, 0, 0, 0.90);
       color: #00FF00;
       padding: 15px;
       border-radius: 8px;
       font-family: 'Courier New', monospace;
       font-size: 12px;
-      width: 360px;
-      max-height: 95vh;
-      overflow-y: auto;
+      width: 280px;
       box-shadow: 0 4px 20px rgba(0, 255, 0, 0.4);
       border: 2px solid #00FF00;
       z-index: 1000;
@@ -141,218 +138,48 @@ class UIControls {
     
     container.innerHTML = `
       <h2 style="margin: 0 0 12px 0; color: #00FF00; font-size: 16px; text-align: center; text-shadow: 0 0 10px #00FF00;">
-        ⚡ VECTORIUM ENGINE ⚡
+        🎮 DEMO CONTROLS
       </h2>
       
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(0, 255, 0, 0.1); border-radius: 4px; border-left: 3px solid #00FF00;">
-        <div style="font-weight: bold; margin-bottom: 6px; color: #FFFF00;">
-          🎯 FRAME METRICS
-        </div>
-        <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>FPS:</span> <span id="fps" style="color: #FFFF00; font-weight: bold;">60</span>
-        </div>
-        <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>Frame Time:</span> <span id="frameTime">0.00</span>ms
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span>Quality:</span> <span id="quality">HIGH</span>
-        </div>
-      </div>
-      
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(0, 255, 255, 0.1); border-radius: 4px; border-left: 3px solid #00FFFF;">
-        <div style="font-weight: bold; margin-bottom: 6px; color: #00FFFF;">
-          ⚙️ UPDATE BREAKDOWN
-        </div>
-        <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>Total:</span> <span id="updateTotal" style="font-weight: bold;">0.00</span>ms
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; padding-left: 8px; font-size: 11px; opacity: 0.9;">
-          <span>├─ Physics:</span> <span id="updatePhysics">0.00</span>ms
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; padding-left: 8px; font-size: 11px; opacity: 0.9;">
-          <span>├─ Animation:</span> <span id="updateAnimation">0.00</span>ms
-        </div>
-        <div style="margin-bottom: 6px; display: flex; justify-content: space-between; padding-left: 8px; font-size: 11px; opacity: 0.9;">
-          <span>└─ Entity Sync:</span> <span id="updateEntitySync">0.00</span>ms
-        </div>
-        <div style="padding-top: 6px; border-top: 1px solid rgba(0,255,255,0.3); font-size: 11px; display: flex; justify-content: space-between;">
-          <span>Custom Update Entities:</span> <span id="customUpdateCount">0</span>
-        </div>
-      </div>
-      
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(255, 0, 255, 0.1); border-radius: 4px; border-left: 3px solid #FF00FF;">
-        <div style="font-weight: bold; margin-bottom: 6px; color: #FF00FF;">
-          🎨 RENDER BREAKDOWN
-        </div>
-        <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>Total:</span> <span id="renderTotal" style="font-weight: bold;">0.00</span>ms
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; padding-left: 8px; font-size: 11px; opacity: 0.9;">
-          <span>├─ ECS Batch:</span> <span id="renderBatch">0.00</span>ms
-        </div>
-        <div style="margin-bottom: 6px; display: flex; justify-content: space-between; padding-left: 8px; font-size: 11px; opacity: 0.9;">
-          <span>└─ Custom:</span> <span id="renderCustom">0.00</span>ms
-        </div>
-        <div style="padding-top: 6px; border-top: 1px solid rgba(255,0,255,0.3); font-size: 11px; display: flex; justify-content: space-between;">
-          <span>WebGL Draw Calls:</span> <span id="drawCalls" style="font-weight: bold;">0</span>
-        </div>
-        <div style="font-size: 11px; display: flex; justify-content: space-between; margin-top: 4px;">
-          <span>Rendering Mode:</span> <span id="renderMode" style="font-weight: bold; color: #FF00FF;">Batch</span>
-        </div>
-      </div>
-      
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(255, 255, 0, 0.1); border-radius: 4px; border-left: 3px solid #FFFF00;">
-        <div style="font-weight: bold; margin-bottom: 6px; color: #FFFF00;">
-          📊 ECS METRICS
-        </div>
-        <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>Active Entities:</span> <span id="ecsActive" style="font-weight: bold;">0</span>
-        </div>
-        <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>Total Entities:</span> <span id="ecsTotal">0</span>
-        </div>
-        <div style="margin-bottom: 4px; display: flex; justify-content: space-between;">
-          <span>Memory:</span> <span id="memory">0.0</span>MB
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px; opacity: 0.9;">
-          <span>Efficiency:</span> <span id="ecsEfficiency">100</span>%
-        </div>
-      </div>
-
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(0, 255, 128, 0.1); border-radius: 4px; border-left: 3px solid #00FF80;">
-        <div style="font-weight: bold; margin-bottom: 6px; color: #00FF80;">
-          🔬 ADVANCED METRICS
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Vertices/Frame:</span> <span id="verticesRendered">0</span>
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Triangles/Frame:</span> <span id="trianglesRendered">0</span>
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Batch Efficiency:</span> <span id="batchEfficiency">0</span>%
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Buffer Upload:</span> <span id="bufferUploadSize">0.00</span>MB
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>State Changes:</span> <span id="stateChanges">0</span>
-        </div>
-        <div style="margin-bottom: 6px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Time/Entity:</span> <span id="timePerEntity">0.00</span>μs
-        </div>
-        <div style="padding-top: 6px; border-top: 1px solid rgba(0,255,128,0.3); font-size: 11px; display: flex; justify-content: space-between;">
-          <span>Bottleneck:</span> <span id="bottleneck" style="font-weight: bold;">BALANCED</span>
-        </div>
-        <div style="margin-top: 4px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Perf Score:</span> <span id="performanceScore" style="font-weight: bold;">100</span>/100
-        </div>
-      </div>
-
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(255, 128, 0, 0.1); border-radius: 4px; border-left: 3px solid #FF8000;">
-        <div style="font-weight: bold; margin-bottom: 6px; color: #FF8000;">
-          📈 FRAME PACING
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>1% Low:</span> <span id="frameTimeMin">0.00</span>ms
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Average:</span> <span id="frameTimeAvg">0.00</span>ms
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Worst:</span> <span id="frameTimeMax">0.00</span>ms
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Variance:</span> <span id="frameTimeVariance">0.00</span>ms
-        </div>
-      </div>
-
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(128, 0, 255, 0.1); border-radius: 4px; border-left: 3px solid #8000FF;">
-        <div style="font-weight: bold; margin-bottom: 6px; color: #8000FF;">
-          🎯 FRUSTUM CULLING
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Visible Entities:</span> <span id="entitiesInFrustum" style="font-weight: bold;">0</span>
-        </div>
-        <div style="margin-bottom: 3px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Culled Entities:</span> <span id="entitiesCulled">0</span>
-        </div>
-        <div style="margin-bottom: 6px; display: flex; justify-content: space-between; font-size: 11px;">
-          <span>Culling Efficiency:</span> <span id="cullingEfficiency" style="font-weight: bold;">0.0</span>%
-        </div>
-        <div style="padding-top: 6px; border-top: 1px solid rgba(128,0,255,0.3); font-size: 11px;">
-          <button id="toggleCullingBtn" style="width: 100%; padding: 6px; background: #8000FF; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">
-            ✓ Culling ON
-          </button>
-        </div>
-      </div>
-      
       <div style="margin-bottom: 12px;">
-        <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">Canvas Resolution</h3>
-        <select id="resolutionSelect" style="width: 100%; padding: 8px; background: #000; color: #00FF00; border: 1px solid #00FF00; border-radius: 4px; font-family: inherit; margin-bottom: 8px; font-size: 12px;">
-          <option value="800x600">800×600 (4:3)</option>
-          <option value="1024x768">1024×768 (4:3)</option>
-          <option value="1280x720">1280×720 (16:9)</option>
-          <option value="1366x768">1366×768 (16:9)</option>
-          <option value="1920x1080" selected>1920×1080 (16:9)</option>
-          <option value="2560x1440">2560×1440 (16:9)</option>
-        </select>
+        <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">🖥️ Fullscreen</h3>
         <button id="fullscreenBtn" style="width: 100%; padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">
-          🖥️ Fullscreen
+          Enter Fullscreen
         </button>
       </div>
       
-      <div style="margin-bottom: 12px; padding: 10px; background: rgba(255, 165, 0, 0.1); border-radius: 4px; border-left: 3px solid #FFA500;">
-        <h3 style="margin: 0 0 8px 0; color: #FFA500; font-size: 13px; font-weight: bold;">🔧 Batch Size Tuning</h3>
-        <div style="margin-bottom: 6px; font-size: 10px; color: #FFCC00; line-height: 1.4;">
-          Smaller = More draw calls, better GPU pipelining<br>
-          Larger = Fewer draw calls, possible stalling
-        </div>
-        <select id="batchSizeSelect" style="width: 100%; padding: 8px; background: #000; color: #FFA500; border: 1px solid #FFA500; border-radius: 4px; font-family: inherit; margin-bottom: 6px; font-size: 12px;">
-          <option value="16000">16K sprites/batch (more calls)</option>
-          <option value="32000">32K sprites/batch</option>
-          <option value="48000">48K sprites/batch</option>
-          <option value="65000" selected>65K sprites/batch (default)</option>
-        </select>
-        <div style="font-size: 10px; color: #AAA; text-align: center;">
-          Current: <span id="currentBatchSize" style="color: #FFA500; font-weight: bold;">65000</span>
-        </div>
-      </div>
-      
-      <div style="margin-bottom: 12px;">
-        <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">Entity Controls</h3>
-        <div style="margin-bottom: 6px; font-size: 11px; color: #FFFF00;">
-          🌍 World Spawning (10x area):
+      <div>
+        <h3 style="margin: 0 0 8px 0; color: #00FF00; font-size: 13px; font-weight: bold;">➕ Spawn Entities</h3>
+        <div style="margin-bottom: 6px; font-size: 10px; color: #FFFF00;">
+          🌍 World (10x area):
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;">
-          <button id="add100Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100</button>
-          <button id="add1000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1K</button>
-          <button id="add10000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+10K</button>
-          <button id="add100000Btn" style="padding: 8px; background: #FF00FF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100K 🔥</button>
+          <button id="add100Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+100</button>
+          <button id="add1000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+1K</button>
+          <button id="add10000Btn" style="padding: 8px; background: #00FF00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+10K</button>
+          <button id="add100000Btn" style="padding: 8px; background: #FF00FF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+100K 🔥</button>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px;">
-          <button id="add500000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+500K 💥</button>
-          <button id="add1000000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1M ☢️</button>
+          <button id="add500000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+500K 💥</button>
+          <button id="add1000000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+1M ☢️</button>
         </div>
-        <div style="margin-bottom: 6px; font-size: 11px; color: #00FFFF;">
-          📺 Viewport Spawning (visible):
+        <div style="margin-bottom: 6px; font-size: 10px; color: #00FFFF;">
+          📺 Viewport (visible):
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px;">
-          <button id="addViewport100Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100 👁️</button>
-          <button id="addViewport1000Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+1K 👁️</button>
-          <button id="addViewport10000Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+10K 👁️</button>
-          <button id="addViewport100000Btn" style="padding: 8px; background: #00AAAA; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">+100K 👁️</button>
+          <button id="addViewport100Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+100 👁️</button>
+          <button id="addViewport1000Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+1K 👁️</button>
+          <button id="addViewport10000Btn" style="padding: 8px; background: #00FFFF; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+10K 👁️</button>
+          <button id="addViewport100000Btn" style="padding: 8px; background: #00AAAA; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">+100K 👁️</button>
         </div>
-        
-        
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px;">
-          <button id="remove1000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">-1K</button>
-          <button id="clearBtn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 12px;">Clear All</button>
+          <button id="remove1000Btn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">-1K</button>
+          <button id="clearBtn" style="padding: 8px; background: #FF0000; color: #FFF; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 11px;">Clear All</button>
         </div>
       </div>
       
       <div style="font-size: 10px; color: #00AA00; text-align: center; padding-top: 10px; border-top: 1px solid #00FF00;">
-        SPACE: Pause | CLICK: Spawn Burst
+        SPACE: Pause | CLICK: Spawn | P: Profiler
       </div>
     `;
     
@@ -361,21 +188,6 @@ class UIControls {
   }
   
   private setupEventListeners(container: HTMLDivElement): void {
-    const resolutionSelect = container.querySelector('#resolutionSelect') as HTMLSelectElement;
-    resolutionSelect.addEventListener('change', () => {
-      const [width, height] = resolutionSelect.value.split('x').map(Number);
-      
-      // Resize engine (this updates both WebGL canvas AND text overlay canvas)
-      this.engine.resize(width, height);
-      
-      // Update canvas wrapper size to match exactly (no rounding issues)
-      const canvas = this.engine.canvas;
-      if (canvas.parentElement) {
-        canvas.parentElement.style.width = `${width}px`;
-        canvas.parentElement.style.height = `${height}px`;
-      }
-    });
-    
     const fullscreenBtn = container.querySelector('#fullscreenBtn') as HTMLButtonElement;
     fullscreenBtn.addEventListener('click', () => {
       const canvas = this.engine.canvas;
@@ -384,19 +196,6 @@ class UIControls {
         setTimeout(() => {
           this.engine.resize(window.screen.width, window.screen.height);
         }, 100);
-      }
-    });
-    
-    const batchSizeSelect = container.querySelector('#batchSizeSelect') as HTMLSelectElement;
-    batchSizeSelect.addEventListener('change', () => {
-      const batchSize = parseInt(batchSizeSelect.value, 10);
-      const renderer = this.engine.getRenderer();
-      if (renderer && 'setBatchSize' in renderer) {
-        (renderer as WebGLBatchRenderer).setBatchSize(batchSize);
-        const currentBatchSizeSpan = container.querySelector('#currentBatchSize');
-        if (currentBatchSizeSpan) {
-          currentBatchSizeSpan.textContent = batchSize.toString();
-        }
       }
     });
     
@@ -451,25 +250,6 @@ class UIControls {
       }
     });
     
-    // Viewport spawning buttons (spawn entities in visible area only)
-    container.querySelector('#addViewport100Btn')?.addEventListener('click', () => {
-      this.scene.addEntities(100, true); // true = viewport only
-    });
-    
-    container.querySelector('#addViewport1000Btn')?.addEventListener('click', () => {
-      this.scene.addEntities(1000, true);
-    });
-    
-    container.querySelector('#addViewport10000Btn')?.addEventListener('click', () => {
-      this.scene.addEntities(10000, true);
-    });
-    
-    container.querySelector('#addViewport100000Btn')?.addEventListener('click', () => {
-      if (confirm('⚠️ Add 100,000 entities in viewport? Screen will be PACKED!')) {
-        this.scene.addEntities(100000, true);
-      }
-    });
-    
     container.querySelector('#remove1000Btn')?.addEventListener('click', () => {
       this.scene.removeEntities(1000);
     });
@@ -479,151 +259,6 @@ class UIControls {
         this.scene.clearEntities();
       }
     });
-    
-    // Culling toggle button
-    let cullingEnabled = true;
-    const toggleCullingBtn = container.querySelector('#toggleCullingBtn') as HTMLButtonElement;
-    toggleCullingBtn?.addEventListener('click', () => {
-      cullingEnabled = !cullingEnabled;
-      const currentScene = (this.engine as any).currentScene;
-      if (currentScene) {
-        currentScene.setCullingEnabled(cullingEnabled);
-      }
-      toggleCullingBtn.textContent = cullingEnabled ? '✓ Culling ON' : '✗ Culling OFF';
-      toggleCullingBtn.style.background = cullingEnabled ? '#8000FF' : '#666';
-    });
-  }
-  
-  private updateMetrics(): void {
-    const perfMonitorMetrics = this.engine.performanceMonitor.getMetrics();
-    const scenePerfMetrics = (this.engine as any).currentScene?.perfMetrics;
-    
-    // Frame Metrics
-    document.getElementById('fps')!.textContent = Math.round(perfMonitorMetrics.fps).toString();
-    document.getElementById('frameTime')!.textContent = perfMonitorMetrics.frameTime.toFixed(2);
-    document.getElementById('quality')!.textContent = perfMonitorMetrics.quality.toUpperCase();
-    
-    // Update Breakdown (from scene)
-    if (scenePerfMetrics) {
-      document.getElementById('updateTotal')!.textContent = scenePerfMetrics.updateTotal.toFixed(2);
-      document.getElementById('updatePhysics')!.textContent = scenePerfMetrics.updatePhysics.toFixed(2);
-      document.getElementById('updateAnimation')!.textContent = scenePerfMetrics.updateAnimation.toFixed(2);
-      document.getElementById('updateEntitySync')!.textContent = scenePerfMetrics.updateEntitySync.toFixed(2);
-      document.getElementById('customUpdateCount')!.textContent = scenePerfMetrics.customUpdateCount.toString();
-    }
-    
-    // Render Breakdown (from scene)
-    if (scenePerfMetrics) {
-      document.getElementById('renderTotal')!.textContent = scenePerfMetrics.renderTotal.toFixed(2);
-      document.getElementById('renderBatch')!.textContent = scenePerfMetrics.renderBatch.toFixed(2);
-      document.getElementById('renderCustom')!.textContent = scenePerfMetrics.renderCustom.toFixed(2);
-    }
-    document.getElementById('drawCalls')!.textContent = perfMonitorMetrics.drawCalls.toString();
-    
-    // Rendering mode indicator
-    const renderModeEl = document.getElementById('renderMode');
-    if (renderModeEl) {
-      renderModeEl.textContent = 'Batch';
-      renderModeEl.style.color = '#AAA';
-    }
-    
-    // ECS Metrics (from scene)
-    if (scenePerfMetrics) {
-      document.getElementById('ecsActive')!.textContent = scenePerfMetrics.ecsActiveEntities.toLocaleString();
-      document.getElementById('ecsTotal')!.textContent = scenePerfMetrics.ecsTotalEntities.toLocaleString();
-      
-      const efficiency = scenePerfMetrics.ecsTotalEntities > 0 
-        ? (scenePerfMetrics.ecsActiveEntities / scenePerfMetrics.ecsTotalEntities * 100).toFixed(0)
-        : '100';
-      document.getElementById('ecsEfficiency')!.textContent = efficiency;
-    }
-    document.getElementById('memory')!.textContent = perfMonitorMetrics.memory.toFixed(1);
-    
-    // Advanced Metrics
-    document.getElementById('verticesRendered')!.textContent = perfMonitorMetrics.verticesRendered.toLocaleString();
-    document.getElementById('trianglesRendered')!.textContent = perfMonitorMetrics.trianglesRendered.toLocaleString();
-    document.getElementById('batchEfficiency')!.textContent = (perfMonitorMetrics.batchEfficiency * 100).toFixed(1);
-    document.getElementById('bufferUploadSize')!.textContent = perfMonitorMetrics.bufferUploadSize.toFixed(2);
-    document.getElementById('stateChanges')!.textContent = perfMonitorMetrics.stateChanges.toString();
-    document.getElementById('timePerEntity')!.textContent = perfMonitorMetrics.timePerEntity.toFixed(2);
-    document.getElementById('bottleneck')!.textContent = perfMonitorMetrics.bottleneck.toUpperCase();
-    document.getElementById('performanceScore')!.textContent = Math.round(perfMonitorMetrics.performanceScore).toString();
-    
-    // Frame Pacing
-    document.getElementById('frameTimeMin')!.textContent = perfMonitorMetrics.frameTimeMin.toFixed(2);
-    document.getElementById('frameTimeAvg')!.textContent = perfMonitorMetrics.frameTime.toFixed(2);
-    document.getElementById('frameTimeMax')!.textContent = perfMonitorMetrics.frameTimeMax.toFixed(2);
-    document.getElementById('frameTimeVariance')!.textContent = perfMonitorMetrics.frameTimeVariance.toFixed(2);
-    
-    // Culling Metrics (NEW!)
-    const inFrustum = perfMonitorMetrics.entitiesInFrustum || 0;
-    const culled = perfMonitorMetrics.entitiesCulled || 0;
-    const cullingEff = perfMonitorMetrics.cullingEfficiency || 0;
-    document.getElementById('entitiesInFrustum')!.textContent = inFrustum.toLocaleString();
-    document.getElementById('entitiesCulled')!.textContent = culled.toLocaleString();
-    document.getElementById('cullingEfficiency')!.textContent = cullingEff.toFixed(1);
-    
-    // Color code culling efficiency
-    const cullingEffElement = document.getElementById('cullingEfficiency')!;;
-    if (cullingEff > 50) {
-      cullingEffElement.style.color = '#00FF00'; // Green = great culling
-    } else if (cullingEff > 20) {
-      cullingEffElement.style.color = '#FFFF00'; // Yellow = moderate
-    } else {
-      cullingEffElement.style.color = '#FF8000'; // Orange = low culling
-    }
-    
-    // Color coding for FPS
-    const fpsElement = document.getElementById('fps')!;
-    if (perfMonitorMetrics.fps >= 58) {
-      fpsElement.style.color = '#00FF00';
-    } else if (perfMonitorMetrics.fps >= 45) {
-      fpsElement.style.color = '#FFFF00';
-    } else {
-      fpsElement.style.color = '#FF0000';
-    }
-    
-    // Color coding for bottleneck
-    const bottleneckElement = document.getElementById('bottleneck')!;
-    switch (perfMonitorMetrics.bottleneck) {
-      case 'balanced':
-        bottleneckElement.style.color = '#00FF00';
-        break;
-      case 'cpu':
-        bottleneckElement.style.color = '#FFFF00';
-        break;
-      case 'gpu':
-        bottleneckElement.style.color = '#FF8000';
-        break;
-      case 'memory':
-        bottleneckElement.style.color = '#FF0000';
-        break;
-    }
-    
-    // Color coding for performance score
-    const scoreElement = document.getElementById('performanceScore')!;
-    const score = perfMonitorMetrics.performanceScore;
-    if (score >= 90) {
-      scoreElement.style.color = '#00FF00';
-    } else if (score >= 70) {
-      scoreElement.style.color = '#FFFF00';
-    } else if (score >= 50) {
-      scoreElement.style.color = '#FF8000';
-    } else {
-      scoreElement.style.color = '#FF0000';
-    }
-    
-    // Update Total color coding
-    const updateElement = document.getElementById('updateTotal')!;
-    if (scenePerfMetrics) {
-      if (scenePerfMetrics.updateTotal < 5) {
-        updateElement.style.color = '#00FF00';
-      } else if (scenePerfMetrics.updateTotal < 10) {
-        updateElement.style.color = '#FFFF00';
-      } else {
-        updateElement.style.color = '#FF0000';
-      }
-    }
   }
 }
 
@@ -684,7 +319,47 @@ function initDemo() {
     engine.start();
   });
   
-  new UIControls(engine, scene);
+  // Initialize RuntimeConfig and DebugPanel
+  const runtimeConfig = new RuntimeConfig();
+  const debugPanel = new DebugPanel(runtimeConfig);
+  
+  // Apply config changes to engine
+  runtimeConfig.onChange((config) => {
+    // Rendering settings
+    const renderer = engine.getRenderer();
+    if (renderer && 'setBatchSize' in renderer) {
+      (renderer as WebGLBatchRenderer).setBatchSize(config.rendering.batchSize);
+    }
+    
+    // Resolution
+    const { width, height } = config.rendering.resolution;
+    engine.resize(width, height);
+    if (canvas.parentElement) {
+      canvas.parentElement.style.width = `${width}px`;
+      canvas.parentElement.style.height = `${height}px`;
+    }
+    
+    // Culling
+    const currentScene = (engine as any).currentScene;
+    if (currentScene) {
+      currentScene.setCullingEnabled(config.rendering.enableFrustumCulling);
+    }
+    
+    // Quality
+    engine.performanceMonitor.setAdaptiveQuality(config.quality.enableAdaptiveQuality);
+    
+    // Physics
+    if (currentScene) {
+      currentScene.setWorldBoundsMultiplier(config.physics.boundsMultiplier);
+    }
+    
+    console.log('⚙️ Config updated:', config);
+  });
+  
+  // Apply initial config
+  runtimeConfig.onChange(runtimeConfig as any); // Trigger once
+  
+  new DemoControls(engine, scene);
   
   let paused = false;
   document.addEventListener('keydown', (e) => {
@@ -727,6 +402,13 @@ function initDemo() {
       scene.addEntity(entity);
     }
   });
+  
+  // Info hint
+  console.log('🎮 Vectorium Demo Ready!');
+  console.log('   P - Toggle Profiler');
+  console.log('   C - Toggle Config Panel');
+  console.log('   SPACE - Pause/Resume');
+  console.log('   CLICK - Spawn burst');
 }
 
 function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
