@@ -184,4 +184,5 @@ export interface EngineConfig {
   enableAdaptiveQuality: boolean;
   initialQuality: 'high' | 'medium' | 'low';
   debugMode: boolean;
+  enableDebugTools: boolean;
 }

@@ -12,6 +12,9 @@ import { BufferPool } from '../memory/Pooling';
 import { World, EntityId } from './World';
 import { Camera } from './Camera';
 import { Viewport } from './Viewport';
+import { DebugPanel } from '../debug/DebugPanel';
+import { EntitySpawner } from '../debug/EntitySpawner';
+import { CameraControls } from '../debug/CameraControls';
 
 // Re-export Viewport for convenience
 export { Viewport };
@@ -429,21 +432,27 @@ export class Vectorium {
   readonly textRenderer: TextRenderer;
   readonly performanceMonitor: PerformanceMonitor;
   readonly bufferPool: BufferPool;
+  readonly runtimeConfig: RuntimeConfig;
   
   private scenes = new Map<string, Scene>();
   private currentScene: Scene | null = null;
   private running = false;
   private lastTime = 0;
   private rafId = 0;
+  
+  // Debug tools (optional)
+  private debugPanel?: DebugPanel;
+  private entitySpawner?: EntitySpawner;
+  private cameraControls?: CameraControls;
 
   constructor(config: Partial<EngineConfig> = {}) {
     this.featureDetector = new FeatureDetector();
     const optimal = this.featureDetector.getOptimalConfig();
     
     // Use RuntimeConfig defaults as fallback
-    const defaults = new RuntimeConfig();
-    const { width, height } = defaults.rendering.resolution;
-    const { targetFPS } = defaults.quality;
+    this.runtimeConfig = new RuntimeConfig();
+    const { width, height } = this.runtimeConfig.rendering.resolution;
+    const { targetFPS } = this.runtimeConfig.quality;
     
     this.config = {
       canvas: config.canvas ?? document.createElement('canvas'),
@@ -454,9 +463,10 @@ export class Vectorium {
       useWorkers: config.useWorkers ?? optimal.useWorkers ?? false,
       targetFPS: config.targetFPS ?? targetFPS,
       maxTextureSize: config.maxTextureSize ?? optimal.maxTextureSize ?? 2048,
-      enableAdaptiveQuality: config.enableAdaptiveQuality ?? defaults.quality.enableAdaptiveQuality,
+      enableAdaptiveQuality: config.enableAdaptiveQuality ?? this.runtimeConfig.quality.enableAdaptiveQuality,
       initialQuality: config.initialQuality ?? optimal.initialQuality ?? 'high',
-      debugMode: config.debugMode ?? defaults.debug.showStats
+      debugMode: config.debugMode ?? this.runtimeConfig.debug.showStats,
+      enableDebugTools: config.enableDebugTools ?? false
     };
     
     this.canvas = this.config.canvas;
@@ -485,10 +495,62 @@ export class Vectorium {
     // Initialize buffer pool
     this.bufferPool = new BufferPool();
     
+    // Setup runtime config change handler
+    this.setupRuntimeConfig();
+    
+    // Initialize debug tools if enabled
+    if (this.config.enableDebugTools) {
+      this.initializeDebugTools();
+    }
+    
     console.log(`Vectorium Engine initialized`);
     console.log(`WebGL2: ${useWebGL2}`);
     console.log(`Target FPS: ${this.config.targetFPS}`);
     console.log(`Adaptive Quality: ${this.config.enableAdaptiveQuality}`);
+    console.log(`Debug Tools: ${this.config.enableDebugTools ? 'Enabled (Press C, E, V, P)' : 'Disabled'}`);
+  }
+  
+  private setupRuntimeConfig(): void {
+    this.runtimeConfig.onChange((cfg) => {
+      // Apply batch size
+      this.renderer.setBatchSize(cfg.rendering.batchSize);
+      
+      // Apply clear color
+      this.renderer.setClearColor(cfg.rendering.clearColor[0], cfg.rendering.clearColor[1], cfg.rendering.clearColor[2], cfg.rendering.clearColor[3]);
+      
+      // Apply resolution changes
+      const { width, height } = cfg.rendering.resolution;
+      if (width !== this.config.width || height !== this.config.height) {
+        this.resize(width, height);
+      }
+      
+      // Apply scene settings
+      if (this.currentScene) {
+        this.currentScene.setCullingEnabled(cfg.rendering.enableFrustumCulling);
+        this.currentScene.setWorldBoundsMultiplier(cfg.physics.boundsMultiplier);
+      }
+      
+      // Apply quality settings
+      this.performanceMonitor.setAdaptiveQuality(cfg.quality.enableAdaptiveQuality);
+      
+      // Apply camera settings
+      const camera = this.getCamera();
+      if (camera) {
+        camera.setZoom(cfg.camera.zoom);
+        camera.setZoomRange(cfg.camera.minZoom, cfg.camera.maxZoom);
+        camera.setSmooth(cfg.camera.smooth, cfg.camera.smoothFactor);
+        camera.setFollowSettings(cfg.camera.followLerp, cfg.camera.followDeadzoneX, cfg.camera.followDeadzoneY);
+        camera.setCullingMargin(cfg.camera.cullingMargin);
+      }
+    });
+  }
+  
+  private initializeDebugTools(): void {
+    // Initialize debug panel (Press C)
+    this.debugPanel = new DebugPanel(this.runtimeConfig);
+    
+    // Note: Entity spawner and camera controls need a scene/camera
+    // They will be initialized in loadScene()
   }
 
   registerScene(name: string, scene: Scene): void {
@@ -513,6 +575,30 @@ export class Vectorium {
     this.currentScene.setCanvasDimensions(this.canvas.width, this.canvas.height);
     
     await this.currentScene.load();
+    
+    // Initialize scene-specific debug tools
+    if (this.config.enableDebugTools) {
+      // Entity spawner (Press E)
+      this.entitySpawner = new EntitySpawner(this.currentScene);
+      this.entitySpawner.registerCallbacks({
+        remove1K: () => {
+          for (let i = 0; i < 1000 && this.currentScene && this.currentScene.entities.length > 0; i++) {
+            const entity = this.currentScene.entities[this.currentScene.entities.length - 1];
+            if (entity) this.currentScene.removeEntity(entity);
+          }
+        },
+        clearAll: () => this.currentScene?.clear()
+      });
+      
+      // Camera controls (Press V)
+      const camera = this.getCamera();
+      if (camera) {
+        this.cameraControls = new CameraControls(camera, this.runtimeConfig);
+      }
+    }
+    
+    // Apply initial runtime config
+    this.runtimeConfig.onChange(this.runtimeConfig as any);
     
     console.log(`Loaded scene: ${name}`);
   }
@@ -735,6 +821,19 @@ export class Vectorium {
 
   destroy(): void {
     this.stop();
+    
+    // Clean up debug tools
+    if (this.debugPanel) {
+      this.debugPanel.destroy();
+    }
+    if (this.entitySpawner) {
+      this.entitySpawner.destroy();
+    }
+    if (this.cameraControls) {
+      this.cameraControls.destroy();
+    }
+    
+    // Clean up scene and rendering
     if (this.currentScene) {
       this.currentScene.destroy();
     }
