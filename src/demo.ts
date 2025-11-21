@@ -203,13 +203,7 @@ function initDemo() {
   
   // Initialize Entity Spawner with keyboard toggle ('E' key)
   const entitySpawner = new EntitySpawner(scene);
-  entitySpawner.registerStandardCallbacks({
-    spawn100: () => scene.addEntities(100, true),
-    spawn1K: () => scene.addEntities(1000, true),
-    spawn10K: () => scene.addEntities(10000, true),
-    spawn100K: () => scene.addEntities(100000, true),
-    spawn500K: () => scene.addEntities(500000, true),
-    spawn1M: () => scene.addEntities(1000000, true),
+  entitySpawner.registerCallbacks({
     remove1K: () => scene.removeEntities(1000),
     clearAll: () => scene.clearEntities()
   });
@@ -241,14 +235,15 @@ function initDemo() {
     const x = (e.clientX - rect.left) * (canvas.width / rect.width);
     const y = (e.clientY - rect.top) * (canvas.height / rect.height);
     
-    for (let i = 0; i < 50; i++) {
+    const entityCount = entitySpawner.getClickSpawnCount();
+    for (let i = 0; i < entityCount; i++) {
       const entity = new BouncingEntity();
-      const angle = (i / 50) * Math.PI * 2;
+      const angle = (i / entityCount) * Math.PI * 2;
       const speed = 200 + Math.random() * 300;
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
       const size = 6 + Math.random() * 8;
-      const hue = (i / 50) * 360;
+      const hue = (i / entityCount) * 360;
       const color = hslToRgb(hue, 1, 0.5);
       
       entity.spawn(x, y, vx, vy, size, color);

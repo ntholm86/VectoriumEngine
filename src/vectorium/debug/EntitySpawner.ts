@@ -10,7 +10,8 @@ export class EntitySpawner {
   private container: HTMLDivElement | null = null;
   private visible = true;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
-  private spawnCallbacks: Map<string, (count: number) => void> = new Map();
+  private clickSpawnCount = 100; // Number of entities to spawn per click
+  private activeButton: string = 'spawn100';
   
   constructor(_scene: Scene) {
     this.loadVisibility();
@@ -19,34 +20,32 @@ export class EntitySpawner {
   }
   
   /**
-   * Register a spawn callback for a specific button
+   * Get the current spawn count for mouse clicks
    */
-  registerSpawnCallback(id: string, callback: (count: number) => void): void {
-    this.spawnCallbacks.set(id, callback);
+  getClickSpawnCount(): number {
+    return this.clickSpawnCount;
   }
   
   /**
-   * Register callbacks for standard spawn buttons
+   * Set the spawn count for mouse clicks
    */
-  registerStandardCallbacks(callbacks: {
-    spawn100?: () => void;
-    spawn1K?: () => void;
-    spawn10K?: () => void;
-    spawn100K?: () => void;
-    spawn500K?: () => void;
-    spawn1M?: () => void;
+  setClickSpawnCount(count: number): void {
+    this.clickSpawnCount = count;
+    this.updateActiveButtonDisplay();
+  }
+  
+  /**
+   * Register callbacks for remove and clear operations
+   */
+  registerCallbacks(callbacks: {
     remove1K?: () => void;
     clearAll?: () => void;
   }): void {
-    if (callbacks.spawn100) this.spawnCallbacks.set('spawn100', () => callbacks.spawn100!());
-    if (callbacks.spawn1K) this.spawnCallbacks.set('spawn1K', () => callbacks.spawn1K!());
-    if (callbacks.spawn10K) this.spawnCallbacks.set('spawn10K', () => callbacks.spawn10K!());
-    if (callbacks.spawn100K) this.spawnCallbacks.set('spawn100K', () => callbacks.spawn100K!());
-    if (callbacks.spawn500K) this.spawnCallbacks.set('spawn500K', () => callbacks.spawn500K!());
-    if (callbacks.spawn1M) this.spawnCallbacks.set('spawn1M', () => callbacks.spawn1M!());
-    if (callbacks.remove1K) this.spawnCallbacks.set('remove1K', () => callbacks.remove1K!());
-    if (callbacks.clearAll) this.spawnCallbacks.set('clearAll', () => callbacks.clearAll!());
+    this.spawnCallbacks.set('remove1K', () => callbacks.remove1K?.());
+    this.spawnCallbacks.set('clearAll', () => callbacks.clearAll?.());
   }
+  
+  private spawnCallbacks: Map<string, () => void> = new Map();
   
   private createUI(): void {
     this.container = document.createElement('div');
@@ -58,15 +57,16 @@ export class EntitySpawner {
       </div>
       <div class="spawner-content">
         <div class="spawn-section">
+          <div class="spawn-mode-hint">CLICK CANVAS TO SPAWN</div>
           <div class="button-grid">
-            <button id="spawn100" class="spawn-btn">+100</button>
-            <button id="spawn1K" class="spawn-btn">+1K</button>
-            <button id="spawn10K" class="spawn-btn">+10K</button>
-            <button id="spawn100K" class="spawn-btn spawn-btn-hot">+100K 🔥</button>
+            <button id="spawn100" class="spawn-btn spawn-btn-active">100</button>
+            <button id="spawn1K" class="spawn-btn">1K</button>
+            <button id="spawn10K" class="spawn-btn">10K</button>
+            <button id="spawn100K" class="spawn-btn spawn-btn-hot">100K 🔥</button>
           </div>
           <div class="button-grid">
-            <button id="spawn500K" class="spawn-btn spawn-btn-danger">+500K 💥</button>
-            <button id="spawn1M" class="spawn-btn spawn-btn-danger">+1M ☢️</button>
+            <button id="spawn500K" class="spawn-btn spawn-btn-danger">500K 💥</button>
+            <button id="spawn1M" class="spawn-btn spawn-btn-danger">1M ☢️</button>
           </div>
           <div class="button-grid" style="margin-top: 12px;">
             <button id="remove1K" class="spawn-btn spawn-btn-remove">-1K</button>
@@ -95,55 +95,65 @@ export class EntitySpawner {
     const collapseBtn = this.container.querySelector('.panel-collapse-btn');
     collapseBtn?.addEventListener('click', () => this.toggleCollapse());
     
-    // Spawn buttons
+    // Spawn buttons set click spawn count
     this.on('spawn100', 'click', () => {
-      this.triggerCallback('spawn100', 100);
+      this.setClickSpawnCount(100);
+      this.activeButton = 'spawn100';
     });
     
     this.on('spawn1K', 'click', () => {
-      this.triggerCallback('spawn1K', 1000);
+      this.setClickSpawnCount(1000);
+      this.activeButton = 'spawn1K';
     });
     
     this.on('spawn10K', 'click', () => {
-      this.triggerCallback('spawn10K', 10000);
+      this.setClickSpawnCount(10000);
+      this.activeButton = 'spawn10K';
     });
     
     this.on('spawn100K', 'click', () => {
-      if (confirm('⚠️ Add 100,000 entities? This will stress test the engine!')) {
-        this.triggerCallback('spawn100K', 100000);
-      }
+      this.setClickSpawnCount(100000);
+      this.activeButton = 'spawn100K';
     });
     
     this.on('spawn500K', 'click', () => {
-      if (confirm('💥 Add 500,000 entities?! This will fill the viewport!')) {
-        this.triggerCallback('spawn500K', 500000);
-      }
+      this.setClickSpawnCount(500000);
+      this.activeButton = 'spawn500K';
     });
     
     this.on('spawn1M', 'click', () => {
-      if (confirm('☢️ Add 1,000,000 entities?!?!\n\nThis is EXTREME and may take a moment to spawn.')) {
-        console.log('Spawning 1 million entities...');
-        this.triggerCallback('spawn1M', 1000000);
-        console.log('Spawn complete!');
-      }
+      this.setClickSpawnCount(1000000);
+      this.activeButton = 'spawn1M';
     });
     
     this.on('remove1K', 'click', () => {
-      this.triggerCallback('remove1K', -1000);
+      this.triggerCallback('remove1K');
     });
     
     this.on('clearAll', 'click', () => {
       if (confirm('Clear all entities?')) {
-        this.triggerCallback('clearAll', 0);
+        this.triggerCallback('clearAll');
       }
     });
   }
   
-  private triggerCallback(id: string, count: number): void {
+  private triggerCallback(id: string): void {
     const callback = this.spawnCallbacks.get(id);
     if (callback) {
-      callback(count);
+      callback();
     }
+  }
+  
+  private updateActiveButtonDisplay(): void {
+    if (!this.container) return;
+    
+    // Remove active class from all buttons
+    const allButtons = this.container.querySelectorAll('.spawn-btn:not(.spawn-btn-remove)');
+    allButtons.forEach(btn => btn.classList.remove('spawn-btn-active'));
+    
+    // Add active class to current button
+    const activeBtn = this.container.querySelector(`#${this.activeButton}`);
+    activeBtn?.classList.add('spawn-btn-active');
   }
   
   private on(id: string, event: string, handler: (e: Event) => void): void {
@@ -292,6 +302,21 @@ export class EntitySpawner {
         }
         .spawn-btn:hover {
           background: #00FF88;
+        }
+        .spawn-btn-active {
+          background: #00FF00;
+          box-shadow: 0 0 10px rgba(0, 255, 0, 0.6);
+          border: 2px solid #00FF00;
+        }
+        .spawn-mode-hint {
+          font-size: 11px;
+          font-weight: bold;
+          color: #00FF00;
+          text-align: center;
+          padding: 8px;
+          margin-bottom: 10px;
+          background: rgba(0, 255, 0, 0.1);
+          border-radius: 4px;
         }
         .spawn-btn-hot {
           background: #FF00FF;
