@@ -37,7 +37,8 @@ export class WasmPhysics {
     const CELL_SIZE = MAX_ENTITY_RADIUS * 2;
     
     this.spatialHash = new SpatialHash(CELL_SIZE, 2048);
-    this.neighborBuffer = new Array(this.MAX_NEIGHBORS);
+    // Pre-fill buffer with -1 to catch stale reads (debugging aid)
+    this.neighborBuffer = new Array(this.MAX_NEIGHBORS).fill(-1);
   }
   
   async initialize(): Promise<boolean> {
@@ -128,12 +129,18 @@ export class WasmPhysics {
         const mi = mass ? mass[i] : 1;
         const resti = restitution ? restitution[i] : 1;
         
-        // Query 3x3 cell neighborhood
-        const neighborCount = this.spatialHash.queryNeighbors(xi, yi, this.neighborBuffer);
+        // Query 3x3 cell neighborhood with bounds check
+        const neighborCount = this.spatialHash.queryNeighbors(xi, yi, this.neighborBuffer, this.MAX_NEIGHBORS);
         
         // Check collisions only with nearby entities
         for (let k = 0; k < neighborCount; k++) {
           const j = this.neighborBuffer[k];
+          
+          // CRITICAL FIX: Validate entity index (prevent stale buffer reads)
+          if (j < 0 || j >= entityCount) {
+            console.error(`Invalid neighbor index: ${j} (entityCount: ${entityCount})`);
+            continue;
+          }
           
           // Index guard: avoid duplicate pairs and self-collision
           if (j <= i) continue;

@@ -76,6 +76,8 @@ export class SpatialHash {
   
   /**
    * Get or create bucket for cell
+   * 
+   * CRITICAL FIX: Ensure buckets are cleared before reuse
    */
   private getBucket(k: number): number[] {
     let bucket = this.cells.get(k);
@@ -83,6 +85,11 @@ export class SpatialHash {
       // Try to reuse from pool
       if (this.poolIndex < this.bucketPool.length) {
         bucket = this.bucketPool[this.poolIndex++];
+        // CRITICAL: Ensure bucket is cleared (defensive programming)
+        if (bucket.length !== 0) {
+          console.warn(`SpatialHash: Bucket not cleared! Length: ${bucket.length}`);
+          bucket.length = 0;
+        }
       } else {
         // Pool exhausted, create new
         bucket = [];
@@ -98,8 +105,16 @@ export class SpatialHash {
   /**
    * Insert entity into grid
    * Uses multiply instead of divide for cell calculation
+   * 
+   * CRITICAL FIX: Validate entity ID to prevent corruption
    */
   insert(id: number, x: number, y: number): void {
+    // Validate entity ID (catch buffer corruption early)
+    if (id < 0 || !Number.isFinite(id) || id !== Math.floor(id)) {
+      console.error(`SpatialHash.insert: Invalid entity ID ${id} at (${x}, ${y})`);
+      return;
+    }
+    
     const cx = Math.floor(x * this.invCellSize);
     const cy = Math.floor(y * this.invCellSize);
     const k = this.key(cx, cy);
@@ -115,8 +130,11 @@ export class SpatialHash {
   /**
    * Query 3x3 neighborhood (9 cells)
    * Returns flat array of entity indices for cache-friendly iteration
+   * 
+   * CRITICAL FIX: Buffer bounds check to prevent reading stale data
+   * from previous queries (ghost collision bug)
    */
-  queryNeighbors(x: number, y: number, outArray: number[]): number {
+  queryNeighbors(x: number, y: number, outArray: number[], maxNeighbors: number = 256): number {
     const cx = Math.floor(x * this.invCellSize);
     const cy = Math.floor(y * this.invCellSize);
     
@@ -134,6 +152,12 @@ export class SpatialHash {
         if (bucket) {
           const len = bucket.length;
           for (let i = 0; i < len; i++) {
+            // CRITICAL: Check buffer bounds to prevent overflow
+            if (count >= maxNeighbors) {
+              console.warn(`SpatialHash: Max neighbors (${maxNeighbors}) exceeded at (${x}, ${y})`);
+              this.stats.queries++;
+              return count;
+            }
             outArray[count++] = bucket[i];
           }
         }
