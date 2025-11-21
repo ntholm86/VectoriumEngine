@@ -75,7 +75,7 @@ export class Camera {
     for (let i = 0; i < count; i++) {
       const x = posX[i];
       const y = posY[i];
-      const size = scaleX[i] * 8;
+      const size = scaleX[i]; // scaleX already contains the full size
       const halfSize = size * 0.5;
       
       // AABB overlap test - entity is visible if NOT outside all bounds

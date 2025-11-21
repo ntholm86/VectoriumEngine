@@ -69,6 +69,7 @@ export class DebugPanel {
         <div class="config-row">
           <label>Frustum Culling</label>
           <input type="checkbox" id="cfg-culling" ${r.enableFrustumCulling ? 'checked' : ''}>
+          <span id="culling-status" class="status-badge status-off">OFF</span>
         </div>
         <div class="config-row">
           <label>Batch Rendering</label>
@@ -356,6 +357,22 @@ export class DebugPanel {
       this.container.remove();
     }
   }
+  
+  /**
+   * Update the culling status indicator (called by engine)
+   */
+  updateCullingStatus(isActive: boolean, worldScale: number): void {
+    const statusEl = this.container?.querySelector('#culling-status');
+    if (statusEl) {
+      statusEl.textContent = isActive ? 'ON' : 'OFF';
+      statusEl.className = isActive ? 'status-badge status-on' : 'status-badge status-off';
+      statusEl.setAttribute('title', 
+        isActive 
+          ? `Active (world scale: ${worldScale.toFixed(2)}x)`
+          : `Auto-disabled (world scale: ${worldScale.toFixed(2)}x)`
+      );
+    }
+  }
 
   private createStyles(): string {
     return `
@@ -456,6 +473,30 @@ export class DebugPanel {
           width: 16px;
           height: 16px;
           cursor: pointer;
+        }
+        .hint {
+          font-size: 9px;
+          color: #888;
+          font-style: italic;
+          margin-left: 6px;
+        }
+        .status-badge {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 3px;
+          font-size: 9px;
+          font-weight: bold;
+          letter-spacing: 0.5px;
+        }
+        .status-on {
+          background: rgba(0, 255, 0, 0.2);
+          color: #00FF00;
+          border: 1px solid #00FF00;
+        }
+        .status-off {
+          background: rgba(255, 0, 0, 0.1);
+          color: #FF6666;
+          border: 1px solid #FF6666;
         }
         .action-btn {
           width: 100%;

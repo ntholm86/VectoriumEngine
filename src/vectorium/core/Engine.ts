@@ -185,17 +185,43 @@ export class Scene {
     
     const totalCount = this.world.getActiveCount();
     
-    if (!this.cullingEnabled) {
+    // Smart culling: Auto-disable when scene = viewport (all entities always visible)
+    // This avoids culling overhead when there's nothing to cull
+    const worldScale = this.viewport.worldScale;
+    const shouldCull = this.cullingEnabled && worldScale > 1.01; // Allow 1% tolerance
+    
+    // Track culling state changes for debugging
+    const cullingStateChanged = shouldCull !== (this as any)._lastCullingState;
+    if (cullingStateChanged) {
+      (this as any)._lastCullingState = shouldCull;
+      if (this.cullingEnabled) {
+        const reason = worldScale <= 1.01 ? '(world = viewport, nothing to cull)' : '(world > viewport)';
+        console.log(`🔍 Smart Culling: ${shouldCull ? 'ACTIVE' : 'AUTO-DISABLED'} ${reason} [scale: ${worldScale.toFixed(2)}x]`);
+      }
+      
+      // Notify debug panel of culling state change
+      if ((this as any)._debugPanel) {
+        (this as any)._debugPanel.updateCullingStatus(shouldCull, worldScale);
+      }
+    }
+    
+    if (!shouldCull) {
       // No culling - render all entities using batch rendering
       renderer.drawBulk(
         posX, posY, rotation, sizes,
         colorR, colorG, colorB, alphas,
         flags, totalCount, this.world.FLAG_VISIBLE
       );
+      
+      // Track stats: no culling means all entities visible
+      (this as any).culledCount = 0;
+      (this as any).visibleCount = totalCount;
       return;
     }
     
-    // FRUSTUM CULLING: Only render visible entities
+    // FRUSTUM CULLING: Only render entities inside viewport bounds
+    // NOTE: This does NOT do occlusion culling (hiding entities behind others)
+    // Entities at the same position will ALL render (last one on top)
     // 🚀 ULTRA-OPTIMIZED: Use indexed rendering (zero copy!)
     const visibleCount = this.camera.cullEntities(
       posX,

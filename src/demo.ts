@@ -163,7 +163,7 @@ function initDemo() {
   
   // Initialize RuntimeConfig and DebugPanel
   const runtimeConfig = new RuntimeConfig();
-  void new DebugPanel(runtimeConfig); // DebugPanel self-initializes
+  const debugPanel = new DebugPanel(runtimeConfig);
   
   // Apply config changes to engine
   runtimeConfig.onChange((config) => {
@@ -200,6 +200,12 @@ function initDemo() {
   
   // Apply initial config
   runtimeConfig.onChange(runtimeConfig as any); // Trigger once
+  
+  // Connect debug panel to scene for culling status updates
+  const currentScene = (engine as any).currentScene;
+  if (currentScene) {
+    (currentScene as any)._debugPanel = debugPanel;
+  }
   
   // Initialize Entity Spawner with keyboard toggle ('E' key)
   const entitySpawner = new EntitySpawner(scene);
