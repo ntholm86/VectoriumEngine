@@ -4,6 +4,7 @@
  */
 
 import { FeatureDetector, EngineConfig } from './FeatureDetector';
+import { RuntimeConfig } from './RuntimeConfig';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer, TextStyle } from '../rendering/TextRenderer';
 import { PerformanceMonitor } from '../performance/PerformanceMonitor';
@@ -134,6 +135,9 @@ export class Scene {
     this.perfMetrics.ecsActiveEntities = this.world.getActiveCount();
     this.perfMetrics.ecsTotalEntities = this.world.getTotalCount();
     
+    // Update camera (smooth movement, follow, shake, bounds)
+    this.camera.update(dt);
+    
     if (this.enableWarnings && this.perfMetrics.updateTotal > this.updateTimeWarningThreshold) {
       console.warn(`⚠️ VECTORIUM UPDATE BREAKDOWN: Total=${this.perfMetrics.updateTotal.toFixed(2)}ms | Physics=${this.perfMetrics.updatePhysics.toFixed(2)}ms | Anim=${this.perfMetrics.updateAnimation.toFixed(2)}ms | EntitySync=${this.perfMetrics.updateEntitySync.toFixed(2)}ms | Entities w/ custom update=${this.entitiesWithCustomUpdate.length}`);
     }
@@ -210,7 +214,8 @@ export class Scene {
       renderer.drawBulk(
         posX, posY, rotation, sizes,
         colorR, colorG, colorB, alphas,
-        flags, totalCount, this.world.FLAG_VISIBLE
+        flags, totalCount, this.world.FLAG_VISIBLE,
+        this.camera.x, this.camera.y, this.camera.getZoom()
       );
       
       // Track stats: no culling means all entities visible
@@ -236,7 +241,8 @@ export class Scene {
     renderer.drawBulkIndexed(
       posX, posY, rotation, sizes,
       colorR, colorG, colorB, alphas,
-      flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE
+      flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
+      this.camera.x, this.camera.y, this.camera.getZoom()
     );
     
     // Track culling stats (stored on scene for perf monitor access)
@@ -430,27 +436,30 @@ export class Vectorium {
   private lastTime = 0;
   private rafId = 0;
 
-  constructor(config: Partial<EngineConfig>) {
+  constructor(config: Partial<EngineConfig> = {}) {
     this.featureDetector = new FeatureDetector();
-    
-    const canvas = config.canvas || document.createElement('canvas');
     const optimal = this.featureDetector.getOptimalConfig();
     
+    // Use RuntimeConfig defaults as fallback
+    const defaults = new RuntimeConfig();
+    const { width, height } = defaults.rendering.resolution;
+    const { targetFPS } = defaults.quality;
+    
     this.config = {
-      canvas,
-      width: config.width || 800,
-      height: config.height || 600,
-      preferWebGL2: config.preferWebGL2 ?? optimal.preferWebGL2 ?? false,
+      canvas: config.canvas ?? document.createElement('canvas'),
+      width: config.width ?? width,
+      height: config.height ?? height,
+      preferWebGL2: config.preferWebGL2 ?? optimal.preferWebGL2 ?? true,
       useImageBitmap: config.useImageBitmap ?? optimal.useImageBitmap ?? false,
       useWorkers: config.useWorkers ?? optimal.useWorkers ?? false,
-      targetFPS: config.targetFPS ?? optimal.targetFPS ?? 60,
+      targetFPS: config.targetFPS ?? targetFPS,
       maxTextureSize: config.maxTextureSize ?? optimal.maxTextureSize ?? 2048,
-      enableAdaptiveQuality: config.enableAdaptiveQuality ?? true,
+      enableAdaptiveQuality: config.enableAdaptiveQuality ?? defaults.quality.enableAdaptiveQuality,
       initialQuality: config.initialQuality ?? optimal.initialQuality ?? 'high',
-      debugMode: config.debugMode ?? false
+      debugMode: config.debugMode ?? defaults.debug.showStats
     };
     
-    this.canvas = canvas;
+    this.canvas = this.config.canvas;
     this.canvas.width = this.config.width;
     this.canvas.height = this.config.height;
     
@@ -715,6 +724,13 @@ export class Vectorium {
    */
   getRenderer(): WebGLBatchRenderer {
     return this.renderer;
+  }
+
+  /**
+   * Get the current scene's camera
+   */
+  getCamera(): Camera | null {
+    return this.currentScene ? this.currentScene.getCamera() : null;
   }
 
   destroy(): void {

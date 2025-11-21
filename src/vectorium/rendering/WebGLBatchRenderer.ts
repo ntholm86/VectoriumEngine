@@ -51,6 +51,9 @@ export class WebGLBatchRenderer {
   // Performance monitoring
   private perfMonitor: PerformanceMonitor | null = null;
   
+  // Clear color (RGBA 0-1)
+  private clearColor: [number, number, number, number] = [0, 0, 0, 1];
+  
   // Pre-allocated buffers (zero allocation during rendering)
 
   constructor(canvas: HTMLCanvasElement, useWebGL2: boolean = true) {
@@ -206,7 +209,7 @@ export class WebGLBatchRenderer {
     const gl = this.gl;
     
     gl.viewport(0, 0, width, height);
-    gl.clearColor(0.1, 0.1, 0.15, 1.0);
+    gl.clearColor(this.clearColor[0], this.clearColor[1], this.clearColor[2], this.clearColor[3]);
     gl.clear(gl.COLOR_BUFFER_BIT);
     
     gl.useProgram(this.program);
@@ -447,6 +450,10 @@ export class WebGLBatchRenderer {
     }
   }
   
+  setClearColor(r: number, g: number, b: number, a: number = 1): void {
+    this.clearColor = [r, g, b, a];
+  }
+  
   getBatchSize(): number {
     return this.maxBatchSize;
   }
@@ -481,7 +488,10 @@ export class WebGLBatchRenderer {
     alphas: Float32Array,
     flags: Uint32Array,
     count: number,
-    FLAG_VISIBLE: number
+    FLAG_VISIBLE: number,
+    cameraX: number = 0,
+    cameraY: number = 0,
+    cameraZoom: number = 1
   ): void {
     const HALF = 0.5;  // Hoist constant
     
@@ -513,22 +523,29 @@ export class WebGLBatchRenderer {
         const floatOffset = (this.vertexCount + visibleCount * 4) * 3;
         visibleCount++;
         
+        // Apply camera transformation: (world - camera) * zoom
+        const screenX = (x - cameraX) * cameraZoom;
+        const screenY = (y - cameraY) * cameraZoom;
+        const screenHw = hw * cameraZoom;
+        const screenHwCos = screenHw * cos;
+        const screenHwSin = screenHw * sin;
+        
         // Write vertex positions directly with inline math
         // Vertex 0 (floats at 0, 1)
-        this.batchVertices[floatOffset] = x - hwCos + hwSin;
-        this.batchVertices[floatOffset + 1] = y - hwSin - hwCos;
+        this.batchVertices[floatOffset] = screenX - screenHwCos + screenHwSin;
+        this.batchVertices[floatOffset + 1] = screenY - screenHwSin - screenHwCos;
         
         // Vertex 1 (floats at 3, 4)
-        this.batchVertices[floatOffset + 3] = x + hwCos + hwSin;
-        this.batchVertices[floatOffset + 4] = y + hwSin - hwCos;
+        this.batchVertices[floatOffset + 3] = screenX + screenHwCos + screenHwSin;
+        this.batchVertices[floatOffset + 4] = screenY + screenHwSin - screenHwCos;
         
         // Vertex 2 (floats at 6, 7)
-        this.batchVertices[floatOffset + 6] = x + hwCos - hwSin;
-        this.batchVertices[floatOffset + 7] = y + hwSin + hwCos;
+        this.batchVertices[floatOffset + 6] = screenX + screenHwCos - screenHwSin;
+        this.batchVertices[floatOffset + 7] = screenY + screenHwSin + screenHwCos;
         
         // Vertex 3 (floats at 9, 10)
-        this.batchVertices[floatOffset + 9] = x - hwCos - hwSin;
-        this.batchVertices[floatOffset + 10] = y - hwSin + hwCos;
+        this.batchVertices[floatOffset + 9] = screenX - screenHwCos - screenHwSin;
+        this.batchVertices[floatOffset + 10] = screenY - screenHwSin + screenHwCos;
         
         // Pack color as single 32-bit RGBA (at float offset 2, 5, 8, 11)
         const packedColor = aByte << 24 | bByte << 16 | gByte << 8 | rByte;
@@ -560,7 +577,10 @@ export class WebGLBatchRenderer {
     flags: Uint32Array,
     indices: Uint32Array,
     indexCount: number,
-    FLAG_VISIBLE: number
+    FLAG_VISIBLE: number,
+    cameraX: number = 0,
+    cameraY: number = 0,
+    cameraZoom: number = 1
   ): void {
     const HALF = 0.5;
     
@@ -593,22 +613,29 @@ export class WebGLBatchRenderer {
         const floatOffset = (this.vertexCount + visibleCount * 4) * 3;
         visibleCount++;
         
+        // Apply camera transformation: (world - camera) * zoom
+        const screenX = (x - cameraX) * cameraZoom;
+        const screenY = (y - cameraY) * cameraZoom;
+        const screenHw = hw * cameraZoom;
+        const screenHwCos = screenHw * cos;
+        const screenHwSin = screenHw * sin;
+        
         // Write vertex positions directly with inline math
         // Vertex 0 (floats at 0, 1)
-        this.batchVertices[floatOffset] = x - hwCos + hwSin;
-        this.batchVertices[floatOffset + 1] = y - hwSin - hwCos;
+        this.batchVertices[floatOffset] = screenX - screenHwCos + screenHwSin;
+        this.batchVertices[floatOffset + 1] = screenY - screenHwSin - screenHwCos;
         
         // Vertex 1 (floats at 3, 4)
-        this.batchVertices[floatOffset + 3] = x + hwCos + hwSin;
-        this.batchVertices[floatOffset + 4] = y + hwSin - hwCos;
+        this.batchVertices[floatOffset + 3] = screenX + screenHwCos + screenHwSin;
+        this.batchVertices[floatOffset + 4] = screenY + screenHwSin - screenHwCos;
         
         // Vertex 2 (floats at 6, 7)
-        this.batchVertices[floatOffset + 6] = x + hwCos - hwSin;
-        this.batchVertices[floatOffset + 7] = y + hwSin + hwCos;
+        this.batchVertices[floatOffset + 6] = screenX + screenHwCos - screenHwSin;
+        this.batchVertices[floatOffset + 7] = screenY + screenHwSin + screenHwCos;
         
         // Vertex 3 (floats at 9, 10)
-        this.batchVertices[floatOffset + 9] = x - hwCos - hwSin;
-        this.batchVertices[floatOffset + 10] = y - hwSin + hwCos;
+        this.batchVertices[floatOffset + 9] = screenX - screenHwCos - screenHwSin;
+        this.batchVertices[floatOffset + 10] = screenY - screenHwSin + screenHwCos;
         
         // Pack color as single 32-bit RGBA (at float offset 2, 5, 8, 11)
         const packedColor = aByte << 24 | bByte << 16 | gByte << 8 | rByte;

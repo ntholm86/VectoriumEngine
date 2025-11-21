@@ -1,43 +1,26 @@
 /**
- * Vectorium Engine - Interactive Demo with Enhanced Performance Monitoring
- * Showcases all engine capabilities with detailed metrics
+ * Vectorium Engine - Interactive Demo
  */
 
-import { Vectorium, Scene, Entity, Viewport } from './vectorium/core/Engine';
+import { Vectorium, Scene, Entity } from './vectorium/core/Engine';
 import { RuntimeConfig } from './vectorium/core/RuntimeConfig';
 import { DebugPanel } from './vectorium/debug/DebugPanel';
 import { EntitySpawner } from './vectorium/debug/EntitySpawner';
+import { CameraControls } from './vectorium/debug/CameraControls';
 import { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';
 import { TextRenderer } from './vectorium/rendering/TextRenderer';
 
-/**
- * Bouncing Entity - Fully ECS-managed for maximum performance
- */
 class BouncingEntity implements Entity {
-  x = 0;
-  y = 0;
-  vx = 0;
-  vy = 0;
-  size = 8;
-  rotation = 0;
-  rotationSpeed = 0;
-  alpha = 1.0;
+  x = 0; y = 0; vx = 0; vy = 0; size = 8; rotation = 0; rotationSpeed = 0; alpha = 1.0;
   color = { r: 1, g: 1, b: 1 };
   animationType: 'rotate' | 'pulse' | 'wobble' | 'spin' | 'fade' = 'rotate';
   
   spawn(x: number, y: number, vx: number, vy: number, size: number, color: { r: number; g: number; b: number }): void {
-    this.x = x;
-    this.y = y;
-    this.vx = vx;
-    this.vy = vy;
-    this.size = size;
-    this.color = color;
+    Object.assign(this, { x, y, vx, vy, size, color });
     this.rotation = Math.floor(Math.random() * 360);
     this.rotationSpeed = Math.floor((Math.random() - 0.5) * 360);
     this.alpha = 0.8 + Math.random() * 0.2;
-    
-    const types: Array<'rotate' | 'pulse' | 'wobble' | 'spin' | 'fade'> = ['rotate', 'pulse', 'wobble', 'spin', 'fade'];
-    this.animationType = types[Math.floor(Math.random() * types.length)];
+    this.animationType = ['rotate', 'pulse', 'wobble', 'spin', 'fade'][Math.floor(Math.random() * 5)] as any;
   }
   
   update(_dt: number): void {}
@@ -45,39 +28,31 @@ class BouncingEntity implements Entity {
   destroy(): void {}
 }
 
-/**
- * Demo Scene
- */
 class DemoScene extends Scene {
   private entityCount = 0;
   
   async load(): Promise<void> {
-    // World bounds ALWAYS match canvas resolution exactly
     this.setWorldBoundsMultiplier(1.0);
-    
-    this.addEntities(10, true); // Spawn in viewport by default
+    this.addEntities(10);
   }
   
-  addEntities(count: number, inViewportOnly: boolean = true): void {
-    // Physics bounds ALWAYS match canvas resolution (1.0x)
-    // inViewportOnly only controls WHERE entities spawn, not bounce area
-    
-    // Get spawn area
-    const spawnWidth = inViewportOnly ? this.getWorldWidth() : this.getWorldWidth() * 10;
-    const spawnHeight = inViewportOnly ? this.getWorldHeight() : this.getWorldHeight() * 10;
+  addEntities(count: number, inViewportOnly = true): void {
+    const [spawnWidth, spawnHeight] = inViewportOnly 
+      ? [this.getWorldWidth(), this.getWorldHeight()]
+      : [this.getWorldWidth() * 10, this.getWorldHeight() * 10];
     
     for (let i = 0; i < count; i++) {
       const entity = new BouncingEntity();
-      const x = Math.random() * spawnWidth;
-      const y = Math.random() * spawnHeight;
       const angle = Math.random() * Math.PI * 2;
       const speed = 100 + Math.random() * 200;
-      const vx = Math.cos(angle) * speed;
-      const vy = Math.sin(angle) * speed;
-      const size = 4 + Math.random() * 12;
-      const color = { r: Math.random(), g: Math.random(), b: Math.random() };
-      
-      entity.spawn(x, y, vx, vy, size, color);
+      entity.spawn(
+        Math.random() * spawnWidth,
+        Math.random() * spawnHeight,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        4 + Math.random() * 12,
+        { r: Math.random(), g: Math.random(), b: Math.random() }
+      );
       this.addEntity(entity);
       this.entityCount++;
     }
@@ -94,176 +69,103 @@ class DemoScene extends Scene {
     }
   }
   
-  clearEntities(): void {
-    this.clear();
-    this.entityCount = 0;
-  }
-  
-  getEntityCount(): number {
-    return this.entityCount;
-  }
+  clearEntities(): void { this.clear(); this.entityCount = 0; }
+  getEntityCount(): number { return this.entityCount; }
 }
 
 function initDemo() {
-  const container = document.createElement('div');
-  container.style.cssText = `
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
-  `;
+  const runtimeConfig = new RuntimeConfig();
+  const { width, height } = runtimeConfig.rendering.resolution;
+  
+  // Setup DOM
   document.body.style.margin = '0';
   document.body.style.overflow = 'hidden';
-  document.body.appendChild(container);
   
-  const canvas = document.createElement('canvas');
-  canvas.style.cssText = `
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 3px solid #00FF00;
-    box-shadow: 0 0 30px rgba(0, 255, 0, 0.5), 0 0 60px rgba(0, 255, 0, 0.3);
-    border-radius: 4px;
-  `;
-  
-  // Calculate optimal canvas size based on viewport using Viewport helper
-  const maxWidth = window.innerWidth - 450; // Account for UI panel
-  const maxHeight = window.innerHeight - 40; // Account for margins
-  
-  const viewport = Viewport.fromAspectRatio(16 / 9, maxWidth, maxHeight);
-  const canvasWidth = viewport.width;
-  const canvasHeight = viewport.height;
+  const container = document.createElement('div');
+  container.style.cssText = 'display:flex;justify-content:center;align-items:center;min-height:100vh;background:linear-gradient(135deg,#1a1a2e 0%,#0f0f1e 100%)';
   
   const canvasWrapper = document.createElement('div');
-  canvasWrapper.style.cssText = `
-    width: ${canvasWidth}px;
-    height: ${canvasHeight}px;
-    position: relative;
-  `;
+  canvasWrapper.style.cssText = `width:${width}px;height:${height}px;position:relative`;
+  
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'display:block;width:100%;height:100%;border:3px solid #00FF00;box-shadow:0 0 30px rgba(0,255,0,0.5),0 0 60px rgba(0,255,0,0.3);border-radius:4px';
+  
   canvasWrapper.appendChild(canvas);
   container.appendChild(canvasWrapper);
+  document.body.appendChild(container);
   
-  const engine = new Vectorium({
-    canvas,
-    width: canvasWidth,
-    height: canvasHeight,
-    preferWebGL2: true,
-    targetFPS: 60,
-    enableAdaptiveQuality: true,
-    initialQuality: 'high',
-    debugMode: false
-  });
-  
-  const scene = new DemoScene('demo', 2000000); // Support up to 2M entities for extreme stress testing
+  // Create engine and scene
+  const engine = new Vectorium({ canvas, width, height });
+  const scene = new DemoScene('demo', 2000000);
   engine.registerScene('demo', scene);
-  engine.loadScene('demo').then(() => {
-    engine.start();
-  });
   
-  // Initialize RuntimeConfig and DebugPanel
-  const runtimeConfig = new RuntimeConfig();
-  const debugPanel = new DebugPanel(runtimeConfig);
-  
-  // Apply config changes to engine
-  runtimeConfig.onChange((config) => {
-    // Rendering settings
-    const renderer = engine.getRenderer();
-    if (renderer && 'setBatchSize' in renderer) {
-      (renderer as WebGLBatchRenderer).setBatchSize(config.rendering.batchSize);
-    }
+  // Config change handler
+  runtimeConfig.onChange((cfg) => {
+    const renderer = engine.getRenderer() as WebGLBatchRenderer;
+    renderer.setBatchSize(cfg.rendering.batchSize);
+    renderer.setClearColor(cfg.rendering.clearColor[0], cfg.rendering.clearColor[1], cfg.rendering.clearColor[2], cfg.rendering.clearColor[3]);
+    engine.resize(cfg.rendering.resolution.width, cfg.rendering.resolution.height);
+    Object.assign(canvasWrapper.style, { width: `${cfg.rendering.resolution.width}px`, height: `${cfg.rendering.resolution.height}px` });
     
-    // Resolution
-    const { width, height } = config.rendering.resolution;
-    engine.resize(width, height);
-    if (canvas.parentElement) {
-      canvas.parentElement.style.width = `${width}px`;
-      canvas.parentElement.style.height = `${height}px`;
-    }
-    
-    // Culling
     const currentScene = (engine as any).currentScene;
     if (currentScene) {
-      currentScene.setCullingEnabled(config.rendering.enableFrustumCulling);
+      currentScene.setCullingEnabled(cfg.rendering.enableFrustumCulling);
+      currentScene.setWorldBoundsMultiplier(cfg.physics.boundsMultiplier);
     }
     
-    // Quality
-    engine.performanceMonitor.setAdaptiveQuality(config.quality.enableAdaptiveQuality);
-    
-    // Physics
-    if (currentScene) {
-      currentScene.setWorldBoundsMultiplier(config.physics.boundsMultiplier);
+    engine.performanceMonitor.setAdaptiveQuality(cfg.quality.enableAdaptiveQuality);
+    const camera = engine.getCamera();
+    if (camera) {
+      camera.setZoom(cfg.camera.zoom);
+      camera.setZoomRange(cfg.camera.minZoom, cfg.camera.maxZoom);
+      camera.setSmooth(cfg.camera.smooth, cfg.camera.smoothFactor);
+      camera.setFollowSettings(cfg.camera.followLerp, cfg.camera.followDeadzoneX, cfg.camera.followDeadzoneY);
+      camera.setCullingMargin(cfg.camera.cullingMargin);
     }
-    
-    console.log('⚙️ Config updated:', config);
   });
   
-  // Apply initial config
-  runtimeConfig.onChange(runtimeConfig as any); // Trigger once
-  
-  // Connect debug panel to scene for culling status updates
-  const currentScene = (engine as any).currentScene;
-  if (currentScene) {
-    (currentScene as any)._debugPanel = debugPanel;
-  }
-  
-  // Initialize Entity Spawner with keyboard toggle ('E' key)
+  // UI and controls
+  new DebugPanel(runtimeConfig);
   const entitySpawner = new EntitySpawner(scene);
-  entitySpawner.registerCallbacks({
-    remove1K: () => scene.removeEntities(1000),
-    clearAll: () => scene.clearEntities()
-  });
+  entitySpawner.registerCallbacks({ remove1K: () => scene.removeEntities(1000), clearAll: () => scene.clearEntities() });
   
   let paused = false;
   document.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
       e.preventDefault();
-      if (paused) {
-        engine.start();
-        paused = false;
-      } else {
-        engine.stop();
-        paused = true;
-      }
-    }
-    
-    // Toggle vertex pulling with 'G' key
-    if (e.key.toLowerCase() === 'g') {
-      const renderer = (engine as any).renderer;
-      const currentlyEnabled = renderer.isVertexPullingActive();
-      renderer.setVertexPullingEnabled(!currentlyEnabled);
-      console.log(`🚀 Vertex Pulling ${!currentlyEnabled ? 'ENABLED' : 'DISABLED'} - GPU-side vertex generation`);
+      paused ? engine.start() : engine.stop();
+      paused = !paused;
     }
   });
   
+  // Click spawner
   canvas.addEventListener('click', (e) => {
+    const camera = engine.getCamera();
+    if (!camera) return;
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const world = camera.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+    const count = entitySpawner.getClickSpawnCount();
     
-    const entityCount = entitySpawner.getClickSpawnCount();
-    for (let i = 0; i < entityCount; i++) {
+    if (count >= 100000) camera.startShake(20, 500);
+    else if (count >= 10000) camera.startShake(10, 300);
+    
+    for (let i = 0; i < count; i++) {
       const entity = new BouncingEntity();
-      const angle = (i / entityCount) * Math.PI * 2;
+      const angle = (i / count) * Math.PI * 2;
       const speed = 200 + Math.random() * 300;
-      const vx = Math.cos(angle) * speed;
-      const vy = Math.sin(angle) * speed;
-      const size = 6 + Math.random() * 8;
-      const hue = (i / entityCount) * 360;
-      const color = hslToRgb(hue, 1, 0.5);
-      
-      entity.spawn(x, y, vx, vy, size, color);
+      entity.spawn(world.x, world.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 6 + Math.random() * 8, hslToRgb((i / count) * 360, 1, 0.5));
       scene.addEntity(entity);
     }
   });
   
-  // Info hint
-  console.log('🎮 Vectorium Demo Ready!');
-  console.log('   P - Toggle Profiler');
-  console.log('   C - Toggle Config Panel');
-  console.log('   E - Toggle Entity Spawner');
-  console.log('   SPACE - Pause/Resume');
-  console.log('   CLICK - Spawn burst');
+  // Start
+  engine.loadScene('demo').then(() => {
+    runtimeConfig.onChange(runtimeConfig as any);
+    const camera = engine.getCamera();
+    if (camera) new CameraControls(camera, runtimeConfig);
+    engine.start();
+    console.log('🎮 Vectorium Demo Ready | P:Profiler C:Config E:Spawner V:Camera Space:Pause');
+  });
 }
 
 function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
@@ -287,6 +189,7 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
   };
 }
 
+// Initialize demo when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDemo);
 } else {

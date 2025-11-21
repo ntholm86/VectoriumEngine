@@ -43,6 +43,32 @@ export interface AnimationSettings {
   animationSpeed: number;         // 0.0-2.0 multiplier
 }
 
+export interface CameraSettings {
+  // Zoom
+  zoom: number;
+  minZoom: number;
+  maxZoom: number;
+  
+  // Smooth movement
+  smooth: boolean;
+  smoothFactor: number;
+  
+  // Follow
+  followEnabled: boolean;
+  followLerp: number;
+  followDeadzoneX: number;
+  followDeadzoneY: number;
+  
+  // Shake
+  shakeDecay: number;
+  
+  // Bounds
+  clampToBounds: boolean;
+  
+  // Culling
+  cullingMargin: number;
+}
+
 /**
  * RuntimeConfig - Live-tweakable settings
  * Can be modified during gameplay for performance tuning
@@ -54,7 +80,7 @@ export class RuntimeConfig {
     enableBatching: true,
     clearColor: [0, 0, 0, 1],
     vsync: true,
-    resolution: { width: 1920, height: 1080 }
+    resolution: { width: 800, height: 600 }
   };
 
   physics: PhysicsSettings = {
@@ -66,7 +92,7 @@ export class RuntimeConfig {
 
   debug: DebugSettings = {
     showProfiler: false,
-    showStats: true,
+    showStats: false,
     showBounds: false,
     showGrid: false,
     logPerformanceWarnings: true,
@@ -87,6 +113,21 @@ export class RuntimeConfig {
     animationSpeed: 1.0
   };
 
+  camera: CameraSettings = {
+    zoom: 1.0,
+    minZoom: 0.1,
+    maxZoom: 10.0,
+    smooth: true,
+    smoothFactor: 0.1,
+    followEnabled: false,
+    followLerp: 0.1,
+    followDeadzoneX: 100,
+    followDeadzoneY: 100,
+    shakeDecay: 0.95,
+    clampToBounds: false,
+    cullingMargin: 50
+  };
+
   private changeCallbacks: Array<(config: RuntimeConfig) => void> = [];
   private storageKey = 'vectorium-runtime-config';
 
@@ -105,7 +146,11 @@ export class RuntimeConfig {
    * Notify listeners of config change
    */
   private notifyChange(): void {
-    this.changeCallbacks.forEach(cb => cb(this));
+    this.changeCallbacks.forEach(cb => {
+      if (typeof cb === 'function') {
+        cb(this);
+      }
+    });
   }
 
   /**
@@ -154,6 +199,15 @@ export class RuntimeConfig {
   }
 
   /**
+   * Update camera settings
+   */
+  setCamera(settings: Partial<CameraSettings>): void {
+    Object.assign(this.camera, settings);
+    this.notifyChange();
+    this.save();
+  }
+
+  /**
    * Load config from localStorage
    */
   load(): void {
@@ -166,6 +220,7 @@ export class RuntimeConfig {
         if (data.debug) Object.assign(this.debug, data.debug);
         if (data.quality) Object.assign(this.quality, data.quality);
         if (data.animation) Object.assign(this.animation, data.animation);
+        if (data.camera) Object.assign(this.camera, data.camera);
       }
     } catch (e) {
       console.warn('Failed to load RuntimeConfig from localStorage:', e);
@@ -182,7 +237,8 @@ export class RuntimeConfig {
         physics: this.physics,
         debug: this.debug,
         quality: this.quality,
-        animation: this.animation
+        animation: this.animation,
+        camera: this.camera
       };
       localStorage.setItem(this.storageKey, JSON.stringify(data));
     } catch (e) {
@@ -233,6 +289,21 @@ export class RuntimeConfig {
       animationSpeed: 1.0
     };
 
+    this.camera = {
+      zoom: 1.0,
+      minZoom: 0.1,
+      maxZoom: 10.0,
+      smooth: true,
+      smoothFactor: 0.1,
+      followEnabled: false,
+      followLerp: 0.1,
+      followDeadzoneX: 100,
+      followDeadzoneY: 100,
+      shakeDecay: 0.95,
+      clampToBounds: false,
+      cullingMargin: 50
+    };
+
     this.notifyChange();
     this.save();
   }
@@ -246,7 +317,8 @@ export class RuntimeConfig {
       physics: this.physics,
       debug: this.debug,
       quality: this.quality,
-      animation: this.animation
+      animation: this.animation,
+      camera: this.camera
     }, null, 2);
   }
 
@@ -261,6 +333,7 @@ export class RuntimeConfig {
       if (data.debug) this.setDebug(data.debug);
       if (data.quality) this.setQuality(data.quality);
       if (data.animation) this.setAnimation(data.animation);
+      if (data.camera) this.setCamera(data.camera);
     } catch (e) {
       console.error('Failed to import RuntimeConfig:', e);
     }
