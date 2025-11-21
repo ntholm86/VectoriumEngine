@@ -166,17 +166,39 @@ export class World {
     this.wobbleSpeed[id] = 3 + Math.random() * 4;
     this.fadeDirection[id] = 1;
     
+    // CRITICAL FIX: Initialize physics properties to prevent stale data
+    // When entities are reused from pool, they must have clean physics state
+    this.mass[id] = 1.0;
+    this.restitution[id] = 0.8;
+    this.enableGravity[id] = 0;  // Disabled by default
+    this.enableCollisions[id] = 0;  // Disabled by default
+    
     return id;
   }
   
   /**
    * Destroy entity - mark inactive and add to free list for reuse
+   * 
+   * CRITICAL FIX: Clear ALL component data to prevent stale data bugs
    */
   destroyEntity(id: EntityId): void {
     if (this.flags[id] & this.FLAG_ACTIVE) {
       this.activeEntityCount--;
     }
+    
+    // Clear flags first
     this.flags[id] = 0;
+    
+    // CRITICAL FIX: Clear physics properties to prevent ghost collisions
+    // When entity is destroyed, it should not participate in any physics
+    this.enableCollisions[id] = 0;
+    this.enableGravity[id] = 0;
+    this.velocityX[id] = 0;
+    this.velocityY[id] = 0;
+    
+    // Clear other properties to prevent visual artifacts
+    this.alpha[id] = 0;
+    
     this.freeList.push(id);
   }
   

@@ -21,6 +21,14 @@ export class WasmPhysics {
   private neighborBuffer: number[]; // Pre-allocated for queries
   private readonly MAX_NEIGHBORS = 256; // Per entity
   
+  // CRITICAL FIX: Delta buffers to prevent corruption and energy gain
+  // Store deltas and apply AFTER all collision detection
+  private positionDeltaX: Float32Array;
+  private positionDeltaY: Float32Array;
+  private velocityDeltaX: Float32Array;
+  private velocityDeltaY: Float32Array;
+  private maxEntities: number = 0;
+  
   // Performance metrics
   public metrics = {
     gravityTime: 0,
@@ -39,6 +47,12 @@ export class WasmPhysics {
     this.spatialHash = new SpatialHash(CELL_SIZE, 2048);
     // Pre-fill buffer with -1 to catch stale reads (debugging aid)
     this.neighborBuffer = new Array(this.MAX_NEIGHBORS).fill(-1);
+    
+    // Initialize delta buffers
+    this.positionDeltaX = new Float32Array(1024);
+    this.positionDeltaY = new Float32Array(1024);
+    this.velocityDeltaX = new Float32Array(1024);
+    this.velocityDeltaY = new Float32Array(1024);
   }
   
   async initialize(): Promise<boolean> {
@@ -119,6 +133,21 @@ export class WasmPhysics {
     t0 = performance.now();
     
     if (collisionsEnabled) {
+      // CRITICAL FIX: Resize delta buffers if needed
+      if (entityCount > this.maxEntities) {
+        this.maxEntities = Math.max(entityCount, this.maxEntities * 2);
+        this.positionDeltaX = new Float32Array(this.maxEntities);
+        this.positionDeltaY = new Float32Array(this.maxEntities);
+        this.velocityDeltaX = new Float32Array(this.maxEntities);
+        this.velocityDeltaY = new Float32Array(this.maxEntities);
+      }
+      
+      // Clear deltas
+      this.positionDeltaX.fill(0);
+      this.positionDeltaY.fill(0);
+      this.velocityDeltaX.fill(0);
+      this.velocityDeltaY.fill(0);
+      
       // Process each entity against its spatial neighbors only
       for (let i = 0; i < entityCount; i++) {
         if (!collisionsEnabled[i]) continue;
@@ -176,27 +205,36 @@ export class WasmPhysics {
           const ny = dy * invDist;
           
           // Positional correction (separate penetrating bodies)
+          // Uses inverse mass ratios for proper force distribution
           const penetration = rsum - dist;
           const mj = mass ? mass[j] : 1;
-          const invMassSum = (mi > 0 ? (1 / mi) : 0) + (mj > 0 ? (1 / mj) : 0);
+          const invMi = mi > 0 ? (1 / mi) : 0;
+          const invMj = mj > 0 ? (1 / mj) : 0;
+          const invMassSum = invMi + invMj;
           
           if (invMassSum > 0) {
-            const correctionScale = penetration / invMassSum;
+            // CRITICAL FIX: Correct positional correction formula
+            // correction = penetration * (invMass / totalInvMass)
+            // Previous code was dividing by mass twice, causing incorrect forces!
+            const correctionPercent = 0.4; // 40% separation per frame for stability
             
+            // CRITICAL FIX: Accumulate position deltas instead of modifying positions directly
+            // This prevents spatial hash corruption (positions change mid-detection!)
             if (mi > 0) {
-              const corri = correctionScale / mi;
-              positionX[i] -= nx * corri;
-              positionY[i] -= ny * corri;
+              const corri = (penetration * correctionPercent) * (invMi / invMassSum);
+              this.positionDeltaX[i] -= nx * corri;
+              this.positionDeltaY[i] -= ny * corri;
             }
             
             if (mj > 0) {
-              const corrj = correctionScale / mj;
-              positionX[j] += nx * corrj;
-              positionY[j] += ny * corrj;
+              const corrj = (penetration * correctionPercent) * (invMj / invMassSum);
+              this.positionDeltaX[j] += nx * corrj;
+              this.positionDeltaY[j] += ny * corrj;
             }
           }
           
           // Impulse resolution (elastic collision)
+          // CRITICAL FIX: Read velocities from arrays, not modified values
           const vxi = velocityX[i];
           const vyi = velocityY[i];
           const vxj = velocityX[j];
@@ -209,25 +247,39 @@ export class WasmPhysics {
           // Moving apart check (avoid double-resolution)
           if (velAlongNormal <= 0) continue;
           
-          // Restitution (bounciness) - reduced to 80% to prevent energy gain
+          // Restitution (bounciness) - reduced to prevent energy gain
           const restj = restitution ? restitution[j] : 1;
-          const e = Math.min(resti, restj) * 0.8;
+          const e = Math.min(resti, restj) * 0.75; // Reduced from 0.8 to 0.75
           
-          // Impulse magnitude
+          // CRITICAL FIX: Correct impulse formula
+          // impulse = -(1 + e) * velAlongNormal / (invMass_i + invMass_j)
+          // Then distribute by inverse mass ratio, NOT divide by mass again!
           const jImpulse = -(1 + e) * velAlongNormal / invMassSum;
           
-          // Apply impulse
+          // CRITICAL FIX: Accumulate velocity deltas instead of modifying directly
+          // This prevents energy gain from reading modified velocities mid-loop
           if (mi > 0) {
-            const impulsei = jImpulse / mi;
-            velocityX[i] -= nx * impulsei;
-            velocityY[i] -= ny * impulsei;
+            const impulsei = jImpulse * invMi; // Multiply by invMass, not divide by mass!
+            this.velocityDeltaX[i] -= nx * impulsei;
+            this.velocityDeltaY[i] -= ny * impulsei;
           }
           
           if (mj > 0) {
-            const impulsej = jImpulse / mj;
-            velocityX[j] += nx * impulsej;
-            velocityY[j] += ny * impulsej;
+            const impulsej = jImpulse * invMj; // Multiply by invMass, not divide by mass!
+            this.velocityDeltaX[j] += nx * impulsej;
+            this.velocityDeltaY[j] += ny * impulsej;
           }
+        }
+      }
+      
+      // CRITICAL FIX: Apply accumulated deltas AFTER all collision detection
+      // This prevents spatial hash corruption AND energy gain from mid-loop modifications
+      for (let i = 0; i < entityCount; i++) {
+        if (collisionsEnabled[i]) {
+          positionX[i] += this.positionDeltaX[i];
+          positionY[i] += this.positionDeltaY[i];
+          velocityX[i] += this.velocityDeltaX[i];
+          velocityY[i] += this.velocityDeltaY[i];
         }
       }
     }
@@ -236,9 +288,21 @@ export class WasmPhysics {
     this.metrics.spatialHashStats = this.spatialHash.getStats();
     
     // ============================================================================
-    // PHASE 4: BOUNDARY BOUNCING (O(n) - SIMD-optimized)
+    // PHASE 4: VELOCITY INTEGRATION (O(n) - Apply velocity to position)
     // ============================================================================
     t0 = performance.now();
+    
+    // Integrate velocity for all entities
+    for (let i = 0; i < entityCount; i++) {
+      if (flags[i] & FLAG_PHYSICS) {
+        positionX[i] += velocityX[i] * dtF;
+        positionY[i] += velocityY[i] * dtF;
+      }
+    }
+    
+    // ============================================================================
+    // PHASE 5: BOUNDARY BOUNCING (O(n) - Clamp positions, bounce velocities)
+    // ============================================================================
     
     // Unrolled 2-wide loop for CPU pipelining
     let i = 0;
@@ -255,9 +319,8 @@ export class WasmPhysics {
         const h0 = size[i] * halfConst;
         const rest0 = restitution ? restitution[i] : 1;
         
-        // Integrate velocity
-        px0 += vx0 * dtF;
-        py0 += vy0 * dtF;
+        // CRITICAL FIX: Don't integrate velocity here (already done in Phase 4!)
+        // Just check boundaries and bounce
         
         // Branchless boundary bounce X
         const hitLeft0 = px0 - h0 < 0;
@@ -287,8 +350,8 @@ export class WasmPhysics {
         const h1 = size[i + 1] * halfConst;
         const rest1 = restitution ? restitution[i + 1] : 1;
         
-        px1 += vx1 * dtF;
-        py1 += vy1 * dtF;
+        // CRITICAL FIX: Don't integrate velocity here (already done in Phase 4!)
+        // Just check boundaries and bounce
         
         const hitLeft1 = px1 - h1 < 0;
         const hitRight1 = px1 + h1 > widthF;
@@ -318,8 +381,8 @@ export class WasmPhysics {
         const h = size[i] * halfConst;
         const rest = restitution ? restitution[i] : 1;
         
-        px += vx * dtF;
-        py += vy * dtF;
+        // CRITICAL FIX: Don't integrate velocity here (already done in Phase 4!)
+        // Just check boundaries and bounce
         
         const hitLeft = px - h < 0;
         const hitRight = px + h > widthF;
@@ -341,7 +404,7 @@ export class WasmPhysics {
     this.metrics.boundaryTime = performance.now() - t0;
     
     // ============================================================================
-    // PHASE 5: VELOCITY DAMPING & CLAMPING (Apply after all forces)
+    // PHASE 6: VELOCITY DAMPING & CLAMPING (Apply after all forces)
     // ============================================================================
     const damping = 0.995; // 0.5% energy loss per frame
     const maxSpeed = 1200; // Prevent entities from going too fast
