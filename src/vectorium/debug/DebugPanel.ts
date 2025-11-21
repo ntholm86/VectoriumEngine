@@ -173,6 +173,7 @@ export class DebugPanel {
     return `
       <div class="config-section">
         <div class="section-header">💾 ACTIONS</div>
+        <button id="cfg-fullscreen" class="action-btn fullscreen">🖥️ Fullscreen</button>
         <button id="cfg-reset" class="action-btn danger">Reset Defaults</button>
         <button id="cfg-export" class="action-btn">Export JSON</button>
       </div>
@@ -270,6 +271,13 @@ export class DebugPanel {
     });
 
     // Actions
+    this.on('cfg-fullscreen', 'click', () => {
+      const canvas = document.querySelector('canvas');
+      if (canvas && canvas.requestFullscreen) {
+        canvas.requestFullscreen();
+      }
+    });
+
     this.on('cfg-reset', 'click', () => {
       if (confirm('Reset all settings to defaults?')) {
         this.config.reset();
@@ -356,22 +364,22 @@ export class DebugPanel {
           position: fixed;
           top: 10px;
           left: 10px;
-          width: 280px;
+          width: 320px;
           max-height: 95vh;
           overflow-y: auto;
           background: rgba(0, 0, 0, 0.92);
-          border: 2px solid #FFA500;
+          border: 2px solid #00FF00;
           border-radius: 6px;
           font-family: 'Courier New', Consolas, monospace;
           font-size: 11px;
-          color: #FFA500;
-          box-shadow: 0 4px 20px rgba(255, 165, 0, 0.3);
+          color: #00FF00;
+          box-shadow: 0 4px 20px rgba(0, 255, 0, 0.3);
           z-index: 9999;
           transition: opacity 0.3s, transform 0.3s;
         }
         .vectorium-debug-panel.hidden {
           opacity: 0;
-          transform: translateX(-320px);
+          transform: translateX(-360px);
           pointer-events: none;
         }
         .debug-panel-header {
@@ -379,17 +387,18 @@ export class DebugPanel {
           justify-content: space-between;
           align-items: center;
           padding: 10px 12px;
-          background: rgba(255, 165, 0, 0.1);
-          border-bottom: 1px solid rgba(255, 165, 0, 0.3);
+          background: rgba(0, 255, 0, 0.05);
+          border-bottom: 1px solid rgba(0, 255, 0, 0.3);
         }
         .panel-title {
           font-weight: bold;
-          font-size: 12px;
+          font-size: 13px;
+          letter-spacing: 0.5px;
         }
         .panel-collapse-btn {
           background: none;
           border: none;
-          color: #FFA500;
+          color: #00FF00;
           cursor: pointer;
           font-size: 14px;
           padding: 0;
@@ -398,30 +407,35 @@ export class DebugPanel {
           padding: 0;
         }
         .config-section {
-          padding: 10px 12px;
+          padding: 8px 12px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         .section-header {
+          background: rgba(0, 255, 0, 0.1);
+          padding: 6px 12px;
+          margin: 0 -12px 8px -12px;
           font-weight: bold;
-          margin-bottom: 8px;
           font-size: 10px;
           letter-spacing: 0.5px;
-          color: #FFAA00;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          color: #4a9eff;
         }
         .config-row {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 6px;
+          padding: 3px 0;
+          line-height: 1.4;
         }
         .config-row label {
           font-size: 11px;
-          color: #FFA500;
+          color: #00FF00;
         }
         .config-select, .config-input {
           background: #000;
-          color: #FFA500;
-          border: 1px solid #FFA500;
+          color: #00FF00;
+          border: 1px solid #00FF00;
           border-radius: 3px;
           padding: 4px 6px;
           font-family: inherit;
@@ -436,7 +450,7 @@ export class DebugPanel {
           min-width: 40px;
           text-align: right;
           font-weight: bold;
-          color: #FFAA00;
+          color: #FFFF00;
         }
         input[type="checkbox"] {
           width: 16px;
@@ -447,7 +461,7 @@ export class DebugPanel {
           width: 100%;
           padding: 8px;
           margin-bottom: 6px;
-          background: #FFA500;
+          background: #00FF00;
           color: #000;
           border: none;
           border-radius: 4px;
@@ -457,7 +471,7 @@ export class DebugPanel {
           font-size: 11px;
         }
         .action-btn:hover {
-          background: #FFB520;
+          background: #00FF88;
         }
         .action-btn.danger {
           background: #FF4444;
@@ -466,6 +480,12 @@ export class DebugPanel {
         .action-btn.danger:hover {
           background: #FF5555;
         }
+        .action-btn.fullscreen {
+          background: #00AA00;
+        }
+        .action-btn.fullscreen:hover {
+          background: #00CC00;
+        }
         .vectorium-debug-panel::-webkit-scrollbar {
           width: 8px;
         }
@@ -473,11 +493,11 @@ export class DebugPanel {
           background: rgba(0, 0, 0, 0.3);
         }
         .vectorium-debug-panel::-webkit-scrollbar-thumb {
-          background: rgba(255, 165, 0, 0.3);
+          background: rgba(0, 255, 0, 0.3);
           border-radius: 4px;
         }
         .vectorium-debug-panel::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 165, 0, 0.5);
+          background: rgba(0, 255, 0, 0.5);
         }
       </style>
     `;
