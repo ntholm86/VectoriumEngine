@@ -392,6 +392,19 @@ export class Camera {
   }
   
   /**
+   * Conditional shake based on value thresholds
+   * Automatically selects intensity/duration based on magnitude
+   */
+  shakeIf(value: number, thresholds: Array<{ min: number; intensity: number; duration: number }>): void {
+    for (const threshold of thresholds.sort((a, b) => b.min - a.min)) {
+      if (value >= threshold.min) {
+        this.startShake(threshold.intensity, threshold.duration);
+        return;
+      }
+    }
+  }
+  
+  /**
    * Get current shake offset (for renderer)
    */
   getShakeOffset(): { x: number; y: number } {

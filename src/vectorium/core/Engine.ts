@@ -461,6 +461,79 @@ export class Vectorium {
     return camera.screenToWorld(canvasCoords.x, canvasCoords.y);
   }
 
+  /**
+   * Convenient click handler with world coordinates
+   */
+  onClick(callback: (worldX: number, worldY: number, event: MouseEvent) => void): void {
+    this.canvas.addEventListener('click', (e) => {
+      const world = this.getWorldCoordinates(e.clientX, e.clientY);
+      if (world) {
+        callback(world.x, world.y, e);
+      }
+    });
+  }
+
+  /**
+   * Toggle pause/resume
+   */
+  togglePause(): boolean {
+    if (this.running) {
+      this.stop();
+      return true; // paused
+    } else {
+      this.start();
+      return false; // running
+    }
+  }
+
+  /**
+   * Convenient keyboard handler
+   */
+  onKey(key: string, callback: (event: KeyboardEvent) => void): void {
+    document.addEventListener('keydown', (e) => {
+      if (e.code === key) {
+        e.preventDefault();
+        callback(e);
+      }
+    });
+  }
+
+  /**
+   * Create a fullscreen centered canvas with default styling
+   */
+  static createFullscreenCanvas(options: {
+    width?: number;
+    height?: number;
+    borderColor?: string;
+    backgroundColor?: string;
+  } = {}): HTMLCanvasElement {
+    const {
+      width = 1280,
+      height = 720,
+      borderColor = '#00FF00',
+      backgroundColor = 'linear-gradient(135deg,#1a1a2e 0%,#0f0f1e 100%)'
+    } = options;
+
+    // Setup DOM
+    document.body.style.margin = '0';
+    document.body.style.overflow = 'hidden';
+    
+    const container = document.createElement('div');
+    container.style.cssText = `display:flex;justify-content:center;align-items:center;min-height:100vh;background:${backgroundColor}`;
+    
+    const canvasWrapper = document.createElement('div');
+    canvasWrapper.style.cssText = `width:${width}px;height:${height}px;position:relative`;
+    
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = `display:block;width:100%;height:100%;border:3px solid ${borderColor};box-shadow:0 0 30px rgba(0,255,0,0.5),0 0 60px rgba(0,255,0,0.3);border-radius:4px`;
+    
+    canvasWrapper.appendChild(canvas);
+    container.appendChild(canvasWrapper);
+    document.body.appendChild(container);
+    
+    return canvas;
+  }
+
   destroy(): void {
     this.stop();
     

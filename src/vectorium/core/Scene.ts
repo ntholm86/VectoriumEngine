@@ -388,6 +388,63 @@ export class Scene {
     }
   }
 
+  /**
+   * Add multiple entities at once
+   */
+  addBatch(entities: Entity[]): void {
+    entities.forEach(entity => this.addEntity(entity));
+  }
+
+  /**
+   * Remove last N entities
+   */
+  removeLast(count: number): void {
+    const toRemove = Math.min(count, this.entities.length);
+    for (let i = 0; i < toRemove; i++) {
+      const entity = this.entities[this.entities.length - 1];
+      if (entity) {
+        this.removeEntity(entity);
+      }
+    }
+  }
+
+  /**
+   * Spawn random entities in viewport or world bounds
+   */
+  spawnRandom<T extends Entity>(
+    EntityClass: new (...args: any[]) => T,
+    count: number,
+    options: {
+      inViewportOnly?: boolean;
+      minSpeed?: number;
+      maxSpeed?: number;
+    } = {}
+  ): T[] {
+    const inViewportOnly = options.inViewportOnly ?? true;
+    const [spawnWidth, spawnHeight] = inViewportOnly 
+      ? [this.worldWidth, this.worldHeight]
+      : [this.worldWidth * 10, this.worldHeight * 10];
+    
+    const entities: T[] = [];
+    for (let i = 0; i < count; i++) {
+      const x = Math.random() * spawnWidth;
+      const y = Math.random() * spawnHeight;
+      
+      // Use static factory if available, otherwise constructor
+      const entity = (EntityClass as any).createAt 
+        ? (EntityClass as any).createAt(x, y, { 
+            minSpeed: options.minSpeed, 
+            maxSpeed: options.maxSpeed 
+          })
+        : new EntityClass(x, y);
+      
+      this.addEntity(entity);
+      entities.push(entity);
+    }
+    
+    return entities;
+  }
+
   clear(): void {
     for (const entity of this.entities) {
       const id = this.entityToId.get(entity);
