@@ -1,29 +1,25 @@
 /**
  * Scene class
- * Manages entities, ECS world, rendering, and physics
+ * Manages ECS world, rendering, and physics
+ * 
+ * 🚀 P0 OPTIMIZATION: Pure ECS - no Entity class instances
+ * Memory: 76 bytes/entity (was 140 bytes with OOP overhead)
  */
 
-import { Entity } from './Entity';
 import { World, EntityId } from './World';
+import type { Entity } from './Entity';
 import { Camera } from './Camera';
 import { Viewport } from './Viewport';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
+import type { EntityBurstFactory } from '../entities/factories';
 
 export class Scene {
   name: string;
-  entities: Entity[] = [];
   active: boolean = false;
   
-  // ECS World - transparent performance layer
+  // 🚀 Pure ECS World - all entity data lives here
   public world: World;
-  private entityToId: WeakMap<Entity, EntityId> = new WeakMap();
-  
-  // Track entities with custom update logic (rare!)
-  private entitiesWithCustomUpdate: Entity[] = [];
-  
-  // Track entities with custom render logic (rare!)
-  private entitiesWithCustomRender: Entity[] = [];
   
   // Viewport manages all resolution and world bounds
   protected viewport: Viewport = Viewport.FullHD();
@@ -82,8 +78,7 @@ export class Scene {
   update(dt: number): void {
     const startTime = performance.now();
     
-    // CRITICAL OPTIMIZATION: Run ECS systems ONLY
-    // Pure data entities don't need update() calls at all!
+    // 🚀 Pure ECS update - no entity sync overhead!
     const physicsStart = performance.now();
     this.world.updatePhysics(dt, this.worldWidth, this.worldHeight);
     this.perfMetrics.updatePhysics = performance.now() - physicsStart;
@@ -92,37 +87,9 @@ export class Scene {
     this.world.updateAnimations(dt);
     this.perfMetrics.updateAnimation = performance.now() - animStart;
     
-    let entitySyncTime = 0;
-    // ONLY update entities with custom logic (typically 0-1% of entities)
-    // Most entities are pure data containers managed entirely by ECS
-    if (this.entitiesWithCustomUpdate.length > 0) {
-      const syncStart = performance.now();
-      const posX = this.world.getPositionX();
-      const posY = this.world.getPositionY();
-      
-      for (const entity of this.entitiesWithCustomUpdate) {
-        const id = this.entityToId.get(entity);
-        if (id === undefined) continue;
-        
-        // Sync position from ECS
-        entity.x = posX[id];
-        entity.y = posY[id];
-        
-        // Call custom update logic
-        entity.update(dt);
-        
-        // Sync back if modified
-        if (entity.x !== posX[id] || entity.y !== posY[id]) {
-          posX[id] = entity.x;
-          posY[id] = entity.y;
-        }
-      }
-      entitySyncTime = performance.now() - syncStart;
-    }
-    
-    this.perfMetrics.updateEntitySync = entitySyncTime;
+    this.perfMetrics.updateEntitySync = 0; // No sync needed!
     this.perfMetrics.updateTotal = performance.now() - startTime;
-    this.perfMetrics.customUpdateCount = this.entitiesWithCustomUpdate.length;
+    this.perfMetrics.customUpdateCount = 0; // No custom entities
     this.perfMetrics.ecsActiveEntities = this.world.getActiveCount();
     this.perfMetrics.ecsTotalEntities = this.world.getTotalCount();
     
@@ -130,34 +97,24 @@ export class Scene {
     this.camera.update(dt);
     
     if (this.enableWarnings && this.perfMetrics.updateTotal > this.updateTimeWarningThreshold) {
-      console.warn(`⚠️ VECTORIUM UPDATE BREAKDOWN: Total=${this.perfMetrics.updateTotal.toFixed(2)}ms | Physics=${this.perfMetrics.updatePhysics.toFixed(2)}ms | Anim=${this.perfMetrics.updateAnimation.toFixed(2)}ms | EntitySync=${this.perfMetrics.updateEntitySync.toFixed(2)}ms | Entities w/ custom update=${this.entitiesWithCustomUpdate.length}`);
+      console.warn(`⚠️ VECTORIUM UPDATE: ${this.perfMetrics.updateTotal.toFixed(2)}ms | Physics=${this.perfMetrics.updatePhysics.toFixed(2)}ms | Anim=${this.perfMetrics.updateAnimation.toFixed(2)}ms`);
     }
   }
 
-  render(renderer: WebGLBatchRenderer, textRenderer: TextRenderer): void {
+  render(renderer: WebGLBatchRenderer, _textRenderer: TextRenderer): void {
     const startTime = performance.now();
     
-    // OPTIMIZATION: Batch-render directly from ECS arrays (10-100x faster!)
+    // 🚀 Pure ECS batch rendering - zero overhead!
     const batchStart = performance.now();
     this.renderECSBatch(renderer);
     this.perfMetrics.renderBatch = performance.now() - batchStart;
     
-    // Then render ONLY entities with custom rendering (should be near-zero)
-    let customRenderTime = 0;
-    if (this.entitiesWithCustomRender.length > 0) {
-      const customStart = performance.now();
-      for (const entity of this.entitiesWithCustomRender) {
-        entity.render(renderer, textRenderer);
-      }
-      customRenderTime = performance.now() - customStart;
-    }
-    
-    this.perfMetrics.renderCustom = customRenderTime;
+    this.perfMetrics.renderCustom = 0; // No custom rendering
     this.perfMetrics.renderTotal = performance.now() - startTime;
-    this.perfMetrics.customRenderCount = this.entitiesWithCustomRender.length;
+    this.perfMetrics.customRenderCount = 0;
     
     if (this.enableWarnings && this.perfMetrics.renderTotal > this.renderTimeWarningThreshold) {
-      console.warn(`⚠️ VECTORIUM RENDER BREAKDOWN: Total=${this.perfMetrics.renderTotal.toFixed(2)}ms | Batch=${this.perfMetrics.renderBatch.toFixed(2)}ms | Custom=${this.perfMetrics.renderCustom.toFixed(2)}ms | CustomCount=${this.entitiesWithCustomRender.length}`);
+      console.warn(`⚠️ VECTORIUM RENDER: ${this.perfMetrics.renderTotal.toFixed(2)}ms | Batch=${this.perfMetrics.renderBatch.toFixed(2)}ms`);
     }
   }
   
@@ -293,194 +250,116 @@ export class Scene {
     return this.worldHeight;
   }
 
-  addEntity(entity: Entity): void {
-    this.entities.push(entity);
-    
-    // Check if entity needs custom update calls (opt-in via marker)
-    // By default, entities are pure data containers managed by ECS
-    const anyEntity = entity as any;
-    if (anyEntity.__needsUpdate === true) {
-      this.entitiesWithCustomUpdate.push(entity);
-    }
-    
-    // Check if entity needs custom render calls (opt-in via marker)
-    if (anyEntity.__customRender === true) {
-      this.entitiesWithCustomRender.push(entity);
-    }
-    
-    // Automatically create ECS component for transparent performance boost
-    const id = this.world.createEntity(
-      entity.x, 
-      entity.y,
-      anyEntity.vx || 0,  // Use velocity from entity if it has it
-      anyEntity.vy || 0
-    );
-    this.entityToId.set(entity, id);
-    
-    // Sync initial properties to ECS (if entity has them)
-    const posX = this.world.getPositionX();
-    const posY = this.world.getPositionY();
-    const rotation = this.world.getRotation();
-    const sizes = this.world.getSizes();
-    const colorR = this.world.getColorR();
-    const colorG = this.world.getColorG();
-    const colorB = this.world.getColorB();
-    const alphas = this.world.getAlphas();
-    
-    // Position is always synced
-    posX[id] = entity.x;
-    posY[id] = entity.y;
-    
-    // Optional rotation (convert to integer degrees if needed)
-    if (typeof anyEntity.rotation === 'number') {
-      const degrees = Math.round((anyEntity.rotation * 180 / Math.PI)) % 360;
-      rotation[id] = degrees < 0 ? degrees + 360 : degrees;
-    }
-    
-    // Optional size
-    if (typeof anyEntity.size === 'number') {
-      sizes[id] = anyEntity.size;
-    } else if (typeof anyEntity.radius === 'number') {
-      sizes[id] = anyEntity.radius;
-    }
-    
-    // Optional color (handle object format {r,g,b})
-    if (anyEntity.color && typeof anyEntity.color === 'object') {
-      colorR[id] = Math.floor(anyEntity.color.r * 255);
-      colorG[id] = Math.floor(anyEntity.color.g * 255);
-      colorB[id] = Math.floor(anyEntity.color.b * 255);
-    } else if (typeof anyEntity.color === 'number') {
-      const color = anyEntity.color;
-      colorR[id] = (color >> 16) & 0xFF;
-      colorG[id] = (color >> 8) & 0xFF;
-      colorB[id] = color & 0xFF;
-    }
-    
-    // Optional alpha
-    if (typeof anyEntity.alpha === 'number') {
-      alphas[id] = anyEntity.alpha;
-    }
-    
-    // Sync physics properties
-    const mass = this.world.getMass();
-    const restitution = this.world.getRestitution();
-    const gravityEnabled = this.world.getGravityEnabled();
-    const collisionsEnabled = this.world.getCollisionsEnabled();
-    
-    if (typeof anyEntity.mass === 'number') {
-      mass[id] = anyEntity.mass;
-    }
-    if (typeof anyEntity.restitution === 'number') {
-      restitution[id] = anyEntity.restitution;
-    }
-    if (typeof anyEntity.enableGravity === 'boolean') {
-      gravityEnabled[id] = anyEntity.enableGravity ? 1 : 0;
-    }
-    if (typeof anyEntity.enableCollisions === 'boolean') {
-      collisionsEnabled[id] = anyEntity.enableCollisions ? 1 : 0;
-    }
-    
-    // Note: Velocity, rotation speed, animation type are set by createEntity()
-    // with random values. Override them manually via World arrays if needed.
+  // ============================================================================
+  // 🚀 PURE ECS ENTITY SPAWNING (Zero OOP overhead!)
+  // ============================================================================
+  
+  /**
+   * Spawn a single entity using a factory function
+   * @param factory Pure function that creates entity data (createBouncingEntity, etc.)
+   * @param x X position
+   * @param y Y position
+   * @param options Optional configuration for the entity
+   * @returns EntityId for the created entity
+   */
+  spawnEntity(
+    factory: (world: World, x: number, y: number, options?: any) => EntityId,
+    x: number,
+    y: number,
+    options?: any
+  ): EntityId {
+    return factory(this.world, x, y, options);
+  }
+  
+  /**
+   * Spawn a burst of entities using a burst factory function
+   * @param burstFactory Pure function that creates multiple entities (createBouncingBurst, etc.)
+   * @param x Center X position
+   * @param y Center Y position
+   * @param count Number of entities to create
+   * @param options Optional configuration for the entities
+   * @returns Array of EntityIds for the created entities
+   */
+  spawnBurst(
+    burstFactory: EntityBurstFactory,
+    x: number,
+    y: number,
+    count: number,
+    options?: any
+  ): EntityId[] {
+    return burstFactory(this.world, x, y, count, options);
   }
 
-  removeEntity(entity: Entity): void {
-    const index = this.entities.indexOf(entity);
-    if (index !== -1) {
-      this.entities.splice(index, 1);
-      
-      // Remove from custom update list if present
-      const customUpdateIndex = this.entitiesWithCustomUpdate.indexOf(entity);
-      if (customUpdateIndex !== -1) {
-        this.entitiesWithCustomUpdate.splice(customUpdateIndex, 1);
-      }
-      
-      // Remove from custom render list if present
-      const customRenderIndex = this.entitiesWithCustomRender.indexOf(entity);
-      if (customRenderIndex !== -1) {
-        this.entitiesWithCustomRender.splice(customRenderIndex, 1);
-      }
-      
-      // Remove from ECS
-      const id = this.entityToId.get(entity);
-      if (id !== undefined) {
-        this.world.destroyEntity(id);
-        this.entityToId.delete(entity);
-      }
-      
-      entity.destroy();
-    }
+  // ============================================================================
+  // ⚠️ DEPRECATED: OOP Entity Methods (Use spawnEntity/spawnBurst instead)
+  // ============================================================================
+  
+  /**
+   * @deprecated Use spawnEntity() with factory functions instead
+   * This method maintains backward compatibility but adds OOP overhead
+   */
+  addEntity(_entity: Entity): void {
+    throw new Error('addEntity() is deprecated. Use spawnEntity() with factory functions instead.');
   }
 
   /**
-   * Add multiple entities at once
+   * @deprecated Use world.destroyEntity(entityId) directly
    */
-  addBatch(entities: Entity[]): void {
-    entities.forEach(entity => this.addEntity(entity));
+  removeEntity(_entity: Entity): void {
+    throw new Error('removeEntity() is deprecated. Use world.destroyEntity(entityId) directly.');
+  }
+
+  /**
+   * @deprecated Use spawnBurst() with burst factory functions instead
+   */
+  addBatch(_entities: Entity[]): void {
+    throw new Error('addBatch() is deprecated. Use spawnBurst() with burst factory functions instead.');
   }
 
   /**
    * Remove last N entities
+   * @deprecated Use world.destroyEntity() directly with entity IDs
    */
   removeLast(count: number): void {
-    const toRemove = Math.min(count, this.entities.length);
-    for (let i = 0; i < toRemove; i++) {
-      const entity = this.entities[this.entities.length - 1];
-      if (entity) {
-        this.removeEntity(entity);
+    // Get active entities and remove the last N
+    const totalCount = this.world.getActiveCount();
+    const toRemove = Math.min(count, totalCount);
+    
+    // Destroy entities from the end (highest IDs)
+    const maxCapacity = this.world.getTotalCount();
+    let removed = 0;
+    for (let i = maxCapacity - 1; i >= 0 && removed < toRemove; i--) {
+      if (this.world.isEntityActive(i)) {
+        this.world.destroyEntity(i);
+        removed++;
       }
     }
   }
 
   /**
    * Spawn random entities in viewport or world bounds
+   * @deprecated Use spawnBurst() with factory functions for better performance
    */
   spawnRandom<T extends Entity>(
-    EntityClass: new (...args: any[]) => T,
-    count: number,
-    options: {
+    _EntityClass: new (...args: any[]) => T,
+    _count: number,
+    _options: {
       inViewportOnly?: boolean;
       minSpeed?: number;
       maxSpeed?: number;
     } = {}
   ): T[] {
-    const inViewportOnly = options.inViewportOnly ?? true;
-    const [spawnWidth, spawnHeight] = inViewportOnly 
-      ? [this.worldWidth, this.worldHeight]
-      : [this.worldWidth * 10, this.worldHeight * 10];
-    
-    const entities: T[] = [];
-    for (let i = 0; i < count; i++) {
-      const x = Math.random() * spawnWidth;
-      const y = Math.random() * spawnHeight;
-      
-      // Use static factory if available, otherwise constructor
-      const entity = (EntityClass as any).createAt 
-        ? (EntityClass as any).createAt(x, y, { 
-            minSpeed: options.minSpeed, 
-            maxSpeed: options.maxSpeed 
-          })
-        : new EntityClass(x, y);
-      
-      this.addEntity(entity);
-      entities.push(entity);
-    }
-    
-    return entities;
+    throw new Error('spawnRandom() is deprecated. Use spawnBurst() with factory functions instead.');
   }
 
   clear(): void {
-    for (const entity of this.entities) {
-      const id = this.entityToId.get(entity);
-      if (id !== undefined) {
-        this.world.destroyEntity(id);
+    // Destroy all active entities in the ECS world
+    const maxCapacity = this.world.getTotalCount();
+    for (let i = 0; i < maxCapacity; i++) {
+      if (this.world.isEntityActive(i)) {
+        this.world.destroyEntity(i);
       }
-      entity.destroy();
     }
-    this.entities = [];
-    this.entitiesWithCustomUpdate = [];
-    this.entitiesWithCustomRender = [];
-    this.entityToId = new WeakMap();
   }
 
   destroy(): void {

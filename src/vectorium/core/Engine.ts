@@ -193,10 +193,8 @@ export class Vectorium {
       this.entitySpawner = new EntitySpawner(this.currentScene);
       this.entitySpawner.registerCallbacks({
         remove1K: () => {
-          for (let i = 0; i < 1000 && this.currentScene && this.currentScene.entities.length > 0; i++) {
-            const entity = this.currentScene.entities[this.currentScene.entities.length - 1];
-            if (entity) this.currentScene.removeEntity(entity);
-          }
+          // Remove last 1K entities using pure ECS
+          this.currentScene?.removeLast(1000);
         },
         clearAll: () => this.currentScene?.clear()
       });

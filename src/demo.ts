@@ -3,13 +3,18 @@
  */
 
 import { Vectorium, Scene } from './vectorium/core/Engine';
-import { BouncingEntity, PhysicsEntity, CollisionEntity, GravityCollisionEntity } from './vectorium/core/Entity';
-import { hslToRgb } from './vectorium/utils/ColorUtils';
+import { EntityBurstFactories } from './vectorium/entities/factories';
 
 class DemoScene extends Scene {
   async load(): Promise<void> {
     this.setWorldBoundsMultiplier(1.0);
-    this.spawnRandom(BouncingEntity, 10);
+    // Spawn initial entities using factory functions
+    this.spawnBurst(EntityBurstFactories.bouncing, 
+      this.worldWidth / 2, 
+      this.worldHeight / 2, 
+      10, 
+      { rainbow: false }
+    );
   }
 }
 
@@ -34,30 +39,31 @@ function initDemo() {
       { min: 10000, intensity: 10, duration: 300 }
     ]);
     
-    // Spawn burst based on selected entity type
-    let entities;
+    // 🚀 Spawn burst using pure ECS factory functions (zero OOP overhead!)
     switch (entityType) {
       case 'bouncing':
-        entities = BouncingEntity.createBurst(x, y, count, { rainbow: true });
+        scene.spawnBurst(EntityBurstFactories.bouncing, x, y, count, { rainbow: true });
         break;
       case 'gravity':
-        entities = Array.from({ length: count }, (_, i) => 
-          PhysicsEntity.createBurstEntity(x, y, i, count, { 
-            sizeRange: [8, 16],
-            speedRange: [200, 500],
-            rainbow: true 
-          })
-        );
+        scene.spawnBurst(EntityBurstFactories.physics, x, y, count, { 
+          rainbow: true,
+          minSpeed: 200,
+          maxSpeed: 500,
+          minSize: 8,
+          maxSize: 16
+        });
         break;
       case 'collision':
-        entities = CollisionEntity.createBurst(x, y, count, { rainbow: true });
+        scene.spawnBurst(EntityBurstFactories.collision, x, y, count, { rainbow: true });
         break;
       case 'full':
-        entities = GravityCollisionEntity.createBurst(x, y, count, { rainbow: true, minSpeed: 50, maxSpeed: 200 });
+        scene.spawnBurst(EntityBurstFactories.fullPhysics, x, y, count, { 
+          rainbow: true, 
+          minSpeed: 50, 
+          maxSpeed: 200 
+        });
         break;
     }
-    
-    scene.addBatch(entities);
   });
   
   // Start engine

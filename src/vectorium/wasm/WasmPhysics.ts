@@ -66,6 +66,8 @@ export class WasmPhysics {
   /**
    * WORLD-CLASS PHYSICS UPDATE
    * Combines best practices from game engines like Unity, Unreal, and custom engines
+   * 
+   * 🚀 P0 OPTIMIZATION: Accepts entity counters for O(1) early exit
    */
   updatePhysicsOptimized(
     entityCount: number,
@@ -83,6 +85,8 @@ export class WasmPhysics {
     collisionsEnabled?: Uint8Array,
     mass?: Float32Array,
     restitution?: Float32Array,
+    collisionEntityCount: number = 0,  // 🚀 P0: Pre-computed counter
+    gravityEntityCount: number = 0,    // 🚀 P0: Pre-computed counter
     gravityY: number = 980
   ): void {
     // Reset metrics
@@ -100,7 +104,8 @@ export class WasmPhysics {
     // ============================================================================
     let t0 = performance.now();
     
-    if (gravityEnabled) {
+    // 🚀 P0 OPTIMIZATION: Skip gravity phase if no entities have gravity enabled
+    if (gravityEnabled && gravityEntityCount > 0) {
       // SIMD-friendly loop (process 4 at once in future WASM)
       for (let i = 0; i < entityCount; i++) {
         velocityY[i] += gravityAccel * gravityEnabled[i]; // Branchless multiply by 0 or 1
@@ -114,27 +119,15 @@ export class WasmPhysics {
     // ============================================================================
     t0 = performance.now();
     
-    let collisionEntityCount = 0;
-    // PERFORMANCE: Early check - if collisions array doesn't exist, skip entirely
-    if (collisionsEnabled && entityCount > 0) {
-      // Quick scan to see if ANY entities have collisions (early exit optimization)
-      let hasAnyCollisions = false;
+    // 🚀 P0 OPTIMIZATION: Use pre-computed counter instead of scanning
+    // PERFORMANCE: Skip collision phase entirely if no entities have collisions
+    if (collisionsEnabled && collisionEntityCount > 0) {
+      this.spatialHash.clear();
+      
+      // Build spatial hash - only insert entities with collisions enabled
       for (let i = 0; i < entityCount; i++) {
         if (collisionsEnabled[i]) {
-          hasAnyCollisions = true;
-          break;
-        }
-      }
-      
-      if (hasAnyCollisions) {
-        this.spatialHash.clear();
-        
-        // Build spatial hash - only insert entities with collisions enabled
-        for (let i = 0; i < entityCount; i++) {
-          if (collisionsEnabled[i]) {
-            this.spatialHash.insert(i, positionX[i], positionY[i]);
-            collisionEntityCount++;
-          }
+          this.spatialHash.insert(i, positionX[i], positionY[i]);
         }
       }
     }

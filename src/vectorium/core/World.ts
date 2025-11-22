@@ -19,6 +19,12 @@ export type { EntityId, EntityFlags };
 export class World {
   private entityCount = 0;
   private activeEntityCount = 0;  // Cached count of active entities
+  
+  // 🚀 P0 OPTIMIZATION: Track subsystem entity counts for O(1) early exit
+  private collisionEntityCount = 0;  // Entities with collisions enabled
+  private gravityEntityCount = 0;    // Entities with gravity enabled
+  private animatedEntityCount = 0;   // Entities with animations
+  
   private readonly maxEntities: number;
   private freeList: EntityId[] = [];  // Recycled entity IDs
   
@@ -173,6 +179,9 @@ export class World {
     this.enableGravity[id] = 0;  // Disabled by default
     this.enableCollisions[id] = 0;  // Disabled by default
     
+    // 🚀 P0 OPTIMIZATION: Track animation count (default: all entities animated)
+    this.animatedEntityCount++;
+    
     return id;
   }
 
@@ -191,6 +200,12 @@ export class World {
     
     // CRITICAL FIX: Clear physics properties to prevent ghost collisions
     // When entity is destroyed, it should not participate in any physics
+    
+    // 🚀 P0 OPTIMIZATION: Decrement counters before clearing flags
+    if (this.enableCollisions[id]) this.collisionEntityCount--;
+    if (this.enableGravity[id]) this.gravityEntityCount--;
+    if (this.animationType[id] !== 0) this.animatedEntityCount--;
+    
     this.enableCollisions[id] = 0;
     this.enableGravity[id] = 0;
     this.velocityX[id] = 0;
@@ -206,8 +221,14 @@ export class World {
    * System: Physics Update - 🚀 WASM-OPTIMIZED!
    * Uses WASM-style branchless patterns for maximum performance
    * Expected: 20-40% faster than standard JavaScript
+   * 
+   * 🚀 P0 OPTIMIZATION: Early exit skips gravity/collision but ALWAYS integrates velocity
    */
   updatePhysics(dt: number, boundsWidth: number, boundsHeight: number): void {
+    // 🚀 CRITICAL: Don't skip velocity integration! Entities need to move!
+    // Early exit only skips gravity and collision phases
+    // The WasmPhysics will handle selective phase execution internally
+    
     // Delegate to WASM-optimized physics system
     this.wasmPhysics.updatePhysicsOptimized(
       this.entityCount,
@@ -224,7 +245,9 @@ export class World {
       this.enableGravity,
       this.enableCollisions,
       this.mass,
-      this.restitution
+      this.restitution,
+      this.collisionEntityCount,  // 🚀 Pass counter for O(1) check
+      this.gravityEntityCount     // 🚀 Pass counter for O(1) check
     );
   }
   
@@ -323,6 +346,13 @@ export class World {
   }
 
   /**
+   * Check if an entity is active
+   */
+  isEntityActive(id: EntityId): boolean {
+    return id < this.entityCount && (this.flags[id] & this.FLAG_ACTIVE) !== 0;
+  }
+
+  /**
    * Direct component access (read-only for rendering)
    */
   getPositionX(): Float32Array { return this.positionX; }
@@ -384,6 +414,42 @@ export class World {
       total: totalBytes,
       perEntity: bytesPerEntity
     };
+  }
+  
+  /**
+   * 🚀 P0 OPTIMIZATION: Enable collision for entity (updates counter)
+   */
+  setCollisionEnabled(id: EntityId, enabled: boolean): void {
+    const wasEnabled = this.enableCollisions[id] !== 0;
+    const isEnabled = enabled;
+    
+    if (wasEnabled !== isEnabled) {
+      if (isEnabled) {
+        this.collisionEntityCount++;
+      } else {
+        this.collisionEntityCount--;
+      }
+    }
+    
+    this.enableCollisions[id] = enabled ? 1 : 0;
+  }
+  
+  /**
+   * 🚀 P0 OPTIMIZATION: Enable gravity for entity (updates counter)
+   */
+  setGravityEnabled(id: EntityId, enabled: boolean): void {
+    const wasEnabled = this.enableGravity[id] !== 0;
+    const isEnabled = enabled;
+    
+    if (wasEnabled !== isEnabled) {
+      if (isEnabled) {
+        this.gravityEntityCount++;
+      } else {
+        this.gravityEntityCount--;
+      }
+    }
+    
+    this.enableGravity[id] = enabled ? 1 : 0;
   }
   
   /**
