@@ -22,7 +22,8 @@ export class Scene {
   public world: World;
   
   // Viewport manages all resolution and world bounds
-  protected viewport: Viewport = Viewport.FullHD();
+  // Initialize with HD resolution (will be updated by Engine.loadScene)
+  protected viewport: Viewport = Viewport.HD();
   
   // Convenience accessors (delegate to Viewport)
   protected get canvasWidth(): number { return this.viewport.width; }
@@ -80,7 +81,9 @@ export class Scene {
     
     // 🚀 Pure ECS update - no entity sync overhead!
     const physicsStart = performance.now();
-    this.world.updatePhysics(dt, this.worldWidth, this.worldHeight);
+    // CRITICAL: Pass viewport dimensions (canvas size) for physics boundaries, NOT world dimensions
+    // worldScale multiplier is for culling only, not physics!
+    this.world.updatePhysics(dt, this.viewport.width, this.viewport.height);
     this.perfMetrics.updatePhysics = performance.now() - physicsStart;
     
     const animStart = performance.now();
@@ -271,6 +274,7 @@ export class Scene {
    * Update canvas/viewport dimensions
    * Should be called when canvas is resized
    * CRITICAL: Preserves world scale multiplier but viewport dimensions = canvas dimensions
+   * Also recenters camera to new viewport center
    */
   setCanvasDimensions(width: number, height: number): void {
     const worldScale = this.viewport.worldScale;
@@ -278,6 +282,9 @@ export class Scene {
     // World scale is reapplied to affect physics bounds only
     this.viewport = new Viewport(width, height, worldScale);
     this.camera.resize(width, height);
+    // CRITICAL FIX: Recenter camera to new viewport center
+    // Camera position = world coordinates camera is looking at
+    this.camera.setPosition(width / 2, height / 2);
   }
   
   /**
