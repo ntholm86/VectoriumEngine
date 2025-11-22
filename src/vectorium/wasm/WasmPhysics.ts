@@ -114,13 +114,27 @@ export class WasmPhysics {
     // ============================================================================
     t0 = performance.now();
     
-    if (collisionsEnabled) {
-      this.spatialHash.clear();
-      
-      // Build spatial hash - only insert entities with collisions enabled
+    let collisionEntityCount = 0;
+    // PERFORMANCE: Early check - if collisions array doesn't exist, skip entirely
+    if (collisionsEnabled && entityCount > 0) {
+      // Quick scan to see if ANY entities have collisions (early exit optimization)
+      let hasAnyCollisions = false;
       for (let i = 0; i < entityCount; i++) {
         if (collisionsEnabled[i]) {
-          this.spatialHash.insert(i, positionX[i], positionY[i]);
+          hasAnyCollisions = true;
+          break;
+        }
+      }
+      
+      if (hasAnyCollisions) {
+        this.spatialHash.clear();
+        
+        // Build spatial hash - only insert entities with collisions enabled
+        for (let i = 0; i < entityCount; i++) {
+          if (collisionsEnabled[i]) {
+            this.spatialHash.insert(i, positionX[i], positionY[i]);
+            collisionEntityCount++;
+          }
         }
       }
     }
@@ -132,7 +146,8 @@ export class WasmPhysics {
     // ============================================================================
     t0 = performance.now();
     
-    if (collisionsEnabled) {
+    // PERFORMANCE: Skip collision phase entirely if no entities have collisions
+    if (collisionsEnabled && collisionEntityCount > 0) {
       // CRITICAL FIX: Resize delta buffers if needed
       if (entityCount > this.maxEntities) {
         this.maxEntities = Math.max(entityCount, this.maxEntities * 2);
@@ -247,9 +262,9 @@ export class WasmPhysics {
           // Moving apart check (avoid double-resolution)
           if (velAlongNormal <= 0) continue;
           
-          // Restitution (bounciness) - reduced to prevent energy gain
+          // Restitution (bounciness) - use full restitution for elastic collisions
           const restj = restitution ? restitution[j] : 1;
-          const e = Math.min(resti, restj) * 0.75; // Reduced from 0.8 to 0.75
+          const e = Math.min(resti, restj); // Full elastic bounce
           
           // CRITICAL FIX: Correct impulse formula
           // impulse = -(1 + e) * velAlongNormal / (invMass_i + invMass_j)
@@ -404,17 +419,16 @@ export class WasmPhysics {
     this.metrics.boundaryTime = performance.now() - t0;
     
     // ============================================================================
-    // PHASE 6: VELOCITY DAMPING & CLAMPING (Apply after all forces)
+    // PHASE 6: VELOCITY CLAMPING (Prevent runaway speeds)
     // ============================================================================
-    const damping = 0.995; // 0.5% energy loss per frame
+    // NOTE: Damping disabled for elastic bouncing. Enable if needed: velocityX[i] *= 0.995
     const maxSpeed = 1200; // Prevent entities from going too fast
     const maxSpeedSq = maxSpeed * maxSpeed;
     
     for (let i = 0; i < entityCount; i++) {
       if (flags[i] & FLAG_PHYSICS) {
-        // Apply damping
-        let vx = velocityX[i] * damping;
-        let vy = velocityY[i] * damping;
+        let vx = velocityX[i];
+        let vy = velocityY[i];
         
         // Clamp to max speed
         const speedSq = vx * vx + vy * vy;

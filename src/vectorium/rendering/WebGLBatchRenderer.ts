@@ -510,8 +510,6 @@ export class WebGLBatchRenderer {
         // Lookup rotation from cache
         const cos = this.cosCache[rotDeg];
         const sin = this.sinCache[rotDeg];
-        const hwCos = hw * cos;
-        const hwSin = hw * sin;
         
         // Color bytes
         const rByte = colorR[i];
@@ -601,8 +599,6 @@ export class WebGLBatchRenderer {
         // Lookup rotation from cache
         const cos = this.cosCache[rotDeg];
         const sin = this.sinCache[rotDeg];
-        const hwCos = hw * cos;
-        const hwSin = hw * sin;
         
         // Color bytes
         const rByte = colorR[idx];

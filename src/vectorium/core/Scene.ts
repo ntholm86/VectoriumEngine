@@ -16,7 +16,7 @@ export class Scene {
   active: boolean = false;
   
   // ECS World - transparent performance layer
-  private world: World;
+  public world: World;
   private entityToId: WeakMap<Entity, EntityId> = new WeakMap();
   
   // Track entities with custom update logic (rare!)

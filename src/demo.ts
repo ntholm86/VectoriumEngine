@@ -22,9 +22,6 @@ function initDemo() {
   const scene = new DemoScene('demo', 2000000);
   engine.registerScene('demo', scene);
   
-  // Pause/resume with spacebar
-  engine.onKey('Space', () => engine.togglePause());
-  
   // Click to spawn entities with automatic camera shake
   engine.onClick((x, y) => {
     const spawner = engine.getEntitySpawner();
@@ -44,15 +41,13 @@ function initDemo() {
         entities = BouncingEntity.createBurst(x, y, count, { rainbow: true });
         break;
       case 'gravity':
-        entities = Array.from({ length: count }, (_, i) => {
-          const angle = (i / count) * Math.PI * 2;
-          const speed = 200 + Math.random() * 300;
-          const hue = (i / count) * 360;
-          const color = hslToRgb(hue, 1, 0.5);
-          const entity = new PhysicsEntity({ x, y, size: 8 + Math.random() * 8, color });
-          entity.setVelocityAngle(angle, speed);
-          return entity;
-        });
+        entities = Array.from({ length: count }, (_, i) => 
+          PhysicsEntity.createBurstEntity(x, y, i, count, { 
+            sizeRange: [8, 16],
+            speedRange: [200, 500],
+            rainbow: true 
+          })
+        );
         break;
       case 'collision':
         entities = CollisionEntity.createBurst(x, y, count, { rainbow: true });

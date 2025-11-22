@@ -97,6 +97,62 @@ export class BouncingEntity implements Entity {
   }
   
   /**
+   * Create entity with burst velocity and rainbow color based on index
+   * Syntactic sugar for common burst pattern
+   */
+  static createBurstEntity(
+    x: number, 
+    y: number, 
+    index: number, 
+    totalCount: number, 
+    options: {
+      size?: number;
+      sizeRange?: [number, number]; // [min, max] - random size in range
+      speedRange?: [number, number]; // [min, max]
+      rainbow?: boolean;
+      color?: { r: number; g: number; b: number };
+    } = {}
+  ): BouncingEntity {
+    const angle = (index / totalCount) * Math.PI * 2;
+    const [minSpeed, maxSpeed] = options.speedRange ?? [200, 500];
+    const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+    
+    // Calculate size: either fixed or random in range
+    let size: number;
+    if (options.size !== undefined) {
+      size = options.size;
+    } else if (options.sizeRange) {
+      const [minSize, maxSize] = options.sizeRange;
+      size = minSize + Math.random() * (maxSize - minSize);
+    } else {
+      size = 8; // default
+    }
+    
+    let color: { r: number; g: number; b: number };
+    if (options.rainbow) {
+      const h = (index / totalCount) * 360;
+      const s = 1, l = 0.5;
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+      const m = l - c / 2;
+      let r = 0, g = 0, b = 0;
+      if (h < 60) { r = c; g = x; }
+      else if (h < 120) { r = x; g = c; }
+      else if (h < 180) { g = c; b = x; }
+      else if (h < 240) { g = x; b = c; }
+      else if (h < 300) { r = x; b = c; }
+      else { r = c; b = x; }
+      color = { r: r + m, g: g + m, b: b + m };
+    } else {
+      color = options.color ?? { r: Math.random(), g: Math.random(), b: Math.random() };
+    }
+    
+    const entity = new BouncingEntity({ x, y, size, color });
+    entity.setVelocityAngle(angle, speed);
+    return entity;
+  }
+  
+  /**
    * Create entity at position with random velocity
    */
   static createAt(x: number, y: number, options: {
@@ -173,6 +229,28 @@ export class PhysicsEntity extends BouncingEntity {
     super(options);
     this.enableGravity = true;
     this.restitution = 0.8; // 80% energy retained on bounce
+  }
+  
+  /**
+   * Create entity with burst velocity and rainbow color based on index
+   */
+  static createBurstEntity(
+    x: number, 
+    y: number, 
+    index: number, 
+    totalCount: number, 
+    options: Parameters<typeof BouncingEntity.createBurstEntity>[4] = {}
+  ): PhysicsEntity {
+    const baseEntity = BouncingEntity.createBurstEntity(x, y, index, totalCount, options);
+    const entity = new PhysicsEntity({ 
+      x: baseEntity.x, 
+      y: baseEntity.y, 
+      size: baseEntity.size, 
+      color: baseEntity.color 
+    });
+    entity.vx = baseEntity.vx;
+    entity.vy = baseEntity.vy;
+    return entity;
   }
   
   static createAt(x: number, y: number, options: Parameters<typeof BouncingEntity.createAt>[2] = {}): PhysicsEntity {

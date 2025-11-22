@@ -147,12 +147,12 @@ export class PerformanceMonitor {
   private updateTimer: number | null = null;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
   private sparklineCanvas: HTMLCanvasElement | null = null;
-  private sparklineCtx: CanvasRenderingContext2D | null = null;
+  private _sparklineCtx: CanvasRenderingContext2D | null = null; // Unused but kept for future
   private frameTimeRingBuffer: number[] = []; // Last 60 frames for sparkline
   private readonly SPARKLINE_SIZE = 60;
 
   // Physics metrics cache
-  private physicsMetrics: any = null;
+
 
   constructor(targetFPS: number = 60, initialQuality: QualityLevel = 'high') {
     this.targetFPS = targetFPS;
@@ -860,10 +860,11 @@ export class PerformanceMonitor {
   private initSparkline(): void {
     this.sparklineCanvas = this.profilerContainer?.querySelector('.sparkline-canvas') as HTMLCanvasElement;
     if (this.sparklineCanvas) {
-      this.sparklineCtx = this.sparklineCanvas.getContext('2d');
+      this._sparklineCtx = this.sparklineCanvas.getContext('2d');
     }
   }
 
+  /* Unused method - keeping for potential future use
   private drawSparkline(): void {
     if (!this.sparklineCanvas || !this.sparklineCtx || this.frameTimeRingBuffer.length < 2) return;
 
@@ -914,6 +915,7 @@ export class PerformanceMonitor {
 
     ctx.stroke();
   }
+  */
 
   private startProfilerUpdates(): void {
     this.updateTimer = window.setInterval(() => {

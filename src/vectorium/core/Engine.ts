@@ -103,11 +103,22 @@ export class Vectorium {
       this.initializeDebugTools();
     }
     
+    // Setup default keyboard shortcuts
+    this.setupDefaultKeyboardShortcuts();
+    
     console.log(`Vectorium Engine initialized`);
     console.log(`WebGL2: ${useWebGL2}`);
     console.log(`Target FPS: ${this.config.targetFPS}`);
     console.log(`Adaptive Quality: ${this.config.enableAdaptiveQuality}`);
     console.log(`Debug Tools: ${this.config.enableDebugTools ? 'Enabled (Press C, E, V, P)' : 'Disabled'}`);
+  }
+  
+  private setupDefaultKeyboardShortcuts(): void {
+    // Spacebar to pause/resume
+    this.onKey('Space', (e) => {
+      e.preventDefault(); // Prevent page scroll
+      this.togglePause();
+    });
   }
   
   private setupRuntimeConfig(): void {
