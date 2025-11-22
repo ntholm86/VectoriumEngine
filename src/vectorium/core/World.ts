@@ -24,6 +24,8 @@ export class World {
   private collisionEntityCount = 0;  // Entities with collisions enabled
   private gravityEntityCount = 0;    // Entities with gravity enabled
   private animatedEntityCount = 0;   // Entities with animations
+  private shapeEntityCount = 0;      // Entities with shapeType > 0 (shapes, not sprites)
+  private textEntityCount = 0;       // Entities with text content
   
   private readonly maxEntities: number;
   private freeList: EntityId[] = [];  // Recycled entity IDs
@@ -57,6 +59,10 @@ export class World {
   private restitution: Float32Array;
   private enableGravity: Uint8Array; // Boolean as 0/1
   private enableCollisions: Uint8Array; // Boolean as 0/1
+  
+  // 🎨 Shape & Text rendering arrays (NEW)
+  private shapeType: Uint8Array;     // 0=sprite (default), 1=circle, 2=triangle, 3=star, etc.
+  private textIndex: Int32Array;     // -1=no text, >=0=index into textPool
   
   // 🚀 WASM Physics Engine
   private wasmPhysics: WasmPhysics;
@@ -125,6 +131,10 @@ export class World {
     this.restitution = new Float32Array(maxEntities).fill(1);
     this.enableGravity = new Uint8Array(maxEntities);
     this.enableCollisions = new Uint8Array(maxEntities);
+    
+    // Initialize shape & text properties
+    this.shapeType = new Uint8Array(maxEntities);  // Default: 0 (sprite)
+    this.textIndex = new Int32Array(maxEntities).fill(-1);  // Default: -1 (no text)
   }
   
   /**
@@ -179,6 +189,10 @@ export class World {
     this.enableGravity[id] = 0;  // Disabled by default
     this.enableCollisions[id] = 0;  // Disabled by default
     
+    // 🎨 Initialize shape & text properties
+    this.shapeType[id] = 0;  // Default: sprite
+    this.textIndex[id] = -1;  // Default: no text
+    
     // 🚀 P0 OPTIMIZATION: Track animation count (default: all entities animated)
     this.animatedEntityCount++;
     
@@ -206,10 +220,18 @@ export class World {
     if (this.enableGravity[id]) this.gravityEntityCount--;
     if (this.animationType[id] !== 0) this.animatedEntityCount--;
     
+    // 🎨 Shape & Text cleanup
+    if (this.shapeType[id] > 0) this.shapeEntityCount--;
+    if (this.textIndex[id] >= 0) this.textEntityCount--;
+    
     this.enableCollisions[id] = 0;
     this.enableGravity[id] = 0;
     this.velocityX[id] = 0;
     this.velocityY[id] = 0;
+    
+    // Clear shape & text
+    this.shapeType[id] = 0;
+    this.textIndex[id] = -1;
     
     // Clear other properties to prevent visual artifacts
     this.alpha[id] = 0;
@@ -370,6 +392,14 @@ export class World {
   getCollisionsEnabled(): Uint8Array { return this.enableCollisions; }
   
   /**
+   * 🎨 Shape & Text component access
+   */
+  getShapeTypes(): Uint8Array { return this.shapeType; }
+  getTextIndices(): Int32Array { return this.textIndex; }
+  getShapeEntityCount(): number { return this.shapeEntityCount; }
+  getTextEntityCount(): number { return this.textEntityCount; }
+  
+  /**
    * Viewport culling - returns visible entity IDs
    * Avoids rendering off-screen entities
    */
@@ -396,7 +426,7 @@ export class World {
    * Get memory usage statistics
    */
   getMemoryUsage(): { arrays: number; total: number; perEntity: number } {
-    const arrayCount = 20; // Number of typed arrays
+    const arrayCount = 22; // Number of typed arrays (20 + shapeType + textIndex)
     const bytesPerEntity = 
       4 + 4 +  // positionX, positionY (Float32)
       4 + 4 +  // velocityX, velocityY (Float32)
@@ -405,7 +435,8 @@ export class World {
       1 + 1 + 1 +  // colorR, colorG, colorB (Uint8)
       4 + 4 +  // alpha, flags (Float32, Uint32)
       1 +  // animationType (Uint8)
-      4 + 4 + 4 + 4 + 1 + 4;  // animation state (Float32 × 5, Int8 × 1)
+      4 + 4 + 4 + 4 + 1 + 4 +  // animation state (Float32 × 5, Int8 × 1)
+      1 + 4;  // 🎨 shapeType (Uint8), textIndex (Int32)
     
     const totalBytes = this.maxEntities * bytesPerEntity;
     
@@ -450,6 +481,46 @@ export class World {
     }
     
     this.enableGravity[id] = enabled ? 1 : 0;
+  }
+  
+  /**
+   * 🎨 Set shape type for entity (updates counter)
+   * @param id Entity ID
+   * @param type 0=sprite (default), 1=circle, 2=triangle, 3=star, etc.
+   */
+  setShapeType(id: EntityId, type: number): void {
+    const wasShape = this.shapeType[id] > 0;
+    const isShape = type > 0;
+    
+    if (wasShape !== isShape) {
+      if (isShape) {
+        this.shapeEntityCount++;
+      } else {
+        this.shapeEntityCount--;
+      }
+    }
+    
+    this.shapeType[id] = type;
+  }
+  
+  /**
+   * 🎨 Set text index for entity (updates counter)
+   * @param id Entity ID
+   * @param textIndex -1=no text, >=0=index into TextPool
+   */
+  setTextIndex(id: EntityId, textIndex: number): void {
+    const hadText = this.textIndex[id] >= 0;
+    const hasText = textIndex >= 0;
+    
+    if (hadText !== hasText) {
+      if (hasText) {
+        this.textEntityCount++;
+      } else {
+        this.textEntityCount--;
+      }
+    }
+    
+    this.textIndex[id] = textIndex;
   }
   
   /**

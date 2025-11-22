@@ -13,6 +13,8 @@
 
 import { World, EntityId } from '../core/World';
 import { hslToRgb } from '../utils/ColorUtils';
+import { ShapeType } from '../shapes/ShapeType'; // 🎨 Import shape types
+import { TextPool } from '../core/TextPool'; // 🎨 Import text pool
 
 export interface EntityFactoryOptions {
   size?: number;
@@ -22,6 +24,8 @@ export interface EntityFactoryOptions {
   color?: { r: number; g: number; b: number };
   minSpeed?: number;
   maxSpeed?: number;
+  vx?: number;
+  vy?: number;
 }
 
 /**
@@ -35,11 +39,19 @@ export function createBouncingEntity(
   options: EntityFactoryOptions = {}
 ): EntityId {
   // Calculate velocity
-  const angle = Math.random() * Math.PI * 2;
-  const [minSpeed, maxSpeed] = options.speedRange ?? [200, 500];
-  const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
-  const vx = Math.cos(angle) * speed;
-  const vy = Math.sin(angle) * speed;
+  let vx: number, vy: number;
+  if (options.vx !== undefined && options.vy !== undefined) {
+    // Use provided velocity
+    vx = options.vx;
+    vy = options.vy;
+  } else {
+    // Calculate random velocity
+    const angle = Math.random() * Math.PI * 2;
+    const [minSpeed, maxSpeed] = options.speedRange ?? [200, 500];
+    const speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+    vx = Math.cos(angle) * speed;
+    vy = Math.sin(angle) * speed;
+  }
   
   // Calculate size
   let size: number;
@@ -250,6 +262,265 @@ export function createFullPhysicsBurst(
   return entities;
 }
 
+// ========================================
+// 🎨 SHAPE ENTITY FACTORIES
+// ========================================
+
+/**
+ * Create a shape entity (circle, star, triangle, etc.)
+ * Shape type determines the SDF function used in fragment shader
+ */
+export function createShapeEntity(
+  world: World,
+  x: number,
+  y: number,
+  shapeType: ShapeType,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  // Create base entity
+  const id = createBouncingEntity(world, x, y, options);
+  
+  // Set shape type
+  world.setShapeType(id, shapeType);
+  
+  return id;
+}
+
+/**
+ * Create a circle entity (GPU-accelerated SDF rendering)
+ */
+export function createCircleEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.CIRCLE, options);
+}
+
+/**
+ * Create a triangle entity
+ */
+export function createTriangleEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.TRIANGLE, options);
+}
+
+/**
+ * Create a 5-pointed star entity (priority shape per user request)
+ */
+export function createStar5Entity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.STAR_5, options);
+}
+
+/**
+ * Create a 6-pointed star entity (Star of David)
+ */
+export function createStar6Entity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.STAR_6, options);
+}
+
+/**
+ * Create a hexagon entity
+ */
+export function createHexagonEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.HEXAGON, options);
+}
+
+/**
+ * Create a square entity
+ */
+export function createSquareEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.SQUARE, options);
+}
+
+/**
+ * Create a pentagon entity
+ */
+export function createPentagonEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.PENTAGON, options);
+}
+
+/**
+ * Create an octagon entity
+ */
+export function createOctagonEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.OCTAGON, options);
+}
+
+/**
+ * Create a diamond entity (rotated square)
+ */
+export function createDiamondEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.DIAMOND, options);
+}
+
+/**
+ * Create a heart entity
+ */
+export function createHeartEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.HEART, options);
+}
+
+/**
+ * Create a burst of shapes radiating from a point
+ */
+export function createShapeBurst(
+  world: World,
+  x: number,
+  y: number,
+  count: number,
+  shapeType: ShapeType,
+  options: EntityFactoryOptions = {}
+): EntityId[] {
+  const entities = createBouncingBurst(world, x, y, count, options);
+  
+  // Set shape type for all entities
+  for (const id of entities) {
+    world.setShapeType(id, shapeType);
+  }
+  
+  return entities;
+}
+
+// ========================================
+// 🎨 TEXT ENTITY FACTORIES
+// ========================================
+
+/**
+ * Create a text entity (requires TextPool)
+ * Text is rendered using glyph atlas with optional effects
+ */
+export function createTextEntity(
+  world: World,
+  textPool: TextPool,
+  x: number,
+  y: number,
+  text: string,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  // Create base entity
+  const id = createBouncingEntity(world, x, y, options);
+  
+  // Allocate text in pool
+  const textIndex = textPool.allocate(text);
+  world.setTextIndex(id, textIndex);
+  
+  return id;
+}
+
+/**
+ * Create a static label entity (no velocity, larger size)
+ */
+export function createLabelEntity(
+  world: World,
+  textPool: TextPool,
+  x: number,
+  y: number,
+  text: string,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  // Create entity with no velocity
+  const id = world.createEntity(x, y, 0, 0);
+  
+  // Set larger default size for labels
+  const sizes = world.getSizes();
+  sizes[id] = options.size ?? 24;
+  
+  // Set color
+  if (options.color) {
+    const colorR = world.getColorR();
+    const colorG = world.getColorG();
+    const colorB = world.getColorB();
+    colorR[id] = Math.floor(options.color.r * 255);
+    colorG[id] = Math.floor(options.color.g * 255);
+    colorB[id] = Math.floor(options.color.b * 255);
+  }
+  
+  // Allocate text
+  const textIndex = textPool.allocate(text);
+  world.setTextIndex(id, textIndex);
+  
+  return id;
+}
+
+/**
+ * Create a counter entity (dynamic text that updates frequently)
+ * Useful for scores, FPS counters, etc.
+ */
+export function createCounterEntity(
+  world: World,
+  textPool: TextPool,
+  x: number,
+  y: number,
+  initialValue: number = 0,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  const text = initialValue.toString();
+  return createLabelEntity(world, textPool, x, y, text, options);
+}
+
+/**
+ * Update counter entity with new value
+ */
+export function updateCounterEntity(
+  world: World,
+  textPool: TextPool,
+  entityId: EntityId,
+  value: number
+): void {
+  const textIndices = world.getTextIndices();
+  const textIndex = textIndices[entityId];
+  
+  if (textIndex >= 0) {
+    textPool.update(textIndex, value.toString());
+  }
+}
+
 /**
  * Factory type for dynamic entity creation
  */
@@ -264,6 +535,18 @@ export const EntityFactories = {
   physics: createPhysicsEntity,
   collision: createCollisionEntity,
   fullPhysics: createFullPhysicsEntity,
+  // 🎨 Shape factories
+  shape: createShapeEntity,
+  circle: createCircleEntity,
+  triangle: createTriangleEntity,
+  star5: createStar5Entity,
+  star6: createStar6Entity,
+  hexagon: createHexagonEntity,
+  square: createSquareEntity,
+  pentagon: createPentagonEntity,
+  octagon: createOctagonEntity,
+  diamond: createDiamondEntity,
+  heart: createHeartEntity,
 } as const;
 
 export const EntityBurstFactories = {
@@ -271,6 +554,8 @@ export const EntityBurstFactories = {
   physics: createPhysicsBurst,
   collision: createCollisionBurst,
   fullPhysics: createFullPhysicsBurst,
+  // 🎨 Shape burst factory
+  shape: createShapeBurst,
 } as const;
 
 export type EntityType = keyof typeof EntityFactories;

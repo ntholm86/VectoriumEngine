@@ -12,7 +12,8 @@ export class EntitySpawner {
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
   private clickSpawnCount = 100; // Number of entities to spawn per click
   private activeButton: string = 'spawn100';
-  private entityType: 'bouncing' | 'gravity' | 'collision' | 'full' = 'bouncing';
+  private physicsMode: 'none' | 'gravity' | 'collision' | 'full' = 'none';
+  private visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' = 'sprite';
   
   constructor(_scene: Scene) {
     this.loadVisibility();
@@ -28,10 +29,17 @@ export class EntitySpawner {
   }
   
   /**
-   * Get the current entity type to spawn
+   * Get the current physics mode
    */
-  getEntityType(): 'bouncing' | 'gravity' | 'collision' | 'full' {
-    return this.entityType;
+  getPhysicsMode(): 'none' | 'gravity' | 'collision' | 'full' {
+    return this.physicsMode;
+  }
+  
+  /**
+   * Get the current visual type
+   */
+  getVisualType(): 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' {
+    return this.visualType;
   }
   
   /**
@@ -66,15 +74,33 @@ export class EntitySpawner {
       <div class="spawner-content">
         <div class="spawn-section">
           <div class="spawn-mode-hint">CLICK CANVAS TO SPAWN</div>
+          
           <div class="entity-type-section">
-            <label class="entity-type-label">Entity Type:</label>
-            <select id="entityType" class="entity-type-select">
-              <option value="bouncing">🎾 Bouncing (No Physics)</option>
-              <option value="gravity">⬇️ Gravity (Falls)</option>
-              <option value="collision">💥 Collision (Bounce Together)</option>
-              <option value="full">🌍 Full Physics (Gravity + Collision)</option>
+            <label class="entity-type-label">⚙️ Physics Mode:</label>
+            <select id="physicsMode" class="entity-type-select">
+              <option value="none">🎾 None (Bouncing Only)</option>
+              <option value="gravity">⬇️ Gravity (Falls Down)</option>
+              <option value="collision">💥 Collision (Entities Collide)</option>
+              <option value="full">🌍 Full (Gravity + Collision)</option>
             </select>
           </div>
+          
+          <div class="entity-type-section">
+            <label class="entity-type-label">🎨 Visual Type:</label>
+            <select id="visualType" class="entity-type-select">
+              <option value="sprite">🖼️ Sprite (Default Texture)</option>
+              <optgroup label="GPU-Accelerated Shapes">
+                <option value="circle">⚪ Circle</option>
+                <option value="star5">⭐ 5-Point Star</option>
+                <option value="triangle">🔺 Triangle</option>
+                <option value="hexagon">⬡ Hexagon</option>
+                <option value="heart">❤️ Heart</option>
+                <option value="square">⬛ Square</option>
+                <option value="diamond">💠 Diamond</option>
+              </optgroup>
+            </select>
+          </div>
+          
           <div class="button-grid">
             <button id="spawn10" class="spawn-btn">10</button>
             <button id="spawn50" class="spawn-btn">50</button>
@@ -117,10 +143,16 @@ export class EntitySpawner {
     const collapseBtn = this.container.querySelector('.panel-collapse-btn');
     collapseBtn?.addEventListener('click', () => this.toggleCollapse());
     
-    // Entity type selector
-    const entityTypeSelect = this.container.querySelector('#entityType') as HTMLSelectElement;
-    entityTypeSelect?.addEventListener('change', (e) => {
-      this.entityType = (e.target as HTMLSelectElement).value as typeof this.entityType;
+    // Physics mode selector
+    const physicsModeSelect = this.container.querySelector('#physicsMode') as HTMLSelectElement;
+    physicsModeSelect?.addEventListener('change', (e) => {
+      this.physicsMode = (e.target as HTMLSelectElement).value as typeof this.physicsMode;
+    });
+    
+    // Visual type selector
+    const visualTypeSelect = this.container.querySelector('#visualType') as HTMLSelectElement;
+    visualTypeSelect?.addEventListener('change', (e) => {
+      this.visualType = (e.target as HTMLSelectElement).value as typeof this.visualType;
     });
     
     // Spawn buttons set click spawn count

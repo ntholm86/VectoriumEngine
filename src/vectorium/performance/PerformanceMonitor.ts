@@ -594,6 +594,14 @@ export class PerformanceMonitor {
             <span class="metric-value" data-metric="active">0</span>
           </div>
           <div class="metric-row">
+            <span class="metric-label">├─ Shapes</span>
+            <span class="metric-value" data-metric="shapes">0</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">└─ Text</span>
+            <span class="metric-value" data-metric="textentities">0</span>
+          </div>
+          <div class="metric-row">
             <span class="metric-label">Rendered</span>
             <span class="metric-value" data-metric="rendered">0</span>
           </div>
@@ -951,11 +959,14 @@ export class PerformanceMonitor {
     // Render Pipeline
     const drawCallClass = metrics.drawCalls > 50 ? 'warning' : metrics.drawCalls > 100 ? 'critical' : '';
     set('drawcalls', metrics.drawCalls.toString(), drawCallClass);
-    set('webgl', `${metrics.webglDrawCalls}/${metrics.textDrawCalls}`);
+    set('webgl', `${metrics.webglDrawCalls}`);
+    set('text', `${metrics.textDrawCalls}`);
+    set('vertices', `${(metrics.verticesRendered / 1000).toFixed(1)}K`);
     set('triangles', `${(metrics.trianglesRendered / 1000).toFixed(1)}K`);
     const batchClass = metrics.batchEfficiency < 0.3 ? 'warning' : metrics.batchEfficiency > 0.7 ? 'good' : '';
     set('batch', `${(metrics.batchEfficiency * 100).toFixed(0)}%`, batchClass);
     set('upload', `${metrics.bufferUploadSize.toFixed(2)}MB`);
+    set('states', metrics.stateChanges.toString());
 
     // Physics Metrics
     const physicsClass = metrics.physicsTime > 10 ? 'warning' : metrics.physicsTime > 5 ? '' : 'good';
@@ -969,6 +980,19 @@ export class PerformanceMonitor {
 
     // ECS Metrics
     set('active', `${(metrics.entitiesProcessed / 1000).toFixed(1)}K`);
+    
+    // Shape and text entity counts (from World)
+    const world = (window as any).vectoriumCurrentWorld;
+    if (world) {
+      const shapeCount = world.getShapeEntityCount();
+      const textCount = world.getTextEntityCount();
+      set('shapes', shapeCount.toString());
+      set('textentities', textCount.toString());
+    } else {
+      set('shapes', '0');
+      set('textentities', '0');
+    }
+    
     set('rendered', `${(metrics.entitiesRendered / 1000).toFixed(1)}K`);
     set('culled', `${((metrics.entitiesCulled || 0) / 1000).toFixed(1)}K`);
     set('timeperentity', `${metrics.timePerEntity.toFixed(1)}μs`);

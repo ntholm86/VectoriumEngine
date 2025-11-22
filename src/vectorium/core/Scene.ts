@@ -104,23 +104,50 @@ export class Scene {
   render(renderer: WebGLBatchRenderer, _textRenderer: TextRenderer): void {
     const startTime = performance.now();
     
-    // 🚀 Pure ECS batch rendering - zero overhead!
+    // 🎨 2-PASS RENDERING: Shapes → Text
+    // Pass 1: Render sprites and shapes
     const batchStart = performance.now();
     this.renderECSBatch(renderer);
     this.perfMetrics.renderBatch = performance.now() - batchStart;
     
-    this.perfMetrics.renderCustom = 0; // No custom rendering
+    // Pass 2: Render text (if any text entities exist)
+    const textStart = performance.now();
+    if (this.world.getTextEntityCount() > 0 && _textRenderer) {
+      this.renderTextBatch(_textRenderer);
+    }
+    const textTime = performance.now() - textStart;
+    
+    this.perfMetrics.renderCustom = textTime; // Track text rendering time
     this.perfMetrics.renderTotal = performance.now() - startTime;
-    this.perfMetrics.customRenderCount = 0;
+    this.perfMetrics.customRenderCount = this.world.getTextEntityCount();
     
     if (this.enableWarnings && this.perfMetrics.renderTotal > this.renderTimeWarningThreshold) {
-      console.warn(`⚠️ VECTORIUM RENDER: ${this.perfMetrics.renderTotal.toFixed(2)}ms | Batch=${this.perfMetrics.renderBatch.toFixed(2)}ms`);
+      console.warn(`⚠️ VECTORIUM RENDER: ${this.perfMetrics.renderTotal.toFixed(2)}ms | Batch=${this.perfMetrics.renderBatch.toFixed(2)}ms | Text=${textTime.toFixed(2)}ms`);
     }
+  }
+  
+  /**
+   * 🎨 Render text entities using TextBatchRenderer
+   * O(1) early exit if no text entities
+   */
+  private renderTextBatch(_textRenderer: TextRenderer): void {
+    // TODO: Implement text rendering with TextBatchRenderer
+    // const textIndices = this.world.getTextIndices();
+    // const posX = this.world.getPositionX();
+    // const posY = this.world.getPositionY();
+    // const colorR = this.world.getColorR();
+    // const colorG = this.world.getColorG();
+    // const colorB = this.world.getColorB();
+    // const alphas = this.world.getAlphas();
+    // const count = this.world.getTotalCount();
+    
+    // For now, just track that text system is available
   }
   
   /**
    * CRITICAL OPTIMIZATION: Batch-render all ECS entities in one tight loop
    * WITH FRUSTUM CULLING: Only render visible entities!
+   * 🎨 NEW: Supports shape rendering via drawBulkShapes
    * This is 10-100x faster than calling entity.render() per-entity
    * Uses cached rotation lookups and contiguous array access
    */
@@ -134,8 +161,10 @@ export class Scene {
     const colorB = this.world.getColorB();
     const alphas = this.world.getAlphas();
     const flags = this.world.getFlags();
+    const shapeTypes = this.world.getShapeTypes(); // 🎨 Shape types array
     
     const totalCount = this.world.getActiveCount();
+    const shapeCount = this.world.getShapeEntityCount();
     
     // Smart culling: Auto-disable when scene = viewport (all entities always visible)
     // This avoids culling overhead when there's nothing to cull
@@ -158,13 +187,24 @@ export class Scene {
     }
     
     if (!shouldCull) {
-      // No culling - render all entities using batch rendering
-      renderer.drawBulk(
-        posX, posY, rotation, sizes,
-        colorR, colorG, colorB, alphas,
-        flags, totalCount, this.world.FLAG_VISIBLE,
-        this.camera.x, this.camera.y, this.camera.getZoom()
-      );
+      // No culling - render all entities
+      // 🎨 Check if we have shapes to render separately
+      if (shapeCount > 0 && renderer.isGPUAccelerationEnabled()) {
+        renderer.drawBulkShapes(
+          posX, posY, rotation, sizes,
+          colorR, colorG, colorB, alphas, shapeTypes,
+          flags, totalCount, this.world.FLAG_VISIBLE,
+          this.camera.x, this.camera.y, this.camera.getZoom()
+        );
+      } else {
+        // Standard sprite rendering
+        renderer.drawBulk(
+          posX, posY, rotation, sizes,
+          colorR, colorG, colorB, alphas,
+          flags, totalCount, this.world.FLAG_VISIBLE,
+          this.camera.x, this.camera.y, this.camera.getZoom()
+        );
+      }
       
       // Track stats: no culling means all entities visible
       (this as any).culledCount = 0;
@@ -185,13 +225,24 @@ export class Scene {
     );
     
     // 🔥 ZERO COPY: Render directly from source arrays using indices!
-    // Batch rendering with frustum culling
-    renderer.drawBulkIndexed(
-      posX, posY, rotation, sizes,
-      colorR, colorG, colorB, alphas,
-      flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
-      this.camera.x, this.camera.y, this.camera.getZoom()
-    );
+    // 🎨 Note: For now, shapes use non-indexed path (TODO: optimize in Phase 3)
+    if (shapeCount > 0 && renderer.isGPUAccelerationEnabled()) {
+      // Shapes rendering (currently non-indexed)
+      renderer.drawBulkShapes(
+        posX, posY, rotation, sizes,
+        colorR, colorG, colorB, alphas, shapeTypes,
+        flags, totalCount, this.world.FLAG_VISIBLE,
+        this.camera.x, this.camera.y, this.camera.getZoom()
+      );
+    } else {
+      // Standard indexed rendering
+      renderer.drawBulkIndexed(
+        posX, posY, rotation, sizes,
+        colorR, colorG, colorB, alphas,
+        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
+        this.camera.x, this.camera.y, this.camera.getZoom()
+      );
+    }
     
     // Track culling stats (stored on scene for perf monitor access)
     (this as any).culledCount = totalCount - visibleCount;

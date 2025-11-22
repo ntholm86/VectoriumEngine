@@ -21,6 +21,7 @@ export interface Sprite {
 export class WebGLBatchRenderer {
   private gl: WebGLRenderingContext | WebGL2RenderingContext;
   private program: WebGLProgram | null = null;
+  private shapeProgram: WebGLProgram | null = null; // 🎨 Shape shader program
   private vertexBuffer: WebGLBuffer | null = null;
   private indexBuffer: WebGLBuffer | null = null;
   private currentTexture: WebGLTexture | null = null;
@@ -33,8 +34,9 @@ export class WebGLBatchRenderer {
   private maxBatchSize = 65000; // 65k quads maximum (Uint16 limit)
   private drawCallCount = 0;
   
-  // Cached uniform location (avoid getUniformLocation calls in hot path)
+  // Cached uniform locations (avoid getUniformLocation calls in hot path)
   private u_projection: WebGLUniformLocation | null = null;
+  private u_shapeProjection: WebGLUniformLocation | null = null; // 🎨 Shape shader uniform
   
   // Performance test toggle
   private useUint16 = false;  // Set to true to test Uint16 performance (16k limit)
@@ -53,6 +55,9 @@ export class WebGLBatchRenderer {
   
   // Clear color (RGBA 0-1)
   private clearColor: [number, number, number, number] = [0, 0, 0, 1];
+  
+  // 🎨 GPU acceleration toggle
+  private gpuAccelerationEnabled = true;
   
   // Pre-allocated buffers (zero allocation during rendering)
 
@@ -114,6 +119,20 @@ export class WebGLBatchRenderer {
     if (monitor) {
       monitor.setMaxBatchSize(this.maxBatchSize);
     }
+  }
+
+  /**
+   * 🎨 Toggle GPU acceleration for shapes
+   */
+  setGPUAccelerationEnabled(enabled: boolean): void {
+    this.gpuAccelerationEnabled = enabled;
+  }
+
+  /**
+   * 🎨 Check if GPU acceleration is enabled
+   */
+  isGPUAccelerationEnabled(): boolean {
+    return this.gpuAccelerationEnabled;
   }
 
   /**
@@ -188,6 +207,184 @@ export class WebGLBatchRenderer {
     
     // Cache projection uniform location
     this.u_projection = gl.getUniformLocation(this.program, 'u_projection');
+    
+    // 🎨 Initialize shape shader program (WebGL2 only for now)
+    if (gl instanceof WebGL2RenderingContext && this.gpuAccelerationEnabled) {
+      this.initializeShapeShader();
+    }
+  }
+
+  /**
+   * 🎨 Initialize shape rendering shader (SDF-based)
+   */
+  private initializeShapeShader(): void {
+    const gl = this.gl as WebGL2RenderingContext;
+    
+    // Shape vertex shader (20-byte vertex format)
+    const shapeVertexSource = `#version 300 es
+precision highp float;
+
+layout(location = 0) in vec2 aPosition;
+layout(location = 1) in vec2 aUV;
+layout(location = 2) in uint aMetadata;
+
+uniform mat3 uProjection;
+
+out vec4 vColor;
+out vec2 vShapeUV;
+flat out int vShapeType;
+
+void main() {
+  vec3 projected = uProjection * vec3(aPosition, 1.0);
+  gl_Position = vec4(projected.xy, 0.0, 1.0);
+  
+  // Unpack metadata: [R8|G8|B8|A4|ShapeType4]
+  uint r = (aMetadata >> 0u) & 0xFFu;
+  uint g = (aMetadata >> 8u) & 0xFFu;
+  uint b = (aMetadata >> 16u) & 0xFFu;
+  uint a = (aMetadata >> 24u) & 0xFu;
+  uint shapeType = (aMetadata >> 28u) & 0xFu;
+  
+  vColor = vec4(
+    float(r) / 255.0,
+    float(g) / 255.0,
+    float(b) / 255.0,
+    float(a) / 15.0
+  );
+  
+  vShapeUV = aUV * 2.0 - 1.0;
+  vShapeType = int(shapeType);
+}
+`;
+
+    // Shape fragment shader (SDF-based)
+    const shapeFragmentSource = `#version 300 es
+precision highp float;
+
+in vec4 vColor;
+in vec2 vShapeUV;
+flat in int vShapeType;
+
+out vec4 fragColor;
+
+const float PI = 3.14159265359;
+
+float sdCircle(vec2 p, float r) {
+  return length(p) - r;
+}
+
+float sdBox(vec2 p, vec2 b) {
+  vec2 d = abs(p) - b;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
+float sdTriangle(vec2 p) {
+  const float k = sqrt(3.0);
+  p.x = abs(p.x) - 1.0;
+  p.y = p.y + 1.0 / k;
+  if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) / 2.0;
+  p.x -= clamp(p.x, -2.0, 0.0);
+  return -length(p) * sign(p.y);
+}
+
+float sdPolygon(vec2 p, float r, int n) {
+  float an = PI / float(n);
+  float en = PI / float(n);
+  vec2 acs = vec2(cos(en), sin(en));
+  
+  float bn = mod(atan(p.x, p.y), 2.0 * an) - an;
+  p = length(p) * vec2(cos(bn), abs(sin(bn)));
+  p -= r * acs;
+  p.y += clamp(-p.y, 0.0, r * acs.y);
+  
+  return length(p) * sign(p.x);
+}
+
+float sdStar5(vec2 p, float r, float rf) {
+  const vec2 k1 = vec2(0.809016994375, -0.587785252292);
+  const vec2 k2 = vec2(-k1.x, k1.y);
+  p.x = abs(p.x);
+  p -= 2.0 * max(dot(k1, p), 0.0) * k1;
+  p -= 2.0 * max(dot(k2, p), 0.0) * k2;
+  p.x = abs(p.x);
+  p.y -= r;
+  vec2 ba = rf * vec2(-k1.y, k1.x) - vec2(0.0, 1.0);
+  float h = clamp(dot(p, ba) / dot(ba, ba), 0.0, r);
+  return length(p - ba * h) * sign(p.y * ba.x - p.x * ba.y);
+}
+
+float sdStar6(vec2 p, float r) {
+  const float k = sqrt(3.0);
+  p = abs(p);
+  p -= vec2(clamp(p.x, -k * r, k * r), r);
+  
+  float d1 = length(p) * sign(p.y);
+  
+  p = vec2(p.x * k + p.y, -p.x + p.y * k) / 2.0;
+  p -= vec2(clamp(p.x, -k * r, k * r), r);
+  
+  float d2 = length(p) * sign(p.y);
+  
+  return min(d1, d2);
+}
+
+float sdHeart(vec2 p) {
+  p.x = abs(p.x);
+  if (p.y + p.x > 1.0) {
+    return sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - sqrt(2.0) / 4.0;
+  }
+  return sqrt(min(dot(p - vec2(0.0, 1.0), p - vec2(0.0, 1.0)),
+                  dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0)))) * sign(p.x - p.y);
+}
+
+float getShapeSDF(vec2 uv, int shapeType) {
+  float dist = 1.0;
+  
+  if (shapeType == 1) dist = sdCircle(uv, 0.9);
+  else if (shapeType == 2) dist = sdTriangle(uv * 1.2);
+  else if (shapeType == 3) dist = sdStar5(uv, 0.7, 0.4);
+  else if (shapeType == 4) dist = sdStar6(uv, 0.5);
+  else if (shapeType == 5) dist = sdPolygon(uv, 0.9, 6);
+  else if (shapeType == 6) dist = sdBox(uv, vec2(0.8));
+  else if (shapeType == 7) dist = sdPolygon(uv, 0.9, 5);
+  else if (shapeType == 8) dist = sdPolygon(uv, 0.9, 8);
+  else if (shapeType == 9) {
+    vec2 rotated = mat2(0.707, -0.707, 0.707, 0.707) * uv;
+    dist = sdBox(rotated, vec2(0.7));
+  }
+  else if (shapeType == 10) dist = sdHeart(uv * 1.5);
+  
+  return dist;
+}
+
+void main() {
+  float dist = getShapeSDF(vShapeUV, vShapeType);
+  float edge = fwidth(dist);
+  float alpha = 1.0 - smoothstep(-edge, edge, dist);
+  
+  fragColor = vec4(vColor.rgb, vColor.a * alpha);
+  if (fragColor.a < 0.01) discard;
+}
+`;
+
+    const vertexShader = this.compileShader(gl.VERTEX_SHADER, shapeVertexSource);
+    const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, shapeFragmentSource);
+    
+    this.shapeProgram = gl.createProgram()!;
+    gl.attachShader(this.shapeProgram, vertexShader);
+    gl.attachShader(this.shapeProgram, fragmentShader);
+    gl.linkProgram(this.shapeProgram);
+    
+    if (!gl.getProgramParameter(this.shapeProgram, gl.LINK_STATUS)) {
+      const info = gl.getProgramInfoLog(this.shapeProgram);
+      throw new Error(`Shape shader program failed to link: ${info}`);
+    }
+    
+    // Cache shape shader uniform
+    this.u_shapeProjection = gl.getUniformLocation(this.shapeProgram, 'uProjection');
+    
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
   }
 
   private compileShader(type: number, source: string): WebGLShader {
@@ -648,6 +845,155 @@ export class WebGLBatchRenderer {
     }
   }
 
+  /**
+   * 🎨 Draw shapes using SDF shader
+   * GPU-accelerated shape rendering (circles, stars, triangles, etc.)
+   * 
+   * Requirements:
+   * - WebGL2 context
+   * - GPU acceleration enabled
+   * 
+   * Fallback: If WebGL2 unavailable, shapes render as colored squares
+   */
+  drawBulkShapes(
+    posX: Float32Array,
+    posY: Float32Array,
+    rotation: Uint16Array,
+    sizes: Float32Array,
+    colorR: Uint8Array,
+    colorG: Uint8Array,
+    colorB: Uint8Array,
+    alphas: Float32Array,
+    shapeTypes: Uint8Array,
+    flags: Uint32Array,
+    count: number,
+    FLAG_VISIBLE: number,
+    cameraX: number = 0,
+    cameraY: number = 0,
+    cameraZoom: number = 1
+  ): void {
+    // Skip if no shape shader (WebGL1 or GPU acceleration disabled)
+    if (!this.shapeProgram || !this.gpuAccelerationEnabled) {
+      // Fallback: render as simple colored squares using regular shader
+      this.drawBulk(posX, posY, rotation, sizes, colorR, colorG, colorB, alphas, flags, count, FLAG_VISIBLE, cameraX, cameraY, cameraZoom);
+      return;
+    }
+    
+    const gl = this.gl;
+    const HALF = 0.5;
+    
+    // Switch to shape shader
+    gl.useProgram(this.shapeProgram);
+    
+    // Set projection uniform
+    const projectionMatrix = this.createProjectionMatrix(gl.canvas.width, gl.canvas.height);
+    gl.uniformMatrix3fv(this.u_shapeProjection, false, projectionMatrix);
+    
+    for (let start = 0; start < count; start += this.maxBatchSize) {
+      const end = Math.min(start + this.maxBatchSize, count);
+      let visibleCount = 0;
+      
+      // Build vertex data with 20-byte format:
+      // Position (8B) + UV (8B) + Metadata (4B)
+      const shapeVertices = new Float32Array(this.maxBatchSize * 4 * 5); // 5 floats per vertex
+      const shapeMetadata = new Uint32Array(shapeVertices.buffer);
+      
+      for (let i = start; i < end; i++) {
+        if ((flags[i] & FLAG_VISIBLE) === 0) continue;
+        
+        const x = posX[i];
+        const y = posY[i];
+        const hw = sizes[i] * HALF;
+        const rotDeg = rotation[i];
+        const shapeType = shapeTypes[i];
+        
+        // Rotation
+        const cos = this.cosCache[rotDeg];
+        const sin = this.sinCache[rotDeg];
+        
+        // Screen space position
+        const screenX = (x - cameraX) * cameraZoom + gl.canvas.width / 2;
+        const screenY = (y - cameraY) * cameraZoom + gl.canvas.height / 2;
+        const screenHw = hw * cameraZoom;
+        const screenHwCos = screenHw * cos;
+        const screenHwSin = screenHw * sin;
+        
+        // Pack metadata: [R8|G8|B8|A4|ShapeType4]
+        const r = colorR[i];
+        const g = colorG[i];
+        const b = colorB[i];
+        const a = Math.min(15, Math.floor(alphas[i] * 15));
+        const metadata = r | (g << 8) | (b << 16) | (a << 24) | (shapeType << 28);
+        
+        const floatOffset = visibleCount * 20; // 5 floats × 4 vertices
+        visibleCount++;
+        
+        // Vertex 0: top-left
+        shapeVertices[floatOffset + 0] = screenX - screenHwCos + screenHwSin;
+        shapeVertices[floatOffset + 1] = screenY - screenHwSin - screenHwCos;
+        shapeVertices[floatOffset + 2] = 0.0; // UV.x
+        shapeVertices[floatOffset + 3] = 0.0; // UV.y
+        shapeMetadata[floatOffset + 4] = metadata;
+        
+        // Vertex 1: top-right
+        shapeVertices[floatOffset + 5] = screenX + screenHwCos + screenHwSin;
+        shapeVertices[floatOffset + 6] = screenY + screenHwSin - screenHwCos;
+        shapeVertices[floatOffset + 7] = 1.0; // UV.x
+        shapeVertices[floatOffset + 8] = 0.0; // UV.y
+        shapeMetadata[floatOffset + 9] = metadata;
+        
+        // Vertex 2: bottom-right
+        shapeVertices[floatOffset + 10] = screenX + screenHwCos - screenHwSin;
+        shapeVertices[floatOffset + 11] = screenY + screenHwSin + screenHwCos;
+        shapeVertices[floatOffset + 12] = 1.0; // UV.x
+        shapeVertices[floatOffset + 13] = 1.0; // UV.y
+        shapeMetadata[floatOffset + 14] = metadata;
+        
+        // Vertex 3: bottom-left
+        shapeVertices[floatOffset + 15] = screenX - screenHwCos - screenHwSin;
+        shapeVertices[floatOffset + 16] = screenY - screenHwSin + screenHwCos;
+        shapeVertices[floatOffset + 17] = 0.0; // UV.x
+        shapeVertices[floatOffset + 18] = 1.0; // UV.y
+        shapeMetadata[floatOffset + 19] = metadata;
+      }
+      
+      // Upload and draw
+      if (visibleCount > 0) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, shapeVertices, gl.STREAM_DRAW);
+        
+        // Setup vertex attributes (20-byte stride)
+        gl.enableVertexAttribArray(0); // position
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 20, 0);
+        
+        gl.enableVertexAttribArray(1); // uv
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 8);
+        
+        gl.enableVertexAttribArray(2); // metadata
+        (gl as WebGL2RenderingContext).vertexAttribIPointer(2, 1, gl.UNSIGNED_INT, 20, 16);
+        
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.drawElements(gl.TRIANGLES, visibleCount * 6, this.indexType, 0);
+        
+        this.drawCallCount++;
+      }
+    }
+    
+    // Restore default shader
+    gl.useProgram(this.program);
+  }
+
+  /**
+   * Create 3x3 projection matrix for 2D rendering
+   */
+  private createProjectionMatrix(width: number, height: number): Float32Array {
+    return new Float32Array([
+      2 / width, 0, 0,
+      0, -2 / height, 0,
+      -1, 1, 1
+    ]);
+  }
+
   createTexture(image: ImageBitmap | HTMLImageElement): WebGLTexture {
     const gl = this.gl;
     const texture = gl.createTexture()!;
@@ -675,6 +1021,7 @@ export class WebGLBatchRenderer {
   destroy(): void {
     const gl = this.gl;
     if (this.program) gl.deleteProgram(this.program);
+    if (this.shapeProgram) gl.deleteProgram(this.shapeProgram); // 🎨 Clean up shape shader
     if (this.vertexBuffer) gl.deleteBuffer(this.vertexBuffer);
     if (this.indexBuffer) gl.deleteBuffer(this.indexBuffer);
   }

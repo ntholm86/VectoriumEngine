@@ -245,8 +245,9 @@ export class Vectorium {
     
     // Update scene
     if (this.currentScene && this.currentScene.active) {
-      // Expose current scene globally for profiler access
+      // Expose current scene and world globally for profiler access
       (window as any).vectoriumCurrentScene = this.currentScene;
+      (window as any).vectoriumCurrentWorld = this.currentScene.world;
       
       this.currentScene.update(dt);
       
