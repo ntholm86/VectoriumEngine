@@ -270,14 +270,13 @@ export class Scene {
   /**
    * Update canvas/viewport dimensions
    * Should be called when canvas is resized
-   * Preserves current world scale multiplier
+   * CRITICAL: Preserves world scale multiplier but viewport dimensions = canvas dimensions
    */
   setCanvasDimensions(width: number, height: number): void {
     const worldScale = this.viewport.worldScale;
-    this.viewport = this.viewport.resize(width, height);
-    if (worldScale !== 1.0) {
-      this.viewport = this.viewport.setWorldScale(worldScale);
-    }
+    // Viewport dimensions MUST match canvas exactly (for rendering)
+    // World scale is reapplied to affect physics bounds only
+    this.viewport = new Viewport(width, height, worldScale);
     this.camera.resize(width, height);
   }
   
@@ -285,9 +284,11 @@ export class Scene {
    * Set world bounds multiplier for physics
    * 1.0 = viewport only (entities bounce at screen edges)
    * 10.0 = 10x world (entities can move offscreen, requires frustum culling)
+   * CRITICAL: Only affects physics world bounds, NOT viewport rendering dimensions
    */
   setWorldBoundsMultiplier(multiplier: number): void {
-    this.viewport = this.viewport.setWorldScale(multiplier);
+    // Recreate viewport with same dimensions but new worldScale
+    this.viewport = new Viewport(this.viewport.width, this.viewport.height, multiplier);
   }
   
   /**

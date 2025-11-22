@@ -21,12 +21,17 @@ export class Viewport {
   readonly worldHeight: number;
   
   constructor(width: number, height: number, worldScale: number = 1.0) {
+    // Viewport dimensions = canvas dimensions (for rendering)
     this.width = width;
     this.height = height;
     this.worldScale = worldScale;
     
     // Computed once on creation (immutable)
     this.aspectRatio = width / height;
+    
+    // World dimensions = viewport * scale (for physics)
+    // When worldScale = 1.0, world = viewport (entities bounce at screen edges)
+    // When worldScale > 1.0, world > viewport (larger physics space, needs culling)
     this.worldWidth = width * worldScale;
     this.worldHeight = height * worldScale;
   }

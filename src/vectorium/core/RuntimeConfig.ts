@@ -10,7 +10,6 @@ export interface RenderingSettings {
   enableBatching: boolean;        // Batch rendering vs individual draws
   clearColor: [number, number, number, number]; // RGBA background
   vsync: boolean;                 // Wait for VSync (affects FPS cap)
-  resolution: { width: number; height: number }; // Canvas resolution
 }
 
 export interface PhysicsSettings {
@@ -79,8 +78,7 @@ export class RuntimeConfig {
     enableFrustumCulling: true,
     enableBatching: true,
     clearColor: [0, 0, 0, 1],
-    vsync: true,
-    resolution: { width: 800, height: 600 }
+    vsync: true
   };
 
   physics: PhysicsSettings = {
@@ -255,8 +253,7 @@ export class RuntimeConfig {
       enableFrustumCulling: true,
       enableBatching: true,
       clearColor: [0, 0, 0, 1],
-      vsync: true,
-      resolution: { width: 1920, height: 1080 }
+      vsync: true
     };
 
     this.physics = {

@@ -47,13 +47,12 @@ export class Vectorium {
     
     // Use RuntimeConfig defaults as fallback
     this.runtimeConfig = new RuntimeConfig();
-    const { width, height } = this.runtimeConfig.rendering.resolution;
     const { targetFPS } = this.runtimeConfig.quality;
     
     this.config = {
       canvas: config.canvas ?? document.createElement('canvas'),
-      width: config.width ?? width,
-      height: config.height ?? height,
+      width: config.width ?? 1280,
+      height: config.height ?? 720,
       preferWebGL2: config.preferWebGL2 ?? optimal.preferWebGL2 ?? true,
       useImageBitmap: config.useImageBitmap ?? optimal.useImageBitmap ?? false,
       useWorkers: config.useWorkers ?? optimal.useWorkers ?? false,
@@ -91,10 +90,6 @@ export class Vectorium {
     // Initialize buffer pool
     this.bufferPool = new BufferPool();
     
-    // Sync RuntimeConfig with actual canvas dimensions (after RuntimeConfig loads from localStorage)
-    this.runtimeConfig.rendering.resolution.width = this.canvas.width;
-    this.runtimeConfig.rendering.resolution.height = this.canvas.height;
-    
     // Setup runtime config change handler
     this.setupRuntimeConfig();
     
@@ -128,12 +123,6 @@ export class Vectorium {
       
       // Apply clear color
       this.renderer.setClearColor(cfg.rendering.clearColor[0], cfg.rendering.clearColor[1], cfg.rendering.clearColor[2], cfg.rendering.clearColor[3]);
-      
-      // Apply resolution changes
-      const { width, height } = cfg.rendering.resolution;
-      if (width !== this.config.width || height !== this.config.height) {
-        this.resize(width, height);
-      }
       
       // Apply scene settings
       if (this.currentScene) {
@@ -184,6 +173,7 @@ export class Vectorium {
     
     // Set canvas dimensions for physics bounds
     this.currentScene.setCanvasDimensions(this.canvas.width, this.canvas.height);
+    console.log(`Scene loaded: ${name} | Viewport: ${this.canvas.width}×${this.canvas.height} | World: ${this.currentScene.getWorldWidth()}×${this.currentScene.getWorldHeight()} (${this.currentScene['viewport'].worldScale}x)`);
     
     await this.currentScene.load();
     
@@ -522,12 +512,14 @@ export class Vectorium {
     height?: number;
     borderColor?: string;
     backgroundColor?: string;
+    pixelPerfect?: boolean;
   } = {}): HTMLCanvasElement {
     const {
       width = 1280,
       height = 720,
       borderColor = '#00FF00',
-      backgroundColor = 'linear-gradient(135deg,#1a1a2e 0%,#0f0f1e 100%)'
+      backgroundColor = 'linear-gradient(135deg,#1a1a2e 0%,#0f0f1e 100%)',
+      pixelPerfect = true
     } = options;
 
     // Setup DOM
@@ -541,7 +533,15 @@ export class Vectorium {
     canvasWrapper.style.cssText = `width:${width}px;height:${height}px;position:relative`;
     
     const canvas = document.createElement('canvas');
-    canvas.style.cssText = `display:block;width:100%;height:100%;border:3px solid ${borderColor};box-shadow:0 0 30px rgba(0,255,0,0.5),0 0 60px rgba(0,255,0,0.3);border-radius:4px`;
+    canvas.width = width;
+    canvas.height = height;
+    
+    // Pixel-perfect rendering: no CSS scaling, canvas size matches wrapper exactly
+    const cssStyle = pixelPerfect 
+      ? `display:block;width:${width}px;height:${height}px;border:3px solid ${borderColor};box-shadow:0 0 30px rgba(0,255,0,0.5),0 0 60px rgba(0,255,0,0.3);border-radius:4px`
+      : `display:block;width:100%;height:100%;border:3px solid ${borderColor};box-shadow:0 0 30px rgba(0,255,0,0.5),0 0 60px rgba(0,255,0,0.3);border-radius:4px`;
+    
+    canvas.style.cssText = cssStyle;
     
     canvasWrapper.appendChild(canvas);
     container.appendChild(canvasWrapper);

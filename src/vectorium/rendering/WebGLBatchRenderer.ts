@@ -349,7 +349,10 @@ float getShapeSDF(vec2 uv, int shapeType) {
   else if (shapeType == 7) dist = sdPolygon(uv, 0.9, 5);
   else if (shapeType == 8) dist = sdPolygon(uv, 0.9, 8);
   else if (shapeType == 9) {
-    vec2 rotated = mat2(0.707, -0.707, 0.707, 0.707) * uv;
+    // DIAMOND: Rotate UV by 45 degrees then render as box
+    // GLSL mat2 is column-major: mat2(col1_x, col1_y, col2_x, col2_y)
+    // For 45° rotation: cos(45°)=0.707, sin(45°)=0.707
+    vec2 rotated = mat2(0.707, 0.707, -0.707, 0.707) * uv;
     dist = sdBox(rotated, vec2(0.7));
   }
   else if (shapeType == 10) dist = sdHeart(uv * 1.5);

@@ -267,7 +267,7 @@ export class CollisionEntity extends BouncingEntity {
   constructor(options: ConstructorParameters<typeof BouncingEntity>[0] = {}) {
     super(options);
     this.enableCollisions = true;
-    this.restitution = 1.0; // Full elastic collision
+    this.restitution = 0.3; // Realistic collision (30% energy retained, 70% lost)
   }
   
   static createAt(x: number, y: number, options: Parameters<typeof BouncingEntity.createAt>[2] = {}): CollisionEntity {

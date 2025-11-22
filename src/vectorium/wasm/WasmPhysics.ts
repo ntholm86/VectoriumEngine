@@ -87,7 +87,7 @@ export class WasmPhysics {
     restitution?: Float32Array,
     collisionEntityCount: number = 0,  // 🚀 P0: Pre-computed counter
     gravityEntityCount: number = 0,    // 🚀 P0: Pre-computed counter
-    gravityY: number = 980
+    gravityY: number = 1200
   ): void {
     // Reset metrics
     this.metrics.totalCollisionChecks = 0;
@@ -156,6 +156,10 @@ export class WasmPhysics {
       this.velocityDeltaX.fill(0);
       this.velocityDeltaY.fill(0);
       
+      // Track collisions per entity to prevent stacking
+      const collisionsPerEntity = new Uint8Array(entityCount);
+      const MAX_COLLISIONS_PER_ENTITY = 3; // Limit to 3 collisions per frame
+      
       // Process each entity against its spatial neighbors only
       for (let i = 0; i < entityCount; i++) {
         if (!collisionsEnabled[i]) continue;
@@ -164,7 +168,7 @@ export class WasmPhysics {
         const yi = positionY[i];
         const ri = size[i] * halfConst;
         const mi = mass ? mass[i] : 1;
-        const resti = restitution ? restitution[i] : 1;
+        const resti = restitution ? restitution[i] : 0.3;
         
         // Query 3x3 cell neighborhood with bounds check
         const neighborCount = this.spatialHash.queryNeighbors(xi, yi, this.neighborBuffer, this.MAX_NEIGHBORS);
@@ -172,6 +176,10 @@ export class WasmPhysics {
         // Check collisions only with nearby entities
         for (let k = 0; k < neighborCount; k++) {
           const j = this.neighborBuffer[k];
+          
+          // Limit collisions per entity to prevent energy stacking
+          if (collisionsPerEntity[i] >= MAX_COLLISIONS_PER_ENTITY) break;
+          if (collisionsPerEntity[j] >= MAX_COLLISIONS_PER_ENTITY) continue;
           
           // CRITICAL FIX: Validate entity index (prevent stale buffer reads)
           if (j < 0 || j >= entityCount) {
@@ -255,9 +263,9 @@ export class WasmPhysics {
           // Moving apart check (avoid double-resolution)
           if (velAlongNormal <= 0) continue;
           
-          // Restitution (bounciness) - use full restitution for elastic collisions
-          const restj = restitution ? restitution[j] : 1;
-          const e = Math.min(resti, restj); // Full elastic bounce
+          // Restitution (bounciness) - realistic energy dissipation
+          const restj = restitution ? restitution[j] : 0.3;
+          const e = Math.min(resti, restj) * 0.7; // Extra energy dissipation to prevent gain
           
           // CRITICAL FIX: Correct impulse formula
           // impulse = -(1 + e) * velAlongNormal / (invMass_i + invMass_j)
@@ -277,17 +285,50 @@ export class WasmPhysics {
             this.velocityDeltaX[j] += nx * impulsej;
             this.velocityDeltaY[j] += ny * impulsej;
           }
+          
+          // Track collision count for both entities
+          collisionsPerEntity[i]++;
+          collisionsPerEntity[j]++;
         }
       }
       
       // CRITICAL FIX: Apply accumulated deltas AFTER all collision detection
       // This prevents spatial hash corruption AND energy gain from mid-loop modifications
+      const airDamping = 0.98; // Air friction: 2% velocity loss per frame
+      const groundDamping = 0.70; // Ground friction: 30% velocity loss when near ground (aggressive)
+      const sleepThreshold = 30.0; // Stop objects moving slower than 30 px/s
+      const maxVelocityChange = 100.0; // Cap velocity change per frame to prevent jumps
+      const groundHeight = heightF * 0.90; // Bottom 10% of world
+      
       for (let i = 0; i < entityCount; i++) {
         if (collisionsEnabled[i]) {
           positionX[i] += this.positionDeltaX[i];
           positionY[i] += this.positionDeltaY[i];
+          
+          // Cap velocity change to prevent extreme jumps
+          const dvMagSq = this.velocityDeltaX[i] * this.velocityDeltaX[i] + 
+                          this.velocityDeltaY[i] * this.velocityDeltaY[i];
+          if (dvMagSq > maxVelocityChange * maxVelocityChange) {
+            const scale = maxVelocityChange / Math.sqrt(dvMagSq);
+            this.velocityDeltaX[i] *= scale;
+            this.velocityDeltaY[i] *= scale;
+          }
+          
           velocityX[i] += this.velocityDeltaX[i];
           velocityY[i] += this.velocityDeltaY[i];
+          
+          // Apply damping (air or ground friction)
+          const isNearGround = positionY[i] > groundHeight;
+          const damping = isNearGround ? groundDamping : airDamping;
+          velocityX[i] *= damping;
+          velocityY[i] *= damping;
+          
+          // Sleep threshold: stop nearly-stationary objects
+          const speedSq = velocityX[i] * velocityX[i] + velocityY[i] * velocityY[i];
+          if (speedSq < sleepThreshold * sleepThreshold) {
+            velocityX[i] = 0;
+            velocityY[i] = 0;
+          }
         }
       }
     }

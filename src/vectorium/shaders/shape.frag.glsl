@@ -173,7 +173,9 @@ float getShapeSDF(vec2 uv, int shapeType) {
   }
   else if (shapeType == 9) {
     // DIAMOND (rotated square)
-    vec2 rotated = mat2(0.707, -0.707, 0.707, 0.707) * uv;
+    // GLSL mat2 is column-major: mat2(col1_x, col1_y, col2_x, col2_y)
+    // For 45° rotation: mat2(cos, sin, -sin, cos)
+    vec2 rotated = mat2(0.707, 0.707, -0.707, 0.707) * uv;
     dist = sdBox(rotated, vec2(0.7));
   }
   else if (shapeType == 10) {
