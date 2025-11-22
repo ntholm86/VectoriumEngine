@@ -175,90 +175,6 @@ export class World {
     
     return id;
   }
-  
-  /**
-   * 🚀 PERFORMANCE: Categorize entity into physics group
-   * Avoids flag checking - just process relevant entity lists
-   */
-  private addToPhysicsGroup(id: EntityId): void {
-    const hasGravity = this.enableGravity[id] !== 0;
-    const hasCollision = this.enableCollisions[id] !== 0;
-    
-    if (hasGravity && hasCollision) {
-      // Full physics (gravity + collision)
-      this.fullPhysicsEntities[this.fullPhysicsEntityCount++] = id;
-    } else if (hasGravity) {
-      // Gravity only
-      this.gravityEntities[this.gravityEntityCount++] = id;
-    } else if (hasCollision) {
-      // Collision only
-      this.collisionEntities[this.collisionEntityCount++] = id;
-    } else {
-      // Simple bouncing (no gravity/collision)
-      this.simpleEntities[this.simpleEntityCount++] = id;
-    }
-  }
-  
-  /**
-   * 🚀 PERFORMANCE: Update entity's physics group when properties change
-   * Call this after changing enableGravity or enableCollisions
-   */
-  updatePhysicsGroup(id: EntityId): void {
-    // Remove from all groups
-    this.removeFromPhysicsGroup(id);
-    // Re-add to correct group
-    this.addToPhysicsGroup(id);
-  }
-  
-  /**
-   * Remove entity from its current physics group
-   */
-  private removeFromPhysicsGroup(id: EntityId): void {
-    // Check simple entities
-    for (let i = 0; i < this.simpleEntityCount; i++) {
-      if (this.simpleEntities[i] === id) {
-        // Swap with last and decrement
-        this.simpleEntities[i] = this.simpleEntities[--this.simpleEntityCount];
-        return;
-      }
-    }
-    
-    // Check gravity entities
-    for (let i = 0; i < this.gravityEntityCount; i++) {
-      if (this.gravityEntities[i] === id) {
-        this.gravityEntities[i] = this.gravityEntities[--this.gravityEntityCount];
-        return;
-      }
-    }
-    
-    // Check collision entities
-    for (let i = 0; i < this.collisionEntityCount; i++) {
-      if (this.collisionEntities[i] === id) {
-        this.collisionEntities[i] = this.collisionEntities[--this.collisionEntityCount];
-        return;
-      }
-    }
-    
-    // Check full physics entities
-    for (let i = 0; i < this.fullPhysicsEntityCount; i++) {
-      if (this.fullPhysicsEntities[i] === id) {
-        this.fullPhysicsEntities[i] = this.fullPhysicsEntities[--this.fullPhysicsEntityCount];
-        return;
-      }
-    }
-  }
-  
-  /**
-   * Update physics flag based on whether entity actually needs physics
-   * PERFORMANCE: Only run expensive physics for entities that need it
-   */
-  updatePhysicsFlag(id: EntityId): void {
-    if (this.enableGravity[id] || this.enableCollisions[id]) {
-      this.flags[id] |= this.FLAG_PHYSICS;
-    } else {
-      this.flags[id] &= ~this.FLAG_PHYSICS;
-    }
-  }
 
   /**
    * Destroy entity - mark inactive and add to free list for reuse
@@ -269,9 +185,6 @@ export class World {
     if (this.flags[id] & this.FLAG_ACTIVE) {
       this.activeEntityCount--;
     }
-    
-    // Remove from physics group
-    this.removeFromPhysicsGroup(id);
     
     // Clear flags first
     this.flags[id] = 0;
@@ -407,18 +320,6 @@ export class World {
    */
   getTotalCount(): number {
     return this.entityCount;
-  }
-  
-  /**
-   * Get physics group counts for debugging/monitoring
-   */
-  getPhysicsGroupCounts(): { simple: number; gravity: number; collision: number; full: number } {
-    return {
-      simple: this.simpleEntityCount,
-      gravity: this.gravityEntityCount,
-      collision: this.collisionEntityCount,
-      full: this.fullPhysicsEntityCount
-    };
   }
 
   /**
