@@ -44,6 +44,7 @@ export class TextBatchRenderer {
   // Glyph atlas
   private atlas: GlyphAtlas | null = null;
   private atlasTexture: WebGLTexture | null = null;
+  private isReady: boolean = false; // Atlas initialization state
   
   // Uniforms
   private u_projection: WebGLUniformLocation | null = null;
@@ -98,9 +99,18 @@ export class TextBatchRenderer {
       this.indexData[offset + 5] = vertexOffset + 3;
     }
     
-    // Initialize atlas and shaders
-    this.initializeAtlas(fontSize, fontFamily);
+    // Initialize shaders synchronously
     this.initializeShaders();
+    
+    // Initialize atlas asynchronously (don't block constructor)
+    this.initializeAtlas(fontSize, fontFamily);
+  }
+  
+  /**
+   * Check if renderer is ready to use
+   */
+  isInitialized(): boolean {
+    return this.isReady;
   }
   
   /**
@@ -122,6 +132,7 @@ export class TextBatchRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     
+    this.isReady = true;
     console.log(`✅ Glyph atlas generated: ${this.atlas.atlasWidth}×${this.atlas.atlasHeight}, ${this.atlas.glyphs.size} glyphs`);
   }
   
@@ -255,7 +266,7 @@ void main() {
     count: number,
     options: TextRenderOptions = {}
   ): void {
-    if (!this.atlas || !this.program) return;
+    if (!this.isReady || !this.atlas || !this.program) return;
     
     const gl = this.gl;
     let charCount = 0;

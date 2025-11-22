@@ -146,8 +146,8 @@ export class PerformanceMonitor {
   private profilerContainer: HTMLDivElement | null = null;
   private updateTimer: number | null = null;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
-  private sparklineCanvas: HTMLCanvasElement | null = null;
-  private _sparklineCtx: CanvasRenderingContext2D | null = null; // Unused but kept for future
+  // private sparklineCanvas: HTMLCanvasElement | null = null; // Unused but kept for future
+  // private _sparklineCtx: CanvasRenderingContext2D | null = null; // Unused but kept for future
   private frameTimeRingBuffer: number[] = []; // Last 60 frames for sparkline
   private readonly SPARKLINE_SIZE = 60;
 
@@ -866,10 +866,11 @@ export class PerformanceMonitor {
   }
 
   private initSparkline(): void {
-    this.sparklineCanvas = this.profilerContainer?.querySelector('.sparkline-canvas') as HTMLCanvasElement;
-    if (this.sparklineCanvas) {
-      this._sparklineCtx = this.sparklineCanvas.getContext('2d');
-    }
+    // Sparkline canvas and context initialization kept for future use
+    // this.sparklineCanvas = this.profilerContainer?.querySelector('.sparkline-canvas') as HTMLCanvasElement;
+    // if (this.sparklineCanvas) {
+    //   this._sparklineCtx = this.sparklineCanvas.getContext('2d');
+    // }
   }
 
   /* Unused method - keeping for potential future use

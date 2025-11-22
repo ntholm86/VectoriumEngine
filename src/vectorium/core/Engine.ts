@@ -7,6 +7,8 @@ import { FeatureDetector, EngineConfig } from './FeatureDetector';
 import { RuntimeConfig } from './RuntimeConfig';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer, TextStyle } from '../rendering/TextRenderer';
+import { TextBatchRenderer } from '../rendering/TextBatchRenderer';
+import { TextPool } from './TextPool';
 import { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { BufferPool } from '../memory/Pooling';
 import { Camera } from './Camera';
@@ -26,6 +28,8 @@ export class Vectorium {
   readonly featureDetector: FeatureDetector;
   readonly renderer: WebGLBatchRenderer;
   readonly textRenderer: TextRenderer;
+  readonly textBatchRenderer: TextBatchRenderer;
+  readonly textPool: TextPool;
   readonly performanceMonitor: PerformanceMonitor;
   readonly bufferPool: BufferPool;
   readonly runtimeConfig: RuntimeConfig;
@@ -81,6 +85,11 @@ export class Vectorium {
     this.textRenderer = new TextRenderer(this.config.width, this.config.height);
     this.textRenderer.setGLContext(this.renderer.getContext());
     this.textRenderer.setBatchRenderer(this.renderer);
+    
+    // Initialize TextPool and TextBatchRenderer (proper glyph atlas approach)
+    this.textPool = new TextPool(10000);
+    const gl2Context = this.renderer.getContext() as WebGL2RenderingContext;
+    this.textBatchRenderer = new TextBatchRenderer(gl2Context, this.textPool, 32, 'Arial');
     
     // Initialize performance monitor
     this.performanceMonitor = new PerformanceMonitor(
@@ -263,7 +272,7 @@ export class Vectorium {
     this.textRenderer.begin();
     
     if (this.currentScene && this.currentScene.active) {
-      this.currentScene.render(this.renderer, this.textRenderer);
+      this.currentScene.render(this.renderer, this.textRenderer, this.textBatchRenderer, this.textPool);
       
       // Record culling statistics if available
       const visibleCount = (this.currentScene as any).visibleCount;

@@ -518,62 +518,54 @@ void main() {
     const b = color.b | 0;
     const a = (alpha * 255) | 0;
     
-    // 24-byte vertex format: 6 floats (pos(2) + uv(2) + padding(2))
-    let offset = this.vertexCount * 6;
-    const baseByteOffset = this.vertexCount * 24;
+    // 12-byte vertex format: 3 floats (pos(2) + color(1))
+    let offset = this.vertexCount * 3;
+    const baseByteOffset = this.vertexCount * 12;
     
     // Vertex 0
     this.batchVertices[offset++] = c0x;
     this.batchVertices[offset++] = c0y;
-    this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = 0;
-    offset += 2; // Skip padding
+    offset++; // Skip color (written via Uint8Array below)
     this.vertexCount++;
     
     // Vertex 1
     this.batchVertices[offset++] = c1x;
     this.batchVertices[offset++] = c1y;
-    this.batchVertices[offset++] = 1;
-    this.batchVertices[offset++] = 0;
-    offset += 2;
+    offset++;
     this.vertexCount++;
     
     // Vertex 2
     this.batchVertices[offset++] = c2x;
     this.batchVertices[offset++] = c2y;
-    this.batchVertices[offset++] = 1;
-    this.batchVertices[offset++] = 1;
-    offset += 2;
+    offset++;
     this.vertexCount++;
     
     // Vertex 3
     this.batchVertices[offset++] = c3x;
     this.batchVertices[offset++] = c3y;
-    this.batchVertices[offset++] = 0;
-    this.batchVertices[offset++] = 1;
-    offset += 2;
+    offset++;
     this.vertexCount++;
     
-    // Write colors as packed bytes
-    this.batchVerticesU8[baseByteOffset + 16] = r;
-    this.batchVerticesU8[baseByteOffset + 17] = g;
-    this.batchVerticesU8[baseByteOffset + 18] = b;
-    this.batchVerticesU8[baseByteOffset + 19] = a;
+    // Write colors via Uint8Array (byte-level access)
+    this.batchVerticesU8[baseByteOffset + 8] = r;
+    this.batchVerticesU8[baseByteOffset + 9] = g;
+    this.batchVerticesU8[baseByteOffset + 10] = b;
+    this.batchVerticesU8[baseByteOffset + 11] = a;
     
-    this.batchVerticesU8[baseByteOffset + 24 + 16] = r;
-    this.batchVerticesU8[baseByteOffset + 24 + 17] = g;
-    this.batchVerticesU8[baseByteOffset + 24 + 18] = b;
-    this.batchVerticesU8[baseByteOffset + 24 + 19] = a;
+    this.batchVerticesU8[baseByteOffset + 12 + 8] = r;
+    this.batchVerticesU8[baseByteOffset + 12 + 9] = g;
+    this.batchVerticesU8[baseByteOffset + 12 + 10] = b;
+    this.batchVerticesU8[baseByteOffset + 12 + 11] = a;
     
-    this.batchVerticesU8[baseByteOffset + 48 + 16] = r;
-    this.batchVerticesU8[baseByteOffset + 48 + 17] = g;
-    this.batchVerticesU8[baseByteOffset + 48 + 18] = b;
-    this.batchVerticesU8[baseByteOffset + 48 + 19] = a;
+    this.batchVerticesU8[baseByteOffset + 24 + 8] = r;
+    this.batchVerticesU8[baseByteOffset + 24 + 9] = g;
+    this.batchVerticesU8[baseByteOffset + 24 + 10] = b;
+    this.batchVerticesU8[baseByteOffset + 24 + 11] = a;
     
-    this.batchVerticesU8[baseByteOffset + 72 + 16] = r;
-    this.batchVerticesU8[baseByteOffset + 72 + 17] = g;
-    this.batchVerticesU8[baseByteOffset + 72 + 18] = b;
-    this.batchVerticesU8[baseByteOffset + 72 + 19] = a;
+    this.batchVerticesU8[baseByteOffset + 36 + 8] = r;
+    this.batchVerticesU8[baseByteOffset + 36 + 9] = g;
+    this.batchVerticesU8[baseByteOffset + 36 + 10] = b;
+    this.batchVerticesU8[baseByteOffset + 36 + 11] = a;
   }
 
   drawRect(x: number, y: number, width: number, height: number, color: { r: number; g: number; b: number }, alpha: number = 1): void {

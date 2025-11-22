@@ -13,7 +13,16 @@ export class EntitySpawner {
   private clickSpawnCount = 100; // Number of entities to spawn per click
   private activeButton: string = 'spawn100';
   private physicsMode: 'none' | 'gravity' | 'collision' | 'full' = 'none';
-  private visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' = 'sprite';
+  private visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' | 'text' = 'sprite';
+  private textMode: 'static' | 'dynamic' = 'static';
+  private textContent: string = 'Hello World';
+  private textBold: boolean = false;
+  private textItalic: boolean = false;
+  private textSize: number = 24;
+  private textAlign: 'left' | 'center' | 'right' = 'center';
+  private textShadow: boolean = false;
+  private textOutline: boolean = false;
+  private textGlow: boolean = false;
   
   constructor(_scene: Scene) {
     this.loadVisibility();
@@ -38,8 +47,25 @@ export class EntitySpawner {
   /**
    * Get the current visual type
    */
-  getVisualType(): 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' {
+  getVisualType(): 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' | 'text' {
     return this.visualType;
+  }
+  
+  /**
+   * Get text configuration for spawning
+   */
+  getTextConfig() {
+    return {
+      mode: this.textMode,
+      content: this.textContent,
+      bold: this.textBold,
+      italic: this.textItalic,
+      size: this.textSize,
+      align: this.textAlign,
+      shadow: this.textShadow,
+      outline: this.textOutline,
+      glow: this.textGlow
+    };
   }
   
   /**
@@ -98,7 +124,71 @@ export class EntitySpawner {
                 <option value="square">⬛ Square</option>
                 <option value="diamond">💠 Diamond</option>
               </optgroup>
+              <optgroup label="Text Rendering">
+                <option value="text">📝 Text</option>
+              </optgroup>
             </select>
+          </div>
+          
+          <div id="textConfigSection" class="text-config-section" style="display: none;">
+            <div class="entity-type-section">
+              <label class="entity-type-label">📝 Text Mode:</label>
+              <select id="textMode" class="entity-type-select">
+                <option value="static">Static Text</option>
+                <option value="dynamic">Dynamic Text (Counter)</option>
+              </select>
+            </div>
+            
+            <div id="staticTextConfig" class="entity-type-section">
+              <label class="entity-type-label">Text Content:</label>
+              <input type="text" id="textContent" class="text-input" value="Hello World" maxlength="50">
+            </div>
+            
+            <div class="entity-type-section">
+              <label class="entity-type-label">🎨 Text Style:</label>
+              <div class="text-style-row">
+                <label class="text-checkbox-label">
+                  <input type="checkbox" id="textBold" class="text-checkbox">
+                  <span>Bold</span>
+                </label>
+                <label class="text-checkbox-label">
+                  <input type="checkbox" id="textItalic" class="text-checkbox">
+                  <span>Italic</span>
+                </label>
+              </div>
+              <div class="text-style-row">
+                <label class="text-size-label">Size:</label>
+                <input type="range" id="textSize" min="12" max="72" value="24" class="text-slider">
+                <span id="textSizeValue" class="text-size-value">24px</span>
+              </div>
+            </div>
+            
+            <div class="entity-type-section">
+              <label class="entity-type-label">📐 Alignment:</label>
+              <select id="textAlign" class="entity-type-select">
+                <option value="left">Left</option>
+                <option value="center" selected>Center</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+            
+            <div class="entity-type-section">
+              <label class="entity-type-label">✨ Effects:</label>
+              <div class="text-style-row">
+                <label class="text-checkbox-label">
+                  <input type="checkbox" id="textShadow" class="text-checkbox">
+                  <span>Shadow</span>
+                </label>
+                <label class="text-checkbox-label">
+                  <input type="checkbox" id="textOutline" class="text-checkbox">
+                  <span>Outline</span>
+                </label>
+                <label class="text-checkbox-label">
+                  <input type="checkbox" id="textGlow" class="text-checkbox">
+                  <span>Glow</span>
+                </label>
+              </div>
+            </div>
           </div>
           
           <div class="button-grid">
@@ -153,6 +243,61 @@ export class EntitySpawner {
     const visualTypeSelect = this.container.querySelector('#visualType') as HTMLSelectElement;
     visualTypeSelect?.addEventListener('change', (e) => {
       this.visualType = (e.target as HTMLSelectElement).value as typeof this.visualType;
+      this.updateTextConfigVisibility();
+    });
+    
+    // Text mode selector
+    const textModeSelect = this.container.querySelector('#textMode') as HTMLSelectElement;
+    textModeSelect?.addEventListener('change', (e) => {
+      this.textMode = (e.target as HTMLSelectElement).value as typeof this.textMode;
+      this.updateStaticTextVisibility();
+    });
+    
+    // Text content input
+    const textContentInput = this.container.querySelector('#textContent') as HTMLInputElement;
+    textContentInput?.addEventListener('input', (e) => {
+      this.textContent = (e.target as HTMLInputElement).value;
+    });
+    
+    // Text styling checkboxes
+    const textBoldCheckbox = this.container.querySelector('#textBold') as HTMLInputElement;
+    textBoldCheckbox?.addEventListener('change', (e) => {
+      this.textBold = (e.target as HTMLInputElement).checked;
+    });
+    
+    const textItalicCheckbox = this.container.querySelector('#textItalic') as HTMLInputElement;
+    textItalicCheckbox?.addEventListener('change', (e) => {
+      this.textItalic = (e.target as HTMLInputElement).checked;
+    });
+    
+    // Text size slider
+    const textSizeSlider = this.container.querySelector('#textSize') as HTMLInputElement;
+    const textSizeValue = this.container.querySelector('#textSizeValue');
+    textSizeSlider?.addEventListener('input', (e) => {
+      this.textSize = parseInt((e.target as HTMLInputElement).value);
+      if (textSizeValue) textSizeValue.textContent = `${this.textSize}px`;
+    });
+    
+    // Text alignment selector
+    const textAlignSelect = this.container.querySelector('#textAlign') as HTMLSelectElement;
+    textAlignSelect?.addEventListener('change', (e) => {
+      this.textAlign = (e.target as HTMLSelectElement).value as typeof this.textAlign;
+    });
+    
+    // Text effects checkboxes
+    const textShadowCheckbox = this.container.querySelector('#textShadow') as HTMLInputElement;
+    textShadowCheckbox?.addEventListener('change', (e) => {
+      this.textShadow = (e.target as HTMLInputElement).checked;
+    });
+    
+    const textOutlineCheckbox = this.container.querySelector('#textOutline') as HTMLInputElement;
+    textOutlineCheckbox?.addEventListener('change', (e) => {
+      this.textOutline = (e.target as HTMLInputElement).checked;
+    });
+    
+    const textGlowCheckbox = this.container.querySelector('#textGlow') as HTMLInputElement;
+    textGlowCheckbox?.addEventListener('change', (e) => {
+      this.textGlow = (e.target as HTMLInputElement).checked;
     });
     
     // Spawn buttons set click spawn count
@@ -229,6 +374,22 @@ export class EntitySpawner {
     // Add active class to current button
     const activeBtn = this.container.querySelector(`#${this.activeButton}`);
     activeBtn?.classList.add('spawn-btn-active');
+  }
+  
+  private updateTextConfigVisibility(): void {
+    if (!this.container) return;
+    const textConfigSection = this.container.querySelector('#textConfigSection') as HTMLDivElement;
+    if (textConfigSection) {
+      textConfigSection.style.display = this.visualType === 'text' ? 'block' : 'none';
+    }
+  }
+  
+  private updateStaticTextVisibility(): void {
+    if (!this.container) return;
+    const staticTextConfig = this.container.querySelector('#staticTextConfig') as HTMLDivElement;
+    if (staticTextConfig) {
+      staticTextConfig.style.display = this.textMode === 'static' ? 'block' : 'none';
+    }
   }
   
   private on(id: string, event: string, handler: (e: Event) => void): void {
@@ -394,6 +555,62 @@ export class EntitySpawner {
         .entity-type-select option {
           background: #0a0a0a;
           color: #00FF00;
+        }
+        
+        .text-config-section {
+          margin-top: 8px;
+        }
+        
+        .text-input {
+          width: 100%;
+          padding: 6px;
+          background: rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(0, 255, 0, 0.3);
+          border-radius: 4px;
+          color: #00FF00;
+          font-family: 'Courier New', monospace;
+          font-size: 12px;
+        }
+        
+        .text-input:focus {
+          outline: none;
+          border-color: rgba(0, 255, 0, 0.7);
+          background: rgba(0, 255, 0, 0.05);
+        }
+        
+        .text-style-row {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          margin-top: 6px;
+        }
+        
+        .text-checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          cursor: pointer;
+          font-size: 11px;
+        }
+        
+        .text-checkbox {
+          cursor: pointer;
+        }
+        
+        .text-size-label {
+          font-size: 11px;
+          margin-right: 4px;
+        }
+        
+        .text-slider {
+          flex: 1;
+          cursor: pointer;
+        }
+        
+        .text-size-value {
+          font-size: 11px;
+          min-width: 40px;
+          text-align: right;
         }
         
         .button-grid {

@@ -12,7 +12,7 @@
  */
 
 export class SpatialHash {
-  private _cellSize: number; // Kept for setCellSize method
+  // private _cellSize: number; // Kept for setCellSize method
   private invCellSize: number; // Precompute 1/cellSize for multiply instead of divide
   private cells: Map<number, number[]>;
   private bucketPool: number[][]; // Reuse buckets to avoid allocations
@@ -28,7 +28,7 @@ export class SpatialHash {
   };
   
   constructor(cellSize: number, initialCapacity: number = 1024) {
-    this._cellSize = cellSize;
+    // this._cellSize = cellSize; // Stored for future use but not currently read
     this.invCellSize = 1 / cellSize;
     this.cells = new Map();
     
@@ -183,7 +183,7 @@ export class SpatialHash {
    * Adjust cell size dynamically based on entity distribution
    */
   setCellSize(size: number): void {
-    this._cellSize = size;
+    // this._cellSize = size; // Stored for future use but not currently read
     this.invCellSize = 1 / size;
   }
 }
