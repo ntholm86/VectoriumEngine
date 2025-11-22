@@ -81,9 +81,10 @@ export class Scene {
     
     // 🚀 Pure ECS update - no entity sync overhead!
     const physicsStart = performance.now();
-    // CRITICAL: Pass viewport dimensions (canvas size) for physics boundaries, NOT world dimensions
-    // worldScale multiplier is for culling only, not physics!
-    this.world.updatePhysics(dt, this.viewport.width, this.viewport.height);
+    // CRITICAL: Pass WORLD dimensions for physics boundaries (entities bounce at world edges)
+    // When boundsMultiplier = 1.0, world = viewport (bounce at screen edges)
+    // When boundsMultiplier > 1.0, world > viewport (camera can scroll, entities off-screen)
+    this.world.updatePhysics(dt, this.viewport.worldWidth, this.viewport.worldHeight);
     this.perfMetrics.updatePhysics = performance.now() - physicsStart;
     
     const animStart = performance.now();
@@ -292,10 +293,17 @@ export class Scene {
    * 1.0 = viewport only (entities bounce at screen edges)
    * 10.0 = 10x world (entities can move offscreen, requires frustum culling)
    * CRITICAL: Only affects physics world bounds, NOT viewport rendering dimensions
+   * Does NOT affect camera position or entity positions
    */
   setWorldBoundsMultiplier(multiplier: number): void {
     // Recreate viewport with same dimensions but new worldScale
+    // This ONLY affects worldWidth/worldHeight calculations for physics
+    // Viewport width/height (rendering dimensions) remain unchanged
     this.viewport = new Viewport(this.viewport.width, this.viewport.height, multiplier);
+    
+    // Camera position should NOT change - it's in world coordinates
+    // Entities should NOT move - they're in world coordinates
+    // Only physics boundaries and culling calculations are affected
   }
   
   /**

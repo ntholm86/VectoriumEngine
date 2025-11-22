@@ -5,6 +5,7 @@
  */
 
 export interface RenderingSettings {
+  resolution: { width: number; height: number }; // Canvas resolution
   batchSize: number;              // Sprites per batch (16K-65K)
   enableFrustumCulling: boolean;  // Viewport culling
   enableBatching: boolean;        // Batch rendering vs individual draws
@@ -14,7 +15,7 @@ export interface RenderingSettings {
 
 export interface PhysicsSettings {
   gravity: { x: number; y: number };
-  boundsMultiplier: number;       // World size vs viewport (1.0 = exact, 10.0 = huge world)
+  boundsMultiplier: number;       // World size vs viewport (1.0 = world=viewport, 2.0 = world is 2x larger)
   enableBounce: boolean;          // Bounce off boundaries
   velocityDamping: number;        // 0.0-1.0 (friction)
 }
@@ -74,6 +75,7 @@ export interface CameraSettings {
  */
 export class RuntimeConfig {
   rendering: RenderingSettings = {
+    resolution: { width: 1280, height: 720 },
     batchSize: 65000,
     enableFrustumCulling: true,
     enableBatching: true,
@@ -249,6 +251,7 @@ export class RuntimeConfig {
    */
   reset(): void {
     this.rendering = {
+      resolution: { width: 1280, height: 720 },
       batchSize: 65000,
       enableFrustumCulling: true,
       enableBatching: true,

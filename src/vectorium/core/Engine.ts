@@ -68,6 +68,11 @@ export class Vectorium {
     this.canvas.width = this.config.width;
     this.canvas.height = this.config.height;
     
+    // Sync RuntimeConfig resolution to match actual canvas dimensions
+    this.runtimeConfig.setRendering({ 
+      resolution: { width: this.config.width, height: this.config.height } 
+    });
+    
     // Initialize renderer
     const useWebGL2 = this.config.preferWebGL2 && this.featureDetector.capabilities.hasWebGL2;
     this.renderer = new WebGLBatchRenderer(this.canvas, useWebGL2);
@@ -118,6 +123,11 @@ export class Vectorium {
   
   private setupRuntimeConfig(): void {
     this.runtimeConfig.onChange((cfg) => {
+      // Apply resolution change
+      if (cfg.rendering.resolution.width !== this.canvas.width || cfg.rendering.resolution.height !== this.canvas.height) {
+        this.resize(cfg.rendering.resolution.width, cfg.rendering.resolution.height);
+      }
+      
       // Apply batch size
       this.renderer.setBatchSize(cfg.rendering.batchSize);
       
