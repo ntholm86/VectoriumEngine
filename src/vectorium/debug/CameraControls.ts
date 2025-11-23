@@ -17,7 +17,7 @@ export class CameraControls extends UIPanel {
       id: 'camera-controls',
       title: '📹 CAMERA',
       keyboardShortcut: 'v',
-      position: 'top-right',
+      position: 'bottom-right',
       defaultVisible: false,
       collapsible: true
     });
@@ -31,56 +31,56 @@ export class CameraControls extends UIPanel {
    */
   protected createContent(): string {
     return `
-      <div class="camera-section">
+      <div class="ui-section">
         <div class="section-header">🔍 ZOOM</div>
-        <div class="control-row">
-          <button class="camera-btn vectorium-btn" data-action="zoom-in">+</button>
+        <div class="ui-row">
+          <button class="vectorium-btn small" data-action="zoom-in">+</button>
           <span class="zoom-display">1.00x</span>
-          <button class="camera-btn vectorium-btn" data-action="zoom-out">−</button>
+          <button class="vectorium-btn small" data-action="zoom-out">−</button>
         </div>
-        <div class="control-row">
-          <input type="range" id="camera-zoom-slider" min="0.1" max="10" step="0.1" value="1" class="vectorium-slider">
+        <div class="ui-row">
+          <input type="range" id="camera-zoom-slider" min="0.1" max="10" step="0.1" value="1">
         </div>
-        <div class="control-row">
-          <button class="vectorium-btn" data-action="zoom-reset" style="flex: 1;">Reset Zoom</button>
+        <div class="ui-row">
+          <button class="vectorium-btn flex-1" data-action="zoom-reset">Reset Zoom</button>
         </div>
       </div>
       
-      <div class="camera-section">
+      <div class="ui-section">
         <div class="section-header">🎯 POSITION</div>
-        <div class="control-row" style="justify-content: center;">
-          <button class="camera-btn vectorium-btn" data-action="pan-up">↑</button>
+        <div class="ui-row text-center">
+          <button class="vectorium-btn small" data-action="pan-up">↑</button>
         </div>
-        <div class="control-row" style="gap: 8px;">
-          <button class="camera-btn vectorium-btn" data-action="pan-left">←</button>
-          <button class="vectorium-btn" data-action="center" style="flex: 1;">Center</button>
-          <button class="camera-btn vectorium-btn" data-action="pan-right">→</button>
+        <div class="ui-row">
+          <button class="vectorium-btn small" data-action="pan-left">←</button>
+          <button class="vectorium-btn flex-1" data-action="center">Center</button>
+          <button class="vectorium-btn small" data-action="pan-right">→</button>
         </div>
-        <div class="control-row" style="justify-content: center;">
-          <button class="camera-btn vectorium-btn" data-action="pan-down">↓</button>
+        <div class="ui-row text-center">
+          <button class="vectorium-btn small" data-action="pan-down">↓</button>
         </div>
       </div>
       
-      <div class="camera-section">
+      <div class="ui-section">
         <div class="section-header">🎬 FEATURES</div>
-        <div class="control-row">
-          <label class="control-label">
-            <input type="checkbox" id="camera-follow-toggle" class="vectorium-checkbox">
+        <div class="ui-row">
+          <label class="ui-label">
+            <input type="checkbox" id="camera-follow-toggle">
             <span>Follow Entity</span>
           </label>
         </div>
-        <div class="control-row">
-          <label class="control-label">
-            <input type="checkbox" id="camera-smooth-toggle" class="vectorium-checkbox" checked>
+        <div class="ui-row">
+          <label class="ui-label">
+            <input type="checkbox" id="camera-smooth-toggle" checked>
             <span>Smooth Movement</span>
           </label>
         </div>
-        <div class="control-row">
-          <button class="vectorium-btn" data-action="shake" style="width: 100%; background: rgba(255, 0, 255, 0.3); border-color: #ff00ff; color: #ff00ff;">Test Shake</button>
+        <div class="ui-row">
+          <button class="vectorium-btn special full-width" data-action="shake">Test Shake</button>
         </div>
       </div>
       
-      <div class="info-text">
+      <div class="ui-hint">
         Z/X: Zoom | Arrows: Pan | F: Follow | Home: Reset
       </div>
     `;

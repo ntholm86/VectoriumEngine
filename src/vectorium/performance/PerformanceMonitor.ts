@@ -156,8 +156,8 @@ export class PerformanceMonitor extends UIPanel {
       id: 'performance-monitor',
       title: '⚡ VECTORIUM PROFILER',
       keyboardShortcut: 'p',
-      position: 'bottom-right',
-      defaultVisible: false,
+      position: 'top-right',
+      defaultVisible: true,
       collapsible: true
     };
     super(panelConfig);

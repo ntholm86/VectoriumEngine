@@ -313,7 +313,7 @@ export class Vectorium {
     
     // Debug text will be reimplemented using WebGLBatchRenderer.drawBulkText()
     // when we add helper methods for simple text rendering
-    console.log(`FPS: ${Math.round(metrics.fps)} | Frame: ${metrics.frameTime.toFixed(2)}ms`);
+    // console.log(`FPS: ${Math.round(metrics.fps)} | Frame: ${metrics.frameTime.toFixed(2)}ms`);
   }
 
   resize(width: number, height: number): void {

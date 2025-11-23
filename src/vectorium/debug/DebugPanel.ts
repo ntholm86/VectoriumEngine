@@ -39,11 +39,11 @@ export class DebugPanel extends UIPanel {
   private renderRenderingSection(): string {
     const r = this.runtimeConfig.rendering;
     return `
-      <div class="config-section">
+      <div class="ui-section">
         <div class="section-header">🎨 RENDERING</div>
-        <div class="config-row">
-          <label class="config-label">Resolution</label>
-          <select id="cfg-resolution" class="vectorium-select">
+        <div class="ui-row">
+          <label class="ui-label">Resolution</label>
+          <select id="cfg-resolution">
             <option value="800x600" ${r.resolution.width === 800 && r.resolution.height === 600 ? 'selected' : ''}>800×600 (4:3)</option>
             <option value="1024x768" ${r.resolution.width === 1024 && r.resolution.height === 768 ? 'selected' : ''}>1024×768 (4:3)</option>
             <option value="1280x720" ${r.resolution.width === 1280 && r.resolution.height === 720 ? 'selected' : ''}>1280×720 (16:9)</option>
@@ -52,29 +52,29 @@ export class DebugPanel extends UIPanel {
             <option value="2560x1440" ${r.resolution.width === 2560 && r.resolution.height === 1440 ? 'selected' : ''}>2560×1440 (16:9)</option>
           </select>
         </div>
-        <div class="config-row">
-          <label class="config-label">Batch Size</label>
-          <select id="cfg-batch-size" class="vectorium-select">
+        <div class="ui-row">
+          <label class="ui-label">Batch Size</label>
+          <select id="cfg-batch-size">
             <option value="16000" ${r.batchSize === 16000 ? 'selected' : ''}>16K (more calls)</option>
             <option value="32000" ${r.batchSize === 32000 ? 'selected' : ''}>32K</option>
             <option value="48000" ${r.batchSize === 48000 ? 'selected' : ''}>48K</option>
             <option value="65000" ${r.batchSize === 65000 ? 'selected' : ''}>65K (default)</option>
           </select>
         </div>
-        <div class="config-row">
-          <label class="config-label">Frustum Culling</label>
-          <div class="config-value">
-            <input type="checkbox" id="cfg-culling" class="vectorium-checkbox" ${r.enableFrustumCulling ? 'checked' : ''}>
-            <span id="culling-status" class="status-badge status-off">OFF</span>
+        <div class="ui-row">
+          <label class="ui-label">Frustum Culling</label>
+          <div class="ui-value">
+            <input type="checkbox" id="cfg-culling" ${r.enableFrustumCulling ? 'checked' : ''}>
+            <span id="culling-status" class="status-badge" data-status="off">OFF</span>
           </div>
         </div>
-        <div class="config-row">
-          <label class="config-label">Batch Rendering</label>
-          <input type="checkbox" id="cfg-batching" class="vectorium-checkbox" ${r.enableBatching ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Batch Rendering</label>
+          <input type="checkbox" id="cfg-batching" ${r.enableBatching ? 'checked' : ''}>
         </div>
-        <div class="config-row">
-          <label class="config-label">VSync</label>
-          <input type="checkbox" id="cfg-vsync" class="vectorium-checkbox" ${r.vsync ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">VSync</label>
+          <input type="checkbox" id="cfg-vsync" ${r.vsync ? 'checked' : ''}>
         </div>
       </div>
     `;
@@ -83,24 +83,24 @@ export class DebugPanel extends UIPanel {
   private renderPhysicsSection(): string {
     const p = this.runtimeConfig.physics;
     return `
-      <div class="config-section">
+      <div class="ui-section">
         <div class="section-header">⚙️ PHYSICS</div>
-        <div class="config-row">
-          <label class="config-label">World Multiplier</label>
-          <div class="config-value">
-            <input type="range" id="cfg-bounds-mult" min="1" max="10" step="0.5" value="${p.boundsMultiplier}" class="vectorium-slider">
-            <span class="slider-value">${p.boundsMultiplier}x</span>
+        <div class="ui-row">
+          <label class="ui-label">World Multiplier</label>
+          <div class="ui-value">
+            <input type="range" id="cfg-bounds-mult" min="1" max="10" step="0.5" value="${p.boundsMultiplier}">
+            <span class="metric-value">${p.boundsMultiplier}x</span>
           </div>
         </div>
-        <div class="config-row">
-          <label class="config-label">Bounce</label>
-          <input type="checkbox" id="cfg-bounce" class="vectorium-checkbox" ${p.enableBounce ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Bounce</label>
+          <input type="checkbox" id="cfg-bounce" ${p.enableBounce ? 'checked' : ''}>
         </div>
-        <div class="config-row">
-          <label class="config-label">Damping</label>
-          <div class="config-value">
-            <input type="range" id="cfg-damping" min="0" max="1" step="0.01" value="${p.velocityDamping}" class="vectorium-slider">
-            <span class="slider-value">${p.velocityDamping.toFixed(2)}</span>
+        <div class="ui-row">
+          <label class="ui-label">Damping</label>
+          <div class="ui-value">
+            <input type="range" id="cfg-damping" min="0" max="1" step="0.01" value="${p.velocityDamping}">
+            <span class="metric-value">${p.velocityDamping.toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -110,15 +110,15 @@ export class DebugPanel extends UIPanel {
   private renderQualitySection(): string {
     const q = this.runtimeConfig.quality;
     return `
-      <div class="config-section">
+      <div class="ui-section">
         <div class="section-header">📊 QUALITY</div>
-        <div class="config-row">
-          <label class="config-label">Adaptive Quality</label>
-          <input type="checkbox" id="cfg-adaptive" class="vectorium-checkbox" ${q.enableAdaptiveQuality ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Adaptive Quality</label>
+          <input type="checkbox" id="cfg-adaptive" ${q.enableAdaptiveQuality ? 'checked' : ''}>
         </div>
-        <div class="config-row">
-          <label class="config-label">Target FPS</label>
-          <input type="number" id="cfg-target-fps" min="30" max="144" value="${q.targetFPS}" class="vectorium-input">
+        <div class="ui-row">
+          <label class="ui-label">Target FPS</label>
+          <input type="number" id="cfg-target-fps" min="30" max="144" value="${q.targetFPS}">
         </div>
       </div>
     `;
@@ -127,26 +127,26 @@ export class DebugPanel extends UIPanel {
   private renderAnimationSection(): string {
     const a = this.runtimeConfig.animation;
     return `
-      <div class="config-section">
+      <div class="ui-section">
         <div class="section-header">🎭 ANIMATION</div>
-        <div class="config-row">
-          <label class="config-label">Speed</label>
-          <div class="config-value">
-            <input type="range" id="cfg-anim-speed" min="0" max="2" step="0.1" value="${a.animationSpeed}" class="vectorium-slider">
-            <span class="slider-value">${a.animationSpeed.toFixed(1)}x</span>
+        <div class="ui-row">
+          <label class="ui-label">Speed</label>
+          <div class="ui-value">
+            <input type="range" id="cfg-anim-speed" min="0" max="2" step="0.1" value="${a.animationSpeed}">
+            <span class="metric-value">${a.animationSpeed.toFixed(1)}x</span>
           </div>
         </div>
-        <div class="config-row">
-          <label class="config-label">Rotation</label>
-          <input type="checkbox" id="cfg-rotation" class="vectorium-checkbox" ${a.enableRotation ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Rotation</label>
+          <input type="checkbox" id="cfg-rotation" ${a.enableRotation ? 'checked' : ''}>
         </div>
-        <div class="config-row">
-          <label class="config-label">Pulse</label>
-          <input type="checkbox" id="cfg-pulse" class="vectorium-checkbox" ${a.enablePulse ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Pulse</label>
+          <input type="checkbox" id="cfg-pulse" ${a.enablePulse ? 'checked' : ''}>
         </div>
-        <div class="config-row">
-          <label class="config-label">Wobble</label>
-          <input type="checkbox" id="cfg-wobble" class="vectorium-checkbox" ${a.enableWobble ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Wobble</label>
+          <input type="checkbox" id="cfg-wobble" ${a.enableWobble ? 'checked' : ''}>
         </div>
       </div>
     `;
@@ -155,19 +155,19 @@ export class DebugPanel extends UIPanel {
   private renderDebugSection(): string {
     const d = this.runtimeConfig.debug;
     return `
-      <div class="config-section">
+      <div class="ui-section">
         <div class="section-header">🐛 DEBUG</div>
-        <div class="config-row">
-          <label class="config-label">Show Grid</label>
-          <input type="checkbox" id="cfg-show-grid" class="vectorium-checkbox" ${d.showGrid ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Show Grid</label>
+          <input type="checkbox" id="cfg-show-grid" ${d.showGrid ? 'checked' : ''}>
         </div>
-        <div class="config-row">
-          <label class="config-label">Show Bounds</label>
-          <input type="checkbox" id="cfg-show-bounds" class="vectorium-checkbox" ${d.showBounds ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Show Bounds</label>
+          <input type="checkbox" id="cfg-show-bounds" ${d.showBounds ? 'checked' : ''}>
         </div>
-        <div class="config-row">
-          <label class="config-label">Perf Warnings</label>
-          <input type="checkbox" id="cfg-warnings" class="vectorium-checkbox" ${d.logPerformanceWarnings ? 'checked' : ''}>
+        <div class="ui-row">
+          <label class="ui-label">Perf Warnings</label>
+          <input type="checkbox" id="cfg-warnings" ${d.logPerformanceWarnings ? 'checked' : ''}>
         </div>
       </div>
     `;
@@ -175,10 +175,10 @@ export class DebugPanel extends UIPanel {
 
   private renderActionsSection(): string {
     return `
-      <div class="config-section">
+      <div class="ui-section">
         <div class="section-header">💾 ACTIONS</div>
-        <button id="cfg-fullscreen" class="vectorium-btn" style="margin-bottom: 6px;">🖥️ Fullscreen</button>
-        <button id="cfg-reset" class="vectorium-btn" style="background: rgba(255, 0, 0, 0.3); border-color: #ff0000; color: #ff0000; margin-bottom: 6px;">Reset Defaults</button>
+        <button id="cfg-fullscreen" class="vectorium-btn">🖥️ Fullscreen</button>
+        <button id="cfg-reset" class="vectorium-btn danger-solid">Reset Defaults</button>
         <button id="cfg-export" class="vectorium-btn">Export JSON</button>
       </div>
     `;
@@ -314,7 +314,8 @@ export class DebugPanel extends UIPanel {
     const statusEl = this.container?.querySelector('#culling-status');
     if (statusEl) {
       statusEl.textContent = isActive ? 'ON' : 'OFF';
-      statusEl.className = isActive ? 'status-badge status-on' : 'status-badge status-off';
+      statusEl.className = 'status-badge';
+      statusEl.setAttribute('data-status', isActive ? 'on' : 'off');
       statusEl.setAttribute('title', 
         isActive 
           ? `Active (world scale: ${worldScale.toFixed(2)}x)`

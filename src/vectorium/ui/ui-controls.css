@@ -1,46 +1,97 @@
 /* ========================================
-   VECTORIUM UI CONTROLS - Consolidated Stylesheet
-   Warm, pleasant color palette with CSS variables
+   VECTORIUM UI CONTROLS - Lean DRY Stylesheet
    ======================================== */
 
 :root {
-  /* Warm Color Palette */
-  --ui-bg: rgba(40, 35, 30, 0.95);
-  --ui-bg-light: rgba(50, 45, 40, 0.95);
-  --ui-text: #e8d4b0;
-  --ui-text-muted: #a89070;
-  --ui-accent: #d4a574;
-  --ui-accent-bright: #e8b889;
-  --ui-highlight: #c9a66b;
-  --ui-border: #5a4f42;
-  --ui-success: #98b88a;
-  --ui-error: #d88881;
+  /* Colors - Monokai Palette */
+  --ui-bg: rgba(39, 40, 34, 0.95);           /* #272822 - Monokai background */
+  --ui-bg-light: rgba(49, 50, 44, 0.95);     /* Lighter variant */
+  --ui-bg-dark: rgba(0, 0, 0, 0.3);
+  --ui-bg-darker: rgba(0, 0, 0, 0.35);
+  --ui-bg-darkest: rgba(0, 0, 0, 0.6);
+  --ui-text: #f8f8f2;                        /* Monokai foreground */
+  --ui-text-muted: #75715e;                  /* Monokai comment */
+  --ui-accent: #66d9ef;                      /* Monokai cyan */
+  --ui-accent-bright: #a6e22e;               /* Monokai green */
+  --ui-highlight: #e6db74;                   /* Monokai yellow */
+  --ui-border-color: #49483e;                /* Monokai line highlight */
+  --ui-success: #a6e22e;                     /* Monokai green */
+  --ui-error: #f92672;                       /* Monokai pink/red */
   --ui-shadow: rgba(0, 0, 0, 0.4);
+  --ui-danger-bg: rgba(249, 38, 114, 0.2);   /* Monokai pink with alpha */
+  --ui-danger-solid-bg: rgba(249, 38, 114, 0.3);
+  --ui-danger-color: #f92672;                /* Monokai pink */
+  --ui-special-bg: rgba(174, 129, 255, 0.3); /* Monokai purple with alpha */
+  --ui-special-color: #ae81ff;               /* Monokai purple */
   
-  /* Font Sizes */
+  /* Typography */
+  --ui-font-family: 'Roboto', monospace;
   --ui-font-micro: 10px;
   --ui-font-tiny: 11px;
   --ui-font-small: 12px;
   --ui-font-title: 13px;
   --ui-font-base: 14px;
+  --ui-letter-spacing-sm: 0.3px;
+  --ui-letter-spacing-md: 0.5px;
+  --ui-line-height: 1.35;
+  
+  /* Spacing */
+  --ui-padding-xs: 3px;
+  --ui-padding-sm: 4px;
+  --ui-padding-md: 6px;
+  --ui-padding-lg: 8px;
+  --ui-padding-xl: 10px;
+  --ui-margin-xs: 4px;
+  --ui-margin-sm: 6px;
+  --ui-margin-md: 8px;
+  --ui-gap-xs: 2px;
+  --ui-gap-sm: 4px;
+  --ui-gap-md: 8px;
+  
+  /* Borders */
+  --ui-border-width: 1px;
+  --ui-border-style: solid;
+  --ui-border-radius-sm: 2px;
+  --ui-border-radius-md: 3px;
+  --ui-border-radius-lg: 4px;
+  --ui-border-main: var(--ui-border-width) var(--ui-border-style) var(--ui-border-color);
+  --ui-border-accent: var(--ui-border-width) var(--ui-border-style) var(--ui-accent);
+  
+  /* Component Sizes */
+  --ui-input-width: 60px;
+  --ui-checkbox-size: 14px;
+  --ui-slider-thumb-size: 12px;
+  --ui-slider-height: 4px;
+  --ui-collapse-btn-size: 16px;
+  --ui-label-min-width: 80px;
+  --ui-value-min-width: 65px;
+  --ui-zoom-display-width: 50px;
+  
+  /* Effects */
+  --ui-transition: all 0.15s ease;
+  --ui-blur: blur(5px);
+  --ui-panel-shadow: 0 var(--ui-gap-xs) var(--ui-margin-md) var(--ui-shadow);
 }
 
-/* Base Panel Styles */
+/* ============================================
+   PANEL
+   ============================================ */
+
 .vectorium-panel {
   position: fixed;
   background: var(--ui-bg);
   color: var(--ui-text);
-  font-family: 'Courier New', monospace;
+  font-family: var(--ui-font-family);
   font-size: var(--ui-font-base);
-  border: 1px solid var(--ui-border);
-  border-radius: 4px;
+  border: var(--ui-border-main);
+  border-radius: var(--ui-border-radius-lg);
   padding: 0;
   z-index: 10000;
-  box-shadow: 0 2px 8px var(--ui-shadow);
+  box-shadow: var(--ui-panel-shadow);
   min-width: 200px;
   max-width: 320px;
-  backdrop-filter: blur(5px);
-  transition: opacity 0.2s ease;
+  backdrop-filter: var(--ui-blur);
+  transition: var(--ui-transition);
 }
 
 .vectorium-panel.hidden {
@@ -48,55 +99,38 @@
   pointer-events: none;
 }
 
-/* Panel Positioning */
-.vectorium-panel-top-left {
-  top: 20px;
-  left: 20px;
-}
+.vectorium-panel[data-position="top-left"] { top: 20px; left: 20px; }
+.vectorium-panel[data-position="top-right"] { top: 20px; right: 20px; }
+.vectorium-panel[data-position="bottom-left"] { bottom: 20px; left: 20px; }
+.vectorium-panel[data-position="bottom-right"] { bottom: 20px; right: 20px; }
 
-.vectorium-panel-top-right {
-  top: 20px;
-  right: 20px;
-}
-
-.vectorium-panel-bottom-left {
-  bottom: 20px;
-  left: 20px;
-}
-
-.vectorium-panel-bottom-right {
-  bottom: 20px;
-  right: 20px;
-}
-
-/* Panel Header */
 .vectorium-panel-header {
   background: var(--ui-bg-light);
-  border-bottom: 1px solid var(--ui-border);
-  padding: 6px 10px;
+  border-bottom: var(--ui-border-main);
+  padding: var(--ui-padding-md) var(--ui-padding-xl);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--ui-border-radius-md) var(--ui-border-radius-md) 0 0;
 }
 
 .panel-title {
   font-weight: bold;
   font-size: var(--ui-font-title);
-  letter-spacing: 0.5px;
+  letter-spacing: var(--ui-letter-spacing-md);
   color: var(--ui-accent-bright);
 }
 
 .panel-collapse-btn {
   background: none;
-  border: 1px solid var(--ui-accent);
+  border: var(--ui-border-accent);
   color: var(--ui-accent);
   font-size: var(--ui-font-micro);
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
+  width: var(--ui-collapse-btn-size);
+  height: var(--ui-collapse-btn-size);
+  border-radius: var(--ui-border-radius-md);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--ui-transition);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -107,280 +141,269 @@
   color: var(--ui-accent-bright);
 }
 
-/* Panel Content */
 .vectorium-panel-content {
-  padding: 8px;
+  padding: var(--ui-padding-lg);
   max-height: 70vh;
   overflow-y: auto;
 }
 
-.vectorium-panel-content::-webkit-scrollbar {
-  width: 8px;
+.vectorium-panel-content::-webkit-scrollbar { width: var(--ui-padding-lg); }
+.vectorium-panel-content::-webkit-scrollbar-track { background: var(--ui-bg-dark); border-radius: var(--ui-border-radius-lg); }
+.vectorium-panel-content::-webkit-scrollbar-thumb { background: var(--ui-accent); border-radius: var(--ui-border-radius-lg); }
+.vectorium-panel-content::-webkit-scrollbar-thumb:hover { background: var(--ui-accent-bright); }
+
+/* ============================================
+   SECTIONS & LAYOUT
+   ============================================ */
+
+.ui-section {
+  margin-bottom: var(--ui-margin-md);
+  padding-bottom: var(--ui-padding-md);
+  border-bottom: var(--ui-border-main);
 }
 
-.vectorium-panel-content::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
+.ui-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0; /* Keep 0 for last child reset */
 }
 
-.vectorium-panel-content::-webkit-scrollbar-thumb {
-  background: var(--ui-accent);
-  border-radius: 4px;
+.section-header {
+  background: var(--ui-bg-light);
+  padding: var(--ui-padding-sm) var(--ui-padding-lg);
+  margin: 0 calc(-1 * var(--ui-padding-lg)) var(--ui-margin-sm) calc(-1 * var(--ui-padding-lg));
+  font-weight: bold;
+  font-size: var(--ui-font-tiny);
+  letter-spacing: var(--ui-letter-spacing-sm);
+  border-top: var(--ui-border-main);
+  border-bottom: var(--ui-border-main);
+  color: var(--ui-accent);
+  text-transform: uppercase;
 }
 
-.vectorium-panel-content::-webkit-scrollbar-thumb:hover {
-  background: var(--ui-accent-bright);
-}
-
-/* Form Controls - Shared Styles */
-.control-row,
-.config-row {
+.ui-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
-  padding: 4px 6px;
+  margin-bottom: var(--ui-margin-sm);
+  padding: var(--ui-padding-sm) var(--ui-padding-md);
   background: var(--ui-bg-light);
-  border-radius: 3px;
+  border-radius: var(--ui-border-radius-md);
 }
 
-.control-label,
-.config-label {
+.ui-label {
   font-size: var(--ui-font-small);
   color: var(--ui-highlight);
-  min-width: 80px;
-  margin-right: 8px;
+  min-width: var(--ui-label-min-width);
+  margin-right: var(--ui-margin-md);
 }
 
-.control-value,
-.config-value {
+.ui-value {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ui-gap-md);
   flex: 1;
   justify-content: flex-end;
 }
 
-/* Select Dropdowns */
-.vectorium-select,
-select {
+.ui-hint {
+  font-size: var(--ui-font-tiny);
+  font-weight: bold;
+  text-align: center;
+  padding: var(--ui-padding-sm);
+  margin-bottom: var(--ui-margin-sm);
   background: var(--ui-bg-light);
-  border: 1px solid var(--ui-border);
-  color: var(--ui-text);
-  padding: 3px 6px;
-  border-radius: 3px;
-  font-family: 'Courier New', monospace;
-  font-size: var(--ui-font-small);
-  cursor: pointer;
-  outline: none;
-  transition: all 0.15s;
-  min-width: 80px;
+  border-radius: var(--ui-border-radius-md);
+  text-transform: uppercase;
+  letter-spacing: var(--ui-letter-spacing-sm);
+  color: var(--ui-highlight);
 }
 
-.vectorium-select:hover,
-select:hover {
-  border-color: var(--ui-accent);
-}
+/* ============================================
+   FORM INPUTS
+   ============================================ */
 
-.vectorium-select:focus,
-select:focus {
-  border-color: var(--ui-accent-bright);
-}
-
-/* Text Input */
-.vectorium-input,
+select,
 input[type="number"],
 input[type="text"] {
   background: var(--ui-bg-light);
-  border: 1px solid var(--ui-border);
+  border: var(--ui-border-main);
   color: var(--ui-text);
-  padding: 3px 6px;
-  border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  padding: var(--ui-padding-xs) var(--ui-padding-md);
+  border-radius: var(--ui-border-radius-md);
+  font-family: var(--ui-font-family);
   font-size: var(--ui-font-small);
   outline: none;
-  transition: all 0.15s;
-  width: 60px;
+  transition: var(--ui-transition);
+}
+
+select { 
+  cursor: pointer;
+  min-width: var(--ui-label-min-width);
+}
+
+input[type="number"],
+input[type="text"] {
+  width: var(--ui-input-width);
   text-align: right;
 }
 
-.vectorium-input:focus,
-input[type="number"]:focus,
-input[type="text"]:focus {
-  border-color: var(--ui-accent-bright);
+select:hover,
+input[type="number"]:hover,
+input[type="text"]:hover { 
+  border-color: var(--ui-accent); 
 }
 
-/* Range Slider */
-.vectorium-slider,
+select:focus,
+input[type="number"]:focus,
+input[type="text"]:focus { 
+  border-color: var(--ui-accent-bright); 
+}
+
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  background: var(--ui-border);
-  height: 4px;
-  border-radius: 2px;
+  background: var(--ui-border-color);
+  height: var(--ui-slider-height);
+  border-radius: var(--ui-border-radius-sm);
   outline: none;
   flex: 1;
   max-width: 100px;
 }
 
-.vectorium-slider::-webkit-slider-thumb,
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: var(--ui-slider-thumb-size);
+  height: var(--ui-slider-thumb-size);
   background: var(--ui-accent);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--ui-transition);
 }
 
-.vectorium-slider::-webkit-slider-thumb:hover,
 input[type="range"]::-webkit-slider-thumb:hover {
   background: var(--ui-accent-bright);
   transform: scale(1.1);
 }
 
-/* Checkbox */
-.vectorium-checkbox,
 input[type="checkbox"] {
   appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: 3px;
+  width: var(--ui-checkbox-size);
+  height: var(--ui-checkbox-size);
+  border: var(--ui-border-main);
+  border-radius: var(--ui-border-radius-md);
   background: var(--ui-bg-light);
   cursor: pointer;
   position: relative;
-  transition: all 0.15s;
+  transition: var(--ui-transition);
 }
 
-.vectorium-checkbox:checked,
 input[type="checkbox"]:checked {
   background: var(--ui-accent);
   border-color: var(--ui-accent);
 }
 
-.vectorium-checkbox:checked::after,
 input[type="checkbox"]:checked::after {
   content: '✓';
   position: absolute;
   top: -3px;
   left: 1px;
-  font-size: 12px;
+  font-size: var(--ui-slider-thumb-size);
   color: var(--ui-bg);
   font-weight: bold;
 }
 
-/* Buttons */
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-gap-xs);
+}
+
+.checkbox-group span {
+  font-size: var(--ui-font-tiny);
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
 .vectorium-btn {
   background: var(--ui-accent);
   border: none;
   color: var(--ui-bg);
-  padding: 5px 10px;
-  border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  padding: 5px var(--ui-padding-xl);
+  border-radius: var(--ui-border-radius-md);
+  font-family: var(--ui-font-family);
   font-size: var(--ui-font-small);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--ui-transition);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: var(--ui-letter-spacing-sm);
   font-weight: bold;
 }
 
-.vectorium-btn:hover {
+.vectorium-btn:hover,
+.vectorium-btn.active {
   background: var(--ui-accent-bright);
 }
 
-.vectorium-btn:active {
-  transform: translateY(0);
-  opacity: 0.8;
-}
-
-/* Spawn Button (EntitySpawner) */
-.spawn-btn {
-  width: 100%;
-  padding: 6px;
-  margin-bottom: 4px;
-  font-size: var(--ui-font-small);
-}
-
-.spawn-btn-active {
-  background: var(--ui-accent-bright);
-}
-
-.spawn-mode-hint {
-  font-size: var(--ui-font-tiny);
-  font-weight: bold;
-  text-align: center;
-  padding: 4px;
-  margin-bottom: 6px;
-  background: var(--ui-bg-light);
-  border-radius: 3px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  color: var(--ui-highlight);
-}
-
-/* Clear Buttons Group */
-.clear-buttons {
-  display: flex;
-  gap: 4px;
-  margin-top: 6px;
-}
-
-.clear-buttons .vectorium-btn {
-  flex: 1;
+.vectorium-btn.small {
   padding: 5px;
   font-size: var(--ui-font-tiny);
 }
 
-/* Camera Controls (CameraControls) */
-.camera-btn {
-  padding: 5px 8px;
-  min-width: 40px;
-  font-size: var(--ui-font-tiny);
+.vectorium-btn.danger {
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-color);
 }
 
-.camera-section {
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--ui-border);
+.vectorium-btn.danger-solid {
+  background: var(--ui-danger-solid-bg);
+  color: var(--ui-danger-color);
 }
 
-.camera-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
+.vectorium-btn.special {
+  background: var(--ui-special-bg);
+  color: var(--ui-special-color);
 }
 
-.zoom-display {
-  font-size: var(--ui-font-base);
-  font-weight: 600;
-  color: var(--ui-accent-bright);
-  min-width: 50px;
-  text-align: center;
+.ui-section .vectorium-btn {
+  margin-bottom: var(--ui-gap-sm);
 }
 
-.camera-btn-group {
+.ui-section .vectorium-btn:last-child {
+  margin-bottom: 0; /* Keep 0 for last child reset */
+}
+
+.ui-btn-group {
   display: flex;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: var(--ui-gap-sm);
 }
 
-.camera-input {
-  width: 50px;
+.ui-btn-group .vectorium-btn {
+  flex: 1;
 }
 
-/* Performance Metrics (PerformanceMonitor) */
+.btn-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ui-gap-sm);
+  margin: var(--ui-margin-xs) 0;
+}
+
+/* ============================================
+   METRICS & DISPLAY VALUES
+   ============================================ */
+
 .metric-group {
-  padding: 3px 0;
+  padding: var(--ui-padding-xs) 0;
 }
 
 .metric-row {
   display: flex;
   justify-content: space-between;
-  padding: 2px 0;
-  line-height: 1.35;
+  padding: var(--ui-gap-xs) 0;
+  line-height: var(--ui-line-height);
 }
 
 .metric-label {
@@ -388,80 +411,96 @@ input[type="checkbox"]:checked::after {
   font-size: var(--ui-font-tiny);
 }
 
-.metric-value {
+.metric-value,
+.zoom-display {
   color: var(--ui-accent-bright);
   font-weight: 600;
   text-align: right;
   font-size: var(--ui-font-tiny);
-  min-width: 65px;
+  min-width: var(--ui-value-min-width);
   display: inline-block;
 }
 
-.metric-value.warning {
-  color: var(--ui-error);
+.zoom-display {
+  font-size: var(--ui-font-base);
+  min-width: var(--ui-zoom-display-width);
+  text-align: center;
 }
 
-.metric-value.critical {
-  color: var(--ui-error);
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.metric-value.good {
-  color: var(--ui-success);
-}
+.metric-value[data-state="warning"] { color: var(--ui-error); }
+.metric-value[data-state="critical"] { color: var(--ui-error); animation: pulse 1s ease-in-out infinite; }
+.metric-value[data-state="good"] { color: var(--ui-success); }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.75; }
 }
 
+.status-badge {
+  display: inline-block;
+  padding: var(--ui-border-width) var(--ui-padding-md);
+  border-radius: var(--ui-border-radius-sm);
+  font-size: var(--ui-font-micro);
+  font-weight: bold;
+  letter-spacing: var(--ui-letter-spacing-sm);
+  transition: var(--ui-transition);
+  color: var(--ui-bg);
+  border: none;
+}
+
+.status-badge[data-status="on"] { background: var(--ui-success); }
+.status-badge[data-status="off"] { background: var(--ui-error); }
+
+/* ============================================
+   CHARTS & VISUALIZATIONS
+   ============================================ */
+
 .sparkline-container {
-  padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.35);
-  border-top: 1px solid var(--ui-border);
-  border-bottom: 1px solid var(--ui-border);
-  margin-bottom: 8px;
+  padding: var(--ui-padding-lg) var(--ui-padding-xl);
+  background: var(--ui-bg-darker);
+  border-top: var(--ui-border-main);
+  border-bottom: var(--ui-border-main);
+  margin-bottom: var(--ui-margin-md);
 }
 
 .sparkline-canvas {
   width: 100%;
   height: 38px;
   display: block;
-  border-radius: 2px;
-  background: rgba(0, 0, 0, 0.6);
+  border-radius: var(--ui-border-radius-sm);
+  background: var(--ui-bg-darkest);
 }
 
 .sparkline-label {
   font-size: var(--ui-font-tiny);
   color: var(--ui-text-muted);
   text-align: center;
-  margin-top: 4px;
+  margin-top: var(--ui-margin-xs);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--ui-letter-spacing-md);
 }
 
-/* Profiler Chart (PerformanceMonitor) */
 .profiler-chart {
-  margin-top: 12px;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-  border: 1px solid var(--ui-border);
+  margin-top: var(--ui-margin-md);
+  padding: var(--ui-padding-xl);
+  background: var(--ui-bg-dark);
+  border-radius: var(--ui-border-radius-lg);
+  border: var(--ui-border-main);
 }
 
 .profiler-bars {
   display: flex;
   align-items: flex-end;
   height: 80px;
-  gap: 2px;
-  margin-bottom: 8px;
+  gap: var(--ui-gap-xs);
+  margin-bottom: var(--ui-margin-md);
 }
 
 .profiler-bar {
   flex: 1;
   background: linear-gradient(to top, var(--ui-accent), transparent);
-  border-radius: 2px 2px 0 0;
-  min-height: 2px;
+  border-radius: var(--ui-border-radius-sm) var(--ui-border-radius-sm) 0 0;
+  min-height: var(--ui-gap-xs);
   transition: height 0.2s ease;
 }
 
@@ -471,78 +510,22 @@ input[type="checkbox"]:checked::after {
   font-size: var(--ui-font-small);
   color: var(--ui-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: var(--ui-letter-spacing-md);
 }
 
-/* Section Dividers */
-.section-divider {
-  height: 1px;
-  background: linear-gradient(to right, transparent, #00ff88, transparent);
-  margin: 16px 0;
-  opacity: 0.3;
-}
+/* ============================================
+   UTILITIES
+   ============================================ */
 
-.config-section {
-  padding: 8px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
+.flex-1 { flex: 1; }
+.full-width { width: 100%; }
+.text-center { text-align: center; }
+.hidden { display: none; }
 
-.section-header {
-  background: var(--ui-bg-light);
-  padding: 4px 8px;
-  margin: 0 -8px 6px -8px;
-  font-weight: bold;
-  font-size: var(--ui-font-tiny);
-  letter-spacing: 0.3px;
-  border-top: 1px solid var(--ui-border);
-  border-bottom: 1px solid var(--ui-border);
-  color: var(--ui-accent);
-  text-transform: uppercase;
-}
+/* ============================================
+   RESPONSIVE
+   ============================================ */
 
-.slider-value {
-  min-width: 35px;
-  text-align: right;
-  font-weight: bold;
-  color: var(--ui-accent-bright);
-  font-size: var(--ui-font-small);
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 2px;
-  font-size: var(--ui-font-micro);
-  font-weight: bold;
-  letter-spacing: 0.3px;
-  transition: all 0.15s;
-}
-
-.status-on {
-  background: var(--ui-success);
-  color: var(--ui-bg);
-  border: none;
-}
-
-.status-off {
-  background: var(--ui-error);
-  color: var(--ui-bg);
-  border: none;
-}
-
-/* Info Text */
-.info-text {
-  font-size: var(--ui-font-tiny);
-  color: var(--ui-text-muted);
-  text-align: center;
-  margin-top: 6px;
-  padding: 4px;
-  background: var(--ui-bg-light);
-  border-radius: 3px;
-  font-style: italic;
-}
-
-/* Responsive Adjustments */
 @media (max-width: 768px) {
   .vectorium-panel {
     min-width: 180px;
@@ -550,17 +533,14 @@ input[type="checkbox"]:checked::after {
     font-size: var(--ui-font-small);
   }
   
-  .control-label,
-  .config-label {
+  .ui-label {
     min-width: 70px;
     font-size: var(--ui-font-tiny);
   }
   
-  .vectorium-select,
   select,
-  .vectorium-input,
   input {
     font-size: var(--ui-font-tiny);
-    padding: 3px 5px;
+    padding: var(--ui-padding-xs) 5px;
   }
 }

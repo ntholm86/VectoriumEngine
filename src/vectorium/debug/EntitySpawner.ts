@@ -97,11 +97,11 @@ export class EntitySpawner extends UIPanel {
    */
   protected createContent(): string {
     return `
-      <div class="spawn-mode-hint">CLICK CANVAS TO SPAWN</div>
+      <div class="ui-hint">CLICK CANVAS TO SPAWN</div>
       
-      <div class="control-row">
-        <label class="control-label">⚙️ Physics Mode:</label>
-        <select id="physicsMode" class="vectorium-select">
+      <div class="ui-row">
+        <label class="ui-label">⚙️ Physics Mode:</label>
+        <select id="physicsMode">
           <option value="none">🎾 None (Bouncing Only)</option>
           <option value="gravity">⬇️ Gravity (Falls Down)</option>
           <option value="collision">💥 Collision (Entities Collide)</option>
@@ -109,9 +109,9 @@ export class EntitySpawner extends UIPanel {
         </select>
       </div>
       
-      <div class="control-row">
-        <label class="control-label">🎨 Visual Type:</label>
-        <select id="visualType" class="vectorium-select">
+      <div class="ui-row">
+        <label class="ui-label">🎨 Visual Type:</label>
+        <select id="visualType">
           <option value="sprite">🖼️ Sprite (Default Texture)</option>
           <optgroup label="GPU-Accelerated Shapes">
             <option value="circle">⚪ Circle</option>
@@ -128,94 +128,92 @@ export class EntitySpawner extends UIPanel {
         </select>
       </div>
       
-      <div id="textConfigSection" style="display: none;">
-        <div class="control-row">
-          <label class="control-label">📋 Text Mode:</label>
-          <select id="textMode" class="vectorium-select">
+      <div id="textConfigSection" class="hidden">
+        <div class="ui-row">
+          <label class="ui-label">📋 Text Mode:</label>
+          <select id="textMode">
             <option value="static">Static (Labels, No Animation)</option>
             <option value="dynamic" selected>Dynamic (Animated, Moving)</option>
           </select>
         </div>
         
-        <div class="control-row">
-          <label class="control-label">Text Content:</label>
-          <input type="text" id="textContent" class="vectorium-input" value="Hello World" maxlength="50" style="flex: 1;">
+        <div class="ui-row">
+          <label class="ui-label">Text Content:</label>
+          <input type="text" id="textContent" value="Hello World" maxlength="50" class="flex-1">
         </div>
         
-        <div class="control-row">
-          <label class="control-label">🎨 Text Style:</label>
-          <div class="control-value">
-            <label style="display: flex; align-items: center; gap: 4px;">
-              <input type="checkbox" id="textBold" class="vectorium-checkbox">
-              <span style="font-size: 11px;">Bold</span>
+        <div class="ui-row">
+          <label class="ui-label">🎨 Text Style:</label>
+          <div class="ui-value">
+            <label class="checkbox-group">
+              <input type="checkbox" id="textBold">
+              <span>Bold</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 4px;">
-              <input type="checkbox" id="textItalic" class="vectorium-checkbox">
-              <span style="font-size: 11px;">Italic</span>
+            <label class="checkbox-group">
+              <input type="checkbox" id="textItalic">
+              <span>Italic</span>
             </label>
           </div>
         </div>
         
-        <div class="control-row">
-          <label class="control-label">Size:</label>
-          <div class="control-value">
-            <input type="range" id="textSize" min="12" max="72" value="24" class="vectorium-slider">
-            <span id="textSizeValue" style="font-size: 11px; min-width: 40px; text-align: right;">24px</span>
+        <div class="ui-row">
+          <label class="ui-label">Size:</label>
+          <div class="ui-value">
+            <input type="range" id="textSize" min="12" max="72" value="24">
+            <span id="textSizeValue" class="checkbox-group"><span>24px</span></span>
           </div>
         </div>
         
-        <div class="control-row">
-          <label class="control-label">📐 Alignment:</label>
-          <select id="textAlign" class="vectorium-select">
+        <div class="ui-row">
+          <label class="ui-label">📐 Alignment:</label>
+          <select id="textAlign">
             <option value="left">Left</option>
             <option value="center" selected>Center</option>
             <option value="right">Right</option>
           </select>
         </div>
         
-        <div class="control-row">
-          <label class="control-label">✨ Effects:</label>
-          <div class="control-value">
-            <label style="display: flex; align-items: center; gap: 4px;">
-              <input type="checkbox" id="textShadow" class="vectorium-checkbox">
-              <span style="font-size: 11px;">Shadow</span>
+        <div class="ui-row">
+          <label class="ui-label">✨ Effects:</label>
+          <div class="ui-value">
+            <label class="checkbox-group">
+              <input type="checkbox" id="textShadow">
+              <span>Shadow</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 4px;">
-              <input type="checkbox" id="textOutline" class="vectorium-checkbox">
-              <span style="font-size: 11px;">Outline</span>
+            <label class="checkbox-group">
+              <input type="checkbox" id="textOutline">
+              <span>Outline</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 4px;">
-              <input type="checkbox" id="textGlow" class="vectorium-checkbox">
-              <span style="font-size: 11px;">Glow</span>
+            <label class="checkbox-group">
+              <input type="checkbox" id="textGlow">
+              <span>Glow</span>
             </label>
           </div>
         </div>
       </div>
       
-      <div class="section-divider"></div>
-      
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
-        <button id="spawn10" class="spawn-btn vectorium-btn">10</button>
-        <button id="spawn50" class="spawn-btn vectorium-btn">50</button>
-        <button id="spawn100" class="spawn-btn vectorium-btn spawn-btn-active">100</button>
-        <button id="spawn500" class="spawn-btn vectorium-btn">500</button>
+      <div class="btn-grid-2col">
+        <button id="spawn10" class="vectorium-btn full-width">10</button>
+        <button id="spawn50" class="vectorium-btn full-width">50</button>
+        <button id="spawn100" class="vectorium-btn full-width active">100</button>
+        <button id="spawn500" class="vectorium-btn full-width">500</button>
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
-        <button id="spawn1K" class="spawn-btn vectorium-btn">1K</button>
-        <button id="spawn10K" class="spawn-btn vectorium-btn">10K</button>
-        <button id="spawn100K" class="spawn-btn vectorium-btn" style="background: rgba(255, 0, 255, 0.3); border-color: #ff00ff;">100K 🔥</button>
+      <div class="btn-grid-2col">
+        <button id="spawn1K" class="vectorium-btn full-width">1K</button>
+        <button id="spawn10K" class="vectorium-btn full-width">10K</button>
+        <button id="spawn100K" class="vectorium-btn full-width special">100K 🔥</button>
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px;">
-        <button id="spawn500K" class="spawn-btn vectorium-btn" style="background: rgba(255, 0, 0, 0.3); border-color: #ff0000; color: #ff0000;">500K 💥</button>
-        <button id="spawn1M" class="spawn-btn vectorium-btn" style="background: rgba(255, 0, 0, 0.3); border-color: #ff0000; color: #ff0000;">1M ☢️</button>
+      <div class="btn-grid-2col">
+        <button id="spawn500K" class="vectorium-btn full-width danger-solid">500K 💥</button>
+        <button id="spawn1M" class="vectorium-btn full-width danger-solid">1M ☢️</button>
       </div>
       
-      <div class="clear-buttons">
-        <button id="remove1K" class="vectorium-btn" style="background: rgba(255, 0, 0, 0.2); border-color: #ff0000; color: #ff0000;">-1K</button>
-        <button id="clearAll" class="vectorium-btn" style="background: rgba(255, 0, 0, 0.2); border-color: #ff0000; color: #ff0000;">Clear All</button>
+      <div class="ui-btn-group">
+        <button id="remove1K" class="vectorium-btn danger">-1K</button>
+        <button id="clearAll" class="vectorium-btn danger">Clear All</button>
       </div>
       
-      <div class="info-text">P: Profiler | C: Config | E: Spawner</div>
+      <div class="ui-hint">P: Profiler | C: Config | E: Spawner</div>
     `;
   }
 
@@ -310,19 +308,23 @@ export class EntitySpawner extends UIPanel {
     if (!this.container) return;
     
     // Remove active class from all buttons
-    const allButtons = this.container.querySelectorAll('.spawn-btn');
-    allButtons.forEach(btn => btn.classList.remove('spawn-btn-active'));
+    const allButtons = this.container.querySelectorAll('.vectorium-btn.full-width');
+    allButtons.forEach(btn => btn.classList.remove('active'));
     
     // Add active class to current button
     const activeBtn = this.container.querySelector(`#${this.activeButton}`);
-    activeBtn?.classList.add('spawn-btn-active');
+    activeBtn?.classList.add('active');
   }
   
   private updateTextConfigVisibility(): void {
     if (!this.container) return;
     const textConfigSection = this.container.querySelector('#textConfigSection') as HTMLDivElement;
     if (textConfigSection) {
-      textConfigSection.style.display = this.visualType === 'text' ? 'block' : 'none';
+      if (this.visualType === 'text') {
+        textConfigSection.classList.remove('hidden');
+      } else {
+        textConfigSection.classList.add('hidden');
+      }
     }
   }
 }

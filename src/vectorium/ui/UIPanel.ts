@@ -43,7 +43,8 @@ export abstract class UIPanel {
    */
   private createUI(): void {
     this.container = document.createElement('div');
-    this.container.className = `vectorium-panel vectorium-panel-${this.config.position} ${this.config.id}`;
+    this.container.className = `vectorium-panel ${this.config.id}`;
+    this.container.setAttribute('data-position', this.config.position);
     
     const collapseBtn = this.config.collapsible 
       ? '<button class="panel-collapse-btn">▼</button>' 
