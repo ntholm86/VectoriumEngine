@@ -5,50 +5,45 @@
  */
 
 import { RuntimeConfig } from '../core/RuntimeConfig';
+import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
 
-export class DebugPanel {
-  private config: RuntimeConfig;
-  private container: HTMLDivElement | null = null;
-  private collapsed = false;
-  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+export class DebugPanel extends UIPanel {
+  private runtimeConfig: RuntimeConfig;
 
   constructor(config: RuntimeConfig) {
-    this.config = config;
-    this.createUI();
-    this.setupKeyboardShortcut();
+    super({
+      id: 'debug-panel',
+      title: '⚙️ CONFIG',
+      keyboardShortcut: 'c',
+      position: 'top-left',
+      defaultVisible: false,
+      collapsible: true
+    });
+    this.runtimeConfig = config;
   }
 
-  private createUI(): void {
-    this.container = document.createElement('div');
-    this.container.className = 'vectorium-debug-panel';
-    this.container.innerHTML = `
-      <div class="debug-panel-header">
-        <span class="panel-title">⚙️ CONFIG</span>
-        <button class="panel-collapse-btn">▼</button>
-      </div>
-      <div class="debug-panel-content">
-        ${this.renderRenderingSection()}
-        ${this.renderPhysicsSection()}
-        ${this.renderQualitySection()}
-        ${this.renderAnimationSection()}
-        ${this.renderDebugSection()}
-        ${this.renderActionsSection()}
-      </div>
-      ${this.createStyles()}
+  /**
+   * Create panel content (required by UIPanel)
+   */
+  protected createContent(): string {
+    return `
+      ${this.renderRenderingSection()}
+      ${this.renderPhysicsSection()}
+      ${this.renderQualitySection()}
+      ${this.renderAnimationSection()}
+      ${this.renderDebugSection()}
+      ${this.renderActionsSection()}
     `;
-
-    document.body.appendChild(this.container);
-    this.attachEventListeners();
   }
 
   private renderRenderingSection(): string {
-    const r = this.config.rendering;
+    const r = this.runtimeConfig.rendering;
     return `
       <div class="config-section">
         <div class="section-header">🎨 RENDERING</div>
         <div class="config-row">
-          <label>Resolution</label>
-          <select id="cfg-resolution" class="config-select">
+          <label class="config-label">Resolution</label>
+          <select id="cfg-resolution" class="vectorium-select">
             <option value="800x600" ${r.resolution.width === 800 && r.resolution.height === 600 ? 'selected' : ''}>800×600 (4:3)</option>
             <option value="1024x768" ${r.resolution.width === 1024 && r.resolution.height === 768 ? 'selected' : ''}>1024×768 (4:3)</option>
             <option value="1280x720" ${r.resolution.width === 1280 && r.resolution.height === 720 ? 'selected' : ''}>1280×720 (16:9)</option>
@@ -58,8 +53,8 @@ export class DebugPanel {
           </select>
         </div>
         <div class="config-row">
-          <label>Batch Size</label>
-          <select id="cfg-batch-size" class="config-select">
+          <label class="config-label">Batch Size</label>
+          <select id="cfg-batch-size" class="vectorium-select">
             <option value="16000" ${r.batchSize === 16000 ? 'selected' : ''}>16K (more calls)</option>
             <option value="32000" ${r.batchSize === 32000 ? 'selected' : ''}>32K</option>
             <option value="48000" ${r.batchSize === 48000 ? 'selected' : ''}>48K</option>
@@ -67,104 +62,112 @@ export class DebugPanel {
           </select>
         </div>
         <div class="config-row">
-          <label>Frustum Culling</label>
-          <input type="checkbox" id="cfg-culling" ${r.enableFrustumCulling ? 'checked' : ''}>
-          <span id="culling-status" class="status-badge status-off">OFF</span>
+          <label class="config-label">Frustum Culling</label>
+          <div class="config-value">
+            <input type="checkbox" id="cfg-culling" class="vectorium-checkbox" ${r.enableFrustumCulling ? 'checked' : ''}>
+            <span id="culling-status" class="status-badge status-off">OFF</span>
+          </div>
         </div>
         <div class="config-row">
-          <label>Batch Rendering</label>
-          <input type="checkbox" id="cfg-batching" ${r.enableBatching ? 'checked' : ''}>
+          <label class="config-label">Batch Rendering</label>
+          <input type="checkbox" id="cfg-batching" class="vectorium-checkbox" ${r.enableBatching ? 'checked' : ''}>
         </div>
         <div class="config-row">
-          <label>VSync</label>
-          <input type="checkbox" id="cfg-vsync" ${r.vsync ? 'checked' : ''}>
+          <label class="config-label">VSync</label>
+          <input type="checkbox" id="cfg-vsync" class="vectorium-checkbox" ${r.vsync ? 'checked' : ''}>
         </div>
       </div>
     `;
   }
 
   private renderPhysicsSection(): string {
-    const p = this.config.physics;
+    const p = this.runtimeConfig.physics;
     return `
       <div class="config-section">
         <div class="section-header">⚙️ PHYSICS</div>
         <div class="config-row">
-          <label>World Multiplier</label>
-          <input type="range" id="cfg-bounds-mult" min="1" max="10" step="0.5" value="${p.boundsMultiplier}" class="config-slider">
-          <span class="slider-value">${p.boundsMultiplier}x</span>
+          <label class="config-label">World Multiplier</label>
+          <div class="config-value">
+            <input type="range" id="cfg-bounds-mult" min="1" max="10" step="0.5" value="${p.boundsMultiplier}" class="vectorium-slider">
+            <span class="slider-value">${p.boundsMultiplier}x</span>
+          </div>
         </div>
         <div class="config-row">
-          <label>Bounce</label>
-          <input type="checkbox" id="cfg-bounce" ${p.enableBounce ? 'checked' : ''}>
+          <label class="config-label">Bounce</label>
+          <input type="checkbox" id="cfg-bounce" class="vectorium-checkbox" ${p.enableBounce ? 'checked' : ''}>
         </div>
         <div class="config-row">
-          <label>Damping</label>
-          <input type="range" id="cfg-damping" min="0" max="1" step="0.01" value="${p.velocityDamping}" class="config-slider">
-          <span class="slider-value">${p.velocityDamping.toFixed(2)}</span>
+          <label class="config-label">Damping</label>
+          <div class="config-value">
+            <input type="range" id="cfg-damping" min="0" max="1" step="0.01" value="${p.velocityDamping}" class="vectorium-slider">
+            <span class="slider-value">${p.velocityDamping.toFixed(2)}</span>
+          </div>
         </div>
       </div>
     `;
   }
 
   private renderQualitySection(): string {
-    const q = this.config.quality;
+    const q = this.runtimeConfig.quality;
     return `
       <div class="config-section">
         <div class="section-header">📊 QUALITY</div>
         <div class="config-row">
-          <label>Adaptive Quality</label>
-          <input type="checkbox" id="cfg-adaptive" ${q.enableAdaptiveQuality ? 'checked' : ''}>
+          <label class="config-label">Adaptive Quality</label>
+          <input type="checkbox" id="cfg-adaptive" class="vectorium-checkbox" ${q.enableAdaptiveQuality ? 'checked' : ''}>
         </div>
         <div class="config-row">
-          <label>Target FPS</label>
-          <input type="number" id="cfg-target-fps" min="30" max="144" value="${q.targetFPS}" class="config-input">
+          <label class="config-label">Target FPS</label>
+          <input type="number" id="cfg-target-fps" min="30" max="144" value="${q.targetFPS}" class="vectorium-input">
         </div>
       </div>
     `;
   }
 
   private renderAnimationSection(): string {
-    const a = this.config.animation;
+    const a = this.runtimeConfig.animation;
     return `
       <div class="config-section">
         <div class="section-header">🎭 ANIMATION</div>
         <div class="config-row">
-          <label>Speed</label>
-          <input type="range" id="cfg-anim-speed" min="0" max="2" step="0.1" value="${a.animationSpeed}" class="config-slider">
-          <span class="slider-value">${a.animationSpeed.toFixed(1)}x</span>
+          <label class="config-label">Speed</label>
+          <div class="config-value">
+            <input type="range" id="cfg-anim-speed" min="0" max="2" step="0.1" value="${a.animationSpeed}" class="vectorium-slider">
+            <span class="slider-value">${a.animationSpeed.toFixed(1)}x</span>
+          </div>
         </div>
         <div class="config-row">
-          <label>Rotation</label>
-          <input type="checkbox" id="cfg-rotation" ${a.enableRotation ? 'checked' : ''}>
+          <label class="config-label">Rotation</label>
+          <input type="checkbox" id="cfg-rotation" class="vectorium-checkbox" ${a.enableRotation ? 'checked' : ''}>
         </div>
         <div class="config-row">
-          <label>Pulse</label>
-          <input type="checkbox" id="cfg-pulse" ${a.enablePulse ? 'checked' : ''}>
+          <label class="config-label">Pulse</label>
+          <input type="checkbox" id="cfg-pulse" class="vectorium-checkbox" ${a.enablePulse ? 'checked' : ''}>
         </div>
         <div class="config-row">
-          <label>Wobble</label>
-          <input type="checkbox" id="cfg-wobble" ${a.enableWobble ? 'checked' : ''}>
+          <label class="config-label">Wobble</label>
+          <input type="checkbox" id="cfg-wobble" class="vectorium-checkbox" ${a.enableWobble ? 'checked' : ''}>
         </div>
       </div>
     `;
   }
 
   private renderDebugSection(): string {
-    const d = this.config.debug;
+    const d = this.runtimeConfig.debug;
     return `
       <div class="config-section">
         <div class="section-header">🐛 DEBUG</div>
         <div class="config-row">
-          <label>Show Grid</label>
-          <input type="checkbox" id="cfg-show-grid" ${d.showGrid ? 'checked' : ''}>
+          <label class="config-label">Show Grid</label>
+          <input type="checkbox" id="cfg-show-grid" class="vectorium-checkbox" ${d.showGrid ? 'checked' : ''}>
         </div>
         <div class="config-row">
-          <label>Show Bounds</label>
-          <input type="checkbox" id="cfg-show-bounds" ${d.showBounds ? 'checked' : ''}>
+          <label class="config-label">Show Bounds</label>
+          <input type="checkbox" id="cfg-show-bounds" class="vectorium-checkbox" ${d.showBounds ? 'checked' : ''}>
         </div>
         <div class="config-row">
-          <label>Perf Warnings</label>
-          <input type="checkbox" id="cfg-warnings" ${d.logPerformanceWarnings ? 'checked' : ''}>
+          <label class="config-label">Perf Warnings</label>
+          <input type="checkbox" id="cfg-warnings" class="vectorium-checkbox" ${d.logPerformanceWarnings ? 'checked' : ''}>
         </div>
       </div>
     `;
@@ -174,101 +177,100 @@ export class DebugPanel {
     return `
       <div class="config-section">
         <div class="section-header">💾 ACTIONS</div>
-        <button id="cfg-fullscreen" class="action-btn fullscreen">🖥️ Fullscreen</button>
-        <button id="cfg-reset" class="action-btn danger">Reset Defaults</button>
-        <button id="cfg-export" class="action-btn">Export JSON</button>
+        <button id="cfg-fullscreen" class="vectorium-btn" style="margin-bottom: 6px;">🖥️ Fullscreen</button>
+        <button id="cfg-reset" class="vectorium-btn" style="background: rgba(255, 0, 0, 0.3); border-color: #ff0000; color: #ff0000; margin-bottom: 6px;">Reset Defaults</button>
+        <button id="cfg-export" class="vectorium-btn">Export JSON</button>
       </div>
     `;
   }
 
-  private attachEventListeners(): void {
+  /**
+   * Attach event listeners (required by UIPanel)
+   */
+  protected attachEventListeners(): void {
     if (!this.container) return;
-
-    // Collapse toggle
-    const collapseBtn = this.container.querySelector('.panel-collapse-btn');
-    collapseBtn?.addEventListener('click', () => this.toggleCollapse());
 
     // Rendering
     this.on('cfg-resolution', 'change', (e: Event) => {
       const value = (e.target as HTMLSelectElement).value;
       const [width, height] = value.split('x').map(Number);
-      this.config.setRendering({ resolution: { width, height } });
+      this.runtimeConfig.setRendering({ resolution: { width, height } });
     });
 
     this.on('cfg-batch-size', 'change', (e: Event) => {
       const value = parseInt((e.target as HTMLSelectElement).value, 10);
-      this.config.setRendering({ batchSize: value });
+      this.runtimeConfig.setRendering({ batchSize: value });
     });
 
     this.on('cfg-culling', 'change', (e: Event) => {
-      this.config.setRendering({ enableFrustumCulling: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setRendering({ enableFrustumCulling: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-batching', 'change', (e: Event) => {
-      this.config.setRendering({ enableBatching: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setRendering({ enableBatching: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-vsync', 'change', (e: Event) => {
-      this.config.setRendering({ vsync: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setRendering({ vsync: (e.target as HTMLInputElement).checked });
     });
 
     // Physics
     this.on('cfg-bounds-mult', 'input', (e: Event) => {
       const value = parseFloat((e.target as HTMLInputElement).value);
-      this.config.setPhysics({ boundsMultiplier: value });
+      this.runtimeConfig.setPhysics({ boundsMultiplier: value });
       this.updateSliderValue(e.target as HTMLInputElement, `${value}x`);
     });
 
     this.on('cfg-bounce', 'change', (e: Event) => {
-      this.config.setPhysics({ enableBounce: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setPhysics({ enableBounce: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-damping', 'input', (e: Event) => {
       const value = parseFloat((e.target as HTMLInputElement).value);
-      this.config.setPhysics({ velocityDamping: value });
+      this.runtimeConfig.setPhysics({ velocityDamping: value });
       this.updateSliderValue(e.target as HTMLInputElement, value.toFixed(2));
     });
 
     // Quality
     this.on('cfg-adaptive', 'change', (e: Event) => {
-      this.config.setQuality({ enableAdaptiveQuality: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setQuality({ enableAdaptiveQuality: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-target-fps', 'change', (e: Event) => {
       const value = parseInt((e.target as HTMLInputElement).value, 10);
-      this.config.setQuality({ targetFPS: value });
+      this.runtimeConfig.setQuality({ targetFPS: value });
     });
 
     // Animation
     this.on('cfg-anim-speed', 'input', (e: Event) => {
       const value = parseFloat((e.target as HTMLInputElement).value);
-      this.config.setAnimation({ animationSpeed: value });
+      this.runtimeConfig.setAnimation({ animationSpeed: value });
       this.updateSliderValue(e.target as HTMLInputElement, `${value.toFixed(1)}x`);
     });
 
     this.on('cfg-rotation', 'change', (e: Event) => {
-      this.config.setAnimation({ enableRotation: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setAnimation({ enableRotation: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-pulse', 'change', (e: Event) => {
-      this.config.setAnimation({ enablePulse: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setAnimation({ enablePulse: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-wobble', 'change', (e: Event) => {
-      this.config.setAnimation({ enableWobble: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setAnimation({ enableWobble: (e.target as HTMLInputElement).checked });
     });
 
     // Debug
     this.on('cfg-show-grid', 'change', (e: Event) => {
-      this.config.setDebug({ showGrid: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setDebug({ showGrid: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-show-bounds', 'change', (e: Event) => {
-      this.config.setDebug({ showBounds: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setDebug({ showBounds: (e.target as HTMLInputElement).checked });
     });
 
     this.on('cfg-warnings', 'change', (e: Event) => {
-      this.config.setDebug({ logPerformanceWarnings: (e.target as HTMLInputElement).checked });
+      this.runtimeConfig.setDebug({ logPerformanceWarnings: (e.target as HTMLInputElement).checked });
     });
 
     // Actions
@@ -281,21 +283,16 @@ export class DebugPanel {
 
     this.on('cfg-reset', 'click', () => {
       if (confirm('Reset all settings to defaults?')) {
-        this.config.reset();
+        this.runtimeConfig.reset();
         this.refresh();
       }
     });
 
     this.on('cfg-export', 'click', () => {
-      const json = this.config.export();
+      const json = this.runtimeConfig.export();
       navigator.clipboard.writeText(json);
       alert('Config copied to clipboard!');
     });
-  }
-
-  private on(id: string, event: string, handler: (e: Event) => void): void {
-    const el = this.container?.querySelector(`#${id}`);
-    el?.addEventListener(event, handler);
   }
 
   private updateSliderValue(slider: HTMLInputElement, text: string): void {
@@ -303,59 +300,11 @@ export class DebugPanel {
     if (valueSpan) valueSpan.textContent = text;
   }
 
-  private toggleCollapse(): void {
-    this.collapsed = !this.collapsed;
-    if (this.container) {
-      const content = this.container.querySelector('.debug-panel-content') as HTMLDivElement;
-      const btn = this.container.querySelector('.panel-collapse-btn') as HTMLButtonElement;
-      if (this.collapsed) {
-        content.style.display = 'none';
-        btn.textContent = '▶';
-      } else {
-        content.style.display = 'block';
-        btn.textContent = '▼';
-      }
-    }
-  }
-
   private refresh(): void {
     if (!this.container) return;
-    const content = this.container.querySelector('.debug-panel-content') as HTMLDivElement;
-    content.innerHTML = `
-      ${this.renderRenderingSection()}
-      ${this.renderPhysicsSection()}
-      ${this.renderQualitySection()}
-      ${this.renderAnimationSection()}
-      ${this.renderDebugSection()}
-      ${this.renderActionsSection()}
-    `;
+    const content = this.container.querySelector('.vectorium-panel-content') as HTMLDivElement;
+    content.innerHTML = this.createContent();
     this.attachEventListeners();
-  }
-
-  private setupKeyboardShortcut(): void {
-    this.keyHandler = (e: KeyboardEvent) => {
-      if ((e.key === 'c' || e.key === 'C') &&
-          !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
-        this.toggle();
-        e.preventDefault();
-      }
-    };
-    window.addEventListener('keydown', this.keyHandler);
-  }
-
-  toggle(): void {
-    if (this.container) {
-      this.container.classList.toggle('hidden');
-    }
-  }
-
-  destroy(): void {
-    if (this.keyHandler) {
-      window.removeEventListener('keydown', this.keyHandler);
-    }
-    if (this.container) {
-      this.container.remove();
-    }
   }
   
   /**
@@ -373,174 +322,5 @@ export class DebugPanel {
       );
     }
   }
-
-  private createStyles(): string {
-    return `
-      <style>
-        .vectorium-debug-panel {
-          position: fixed;
-          top: 10px;
-          left: 10px;
-          width: 320px;
-          max-height: 95vh;
-          overflow-y: auto;
-          background: rgba(0, 0, 0, 0.92);
-          border: 2px solid #00FF00;
-          border-radius: 6px;
-          font-family: 'Courier New', Consolas, monospace;
-          font-size: 11px;
-          color: #00FF00;
-          box-shadow: 0 4px 20px rgba(0, 255, 0, 0.3);
-          z-index: 9999;
-          transition: opacity 0.3s, transform 0.3s;
-        }
-        .vectorium-debug-panel.hidden {
-          opacity: 0;
-          transform: translateX(-360px);
-          pointer-events: none;
-        }
-        .debug-panel-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 10px 12px;
-          background: rgba(0, 255, 0, 0.05);
-          border-bottom: 1px solid rgba(0, 255, 0, 0.3);
-        }
-        .panel-title {
-          font-weight: bold;
-          font-size: 13px;
-          letter-spacing: 0.5px;
-        }
-        .panel-collapse-btn {
-          background: none;
-          border: none;
-          color: #00FF00;
-          cursor: pointer;
-          font-size: 14px;
-          padding: 0;
-        }
-        .debug-panel-content {
-          padding: 0;
-        }
-        .config-section {
-          padding: 8px 12px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .section-header {
-          background: rgba(0, 255, 0, 0.1);
-          padding: 6px 12px;
-          margin: 0 -12px 8px -12px;
-          font-weight: bold;
-          font-size: 10px;
-          letter-spacing: 0.5px;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          color: #4a9eff;
-        }
-        .config-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 3px 0;
-          line-height: 1.4;
-        }
-        .config-row label {
-          font-size: 11px;
-          color: #00FF00;
-        }
-        .config-select, .config-input {
-          background: #000;
-          color: #00FF00;
-          border: 1px solid #00FF00;
-          border-radius: 3px;
-          padding: 4px 6px;
-          font-family: inherit;
-          font-size: 10px;
-          width: 140px;
-        }
-        .config-slider {
-          width: 100px;
-          margin-right: 6px;
-        }
-        .slider-value {
-          min-width: 40px;
-          text-align: right;
-          font-weight: bold;
-          color: #FFFF00;
-        }
-        input[type="checkbox"] {
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
-        }
-        .hint {
-          font-size: 9px;
-          color: #888;
-          font-style: italic;
-          margin-left: 6px;
-        }
-        .status-badge {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 3px;
-          font-size: 9px;
-          font-weight: bold;
-          letter-spacing: 0.5px;
-        }
-        .status-on {
-          background: rgba(0, 255, 0, 0.2);
-          color: #00FF00;
-          border: 1px solid #00FF00;
-        }
-        .status-off {
-          background: rgba(255, 0, 0, 0.1);
-          color: #FF6666;
-          border: 1px solid #FF6666;
-        }
-        .action-btn {
-          width: 100%;
-          padding: 8px;
-          margin-bottom: 6px;
-          background: #00FF00;
-          color: #000;
-          border: none;
-          border-radius: 4px;
-          font-weight: bold;
-          cursor: pointer;
-          font-family: inherit;
-          font-size: 11px;
-        }
-        .action-btn:hover {
-          background: #00FF88;
-        }
-        .action-btn.danger {
-          background: #FF4444;
-          color: #FFF;
-        }
-        .action-btn.danger:hover {
-          background: #FF5555;
-        }
-        .action-btn.fullscreen {
-          background: #00AA00;
-        }
-        .action-btn.fullscreen:hover {
-          background: #00CC00;
-        }
-        .vectorium-debug-panel::-webkit-scrollbar {
-          width: 8px;
-        }
-        .vectorium-debug-panel::-webkit-scrollbar-track {
-          background: rgba(0, 0, 0, 0.3);
-        }
-        .vectorium-debug-panel::-webkit-scrollbar-thumb {
-          background: rgba(0, 255, 0, 0.3);
-          border-radius: 4px;
-        }
-        .vectorium-debug-panel::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 255, 0, 0.5);
-        }
-      </style>
-    `;
-  }
 }
+

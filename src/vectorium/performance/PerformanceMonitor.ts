@@ -3,6 +3,8 @@
  * Adaptive quality system with 5 levels and performance tracking
  */
 
+import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
+
 export type QualityLevel = 'ultra' | 'high' | 'medium' | 'low' | 'potato';
 
 export interface QualitySettings {
@@ -116,7 +118,7 @@ const QUALITY_PRESETS: Record<QualityLevel, QualitySettings> = {
   }
 };
 
-export class PerformanceMonitor {
+export class PerformanceMonitor extends UIPanel {
   private frameTimes: number[] = [];
   private readonly maxSamples = 60;
   private lastFrameTime = 0;
@@ -142,12 +144,7 @@ export class PerformanceMonitor {
   private maxBatchSize = 65000; // Track max for efficiency calculation
 
   // Profiler UI
-  private profilerVisible = false;
-  private profilerContainer: HTMLDivElement | null = null;
   private updateTimer: number | null = null;
-  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
-  // private sparklineCanvas: HTMLCanvasElement | null = null; // Unused but kept for future
-  // private _sparklineCtx: CanvasRenderingContext2D | null = null; // Unused but kept for future
   private frameTimeRingBuffer: number[] = []; // Last 60 frames for sparkline
   private readonly SPARKLINE_SIZE = 60;
 
@@ -155,9 +152,21 @@ export class PerformanceMonitor {
 
 
   constructor(targetFPS: number = 60, initialQuality: QualityLevel = 'high') {
+    const panelConfig: UIPanelConfig = {
+      id: 'performance-monitor',
+      title: '⚡ VECTORIUM PROFILER',
+      keyboardShortcut: 'p',
+      position: 'bottom-right',
+      defaultVisible: false,
+      collapsible: true
+    };
+    super(panelConfig);
+    
     this.targetFPS = targetFPS;
     this.currentQuality = initialQuality;
-    this.initProfiler();
+    
+    this.initSparkline();
+    this.startProfilerUpdates();
   }
 
   beginFrame(): void {
@@ -471,24 +480,8 @@ export class PerformanceMonitor {
   // PROFILER UI
   // ============================================================================
 
-  private initProfiler(): void {
-    this.profilerContainer = this.createProfilerUI();
-    document.body.appendChild(this.profilerContainer);
-    this.initSparkline();
-    this.loadVisibilityState();
-    this.setupKeyboardShortcut();
-    this.startProfilerUpdates();
-  }
-
-  private createProfilerUI(): HTMLDivElement {
-    const container = document.createElement('div');
-    container.id = 'vectorium-profiler';
-    container.className = 'vectorium-profiler hidden';
-    container.innerHTML = `
-      <div class="profiler-header">
-        <span class="profiler-title">⚡ VECTORIUM PROFILER</span>
-        <span class="profiler-hint">Press P to hide</span>
-      </div>
+  protected createContent(): string {
+    return `
       <div class="profiler-content">
         <div class="section-header frame-section">🎯 FRAME METRICS</div>
         <div class="metric-group">
@@ -688,7 +681,13 @@ export class PerformanceMonitor {
         </div>
       </div>
     `;
+  }
 
+  protected attachEventListeners(): void {
+    // PerformanceMonitor doesn't need event listeners - it's display only
+  }
+
+  private createProfilerStyles(): void {
     const style = document.createElement('style');
     style.textContent = `
       .vectorium-profiler {
@@ -867,7 +866,7 @@ export class PerformanceMonitor {
 
   private initSparkline(): void {
     // Sparkline canvas and context initialization kept for future use
-    // this.sparklineCanvas = this.profilerContainer?.querySelector('.sparkline-canvas') as HTMLCanvasElement;
+    // this.sparklineCanvas = this.container?.querySelector('.sparkline-canvas') as HTMLCanvasElement;
     // if (this.sparklineCanvas) {
     //   this._sparklineCtx = this.sparklineCanvas.getContext('2d');
     // }
@@ -935,11 +934,11 @@ export class PerformanceMonitor {
   }
 
   private updateProfilerUI(): void {
-    if (!this.profilerContainer) return;
+    if (!this.container) return;
 
     const metrics = this.getMetrics();
     const set = (selector: string, value: string, colorClass?: string) => {
-      const el = this.profilerContainer!.querySelector(`[data-metric="${selector}"]`) as HTMLElement;
+      const el = this.container!.querySelector(`[data-metric="${selector}"]`) as HTMLElement;
       if (el) {
         el.textContent = value;
         if (colorClass) {
@@ -1022,80 +1021,10 @@ export class PerformanceMonitor {
     set('bottleneck', metrics.bottleneck.toUpperCase());
   }
 
-  private setupKeyboardShortcut(): void {
-    this.keyHandler = (e: KeyboardEvent) => {
-      if ((e.key === 'p' || e.key === 'P') &&
-          !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
-        this.toggleProfiler();
-        e.preventDefault();
-      }
-    };
-    window.addEventListener('keydown', this.keyHandler);
-  }
-
-  toggleProfiler(): void {
-    this.profilerVisible = !this.profilerVisible;
-    if (this.profilerContainer) {
-      if (this.profilerVisible) {
-        this.profilerContainer.classList.remove('hidden');
-      } else {
-        this.profilerContainer.classList.add('hidden');
-      }
-    }
-    this.saveVisibilityState();
-  }
-
-  showProfiler(): void {
-    this.profilerVisible = true;
-    if (this.profilerContainer) {
-      this.profilerContainer.classList.remove('hidden');
-    }
-    this.saveVisibilityState();
-  }
-
-  hideProfiler(): void {
-    this.profilerVisible = false;
-    if (this.profilerContainer) {
-      this.profilerContainer.classList.add('hidden');
-    }
-    this.saveVisibilityState();
-  }
-
-  private saveVisibilityState(): void {
-    try {
-      localStorage.setItem('vectorium-profiler-visible', String(this.profilerVisible));
-    } catch (e) {
-      // Silently fail if localStorage unavailable
-    }
-  }
-
-  private loadVisibilityState(): void {
-    try {
-      const saved = localStorage.getItem('vectorium-profiler-visible');
-      if (saved !== null) {
-        this.profilerVisible = saved === 'true';
-        if (this.profilerContainer) {
-          if (this.profilerVisible) {
-            this.profilerContainer.classList.remove('hidden');
-          } else {
-            this.profilerContainer.classList.add('hidden');
-          }
-        }
-      }
-    } catch (e) {
-      // Silently fail
-    }
-  }
-
   destroy(): void {
     if (this.updateTimer !== null) {
       clearInterval(this.updateTimer);
     }
-    if (this.keyHandler) {
-      window.removeEventListener('keydown', this.keyHandler);
-    }
-    if (this.profilerContainer) {
-      this.profilerContainer.remove();
-    }
+    super.destroy(); // Call parent cleanup
   }
 }

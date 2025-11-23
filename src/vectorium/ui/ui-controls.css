@@ -1,0 +1,503 @@
+/* ========================================
+   VECTORIUM UI CONTROLS - Consolidated Stylesheet
+   Shared styles for all UI panels (debug tools, profilers, spawners)
+   ======================================== */
+
+/* Base Panel Styles */
+.vectorium-panel {
+  position: fixed;
+  background: rgba(10, 10, 20, 0.95);
+  color: #00ff88;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  border: 1px solid #00ff88;
+  border-radius: 4px;
+  padding: 0;
+  z-index: 10000;
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+  min-width: 200px;
+  max-width: 320px;
+  backdrop-filter: blur(5px);
+  transition: opacity 0.2s ease;
+}
+
+.vectorium-panel.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Panel Positioning */
+.vectorium-panel-top-left {
+  top: 20px;
+  left: 20px;
+}
+
+.vectorium-panel-top-right {
+  top: 20px;
+  right: 20px;
+}
+
+.vectorium-panel-bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.vectorium-panel-bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+
+/* Panel Header */
+.vectorium-panel-header {
+  background: rgba(0, 255, 136, 0.1);
+  border-bottom: 1px solid rgba(0, 255, 136, 0.3);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 3px 3px 0 0;
+}
+
+.panel-title {
+  font-weight: bold;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.panel-collapse-btn {
+  background: none;
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  font-size: 8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel-collapse-btn:hover {
+  background: rgba(0, 255, 136, 0.2);
+}
+
+/* Panel Content */
+.vectorium-panel-content {
+  padding: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.vectorium-panel-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.vectorium-panel-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.vectorium-panel-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 136, 0.5);
+  border-radius: 4px;
+}
+
+.vectorium-panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 136, 0.7);
+}
+
+/* Form Controls - Shared Styles */
+.control-row,
+.config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  background: rgba(0, 255, 136, 0.05);
+  border-radius: 3px;
+}
+
+.control-label,
+.config-label {
+  font-size: 10px;
+  color: #00ffaa;
+  min-width: 80px;
+  margin-right: 8px;
+}
+
+.control-value,
+.config-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+/* Select Dropdowns */
+.vectorium-select,
+select {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s;
+  min-width: 80px;
+}
+
+.vectorium-select:hover,
+select:hover {
+  background: rgba(0, 255, 136, 0.15);
+}
+
+.vectorium-select:focus,
+select:focus {
+  border-color: #00ffff;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+/* Text Input */
+.vectorium-input,
+input[type="number"],
+input[type="text"] {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  outline: none;
+  transition: all 0.15s;
+  width: 60px;
+  text-align: right;
+}
+
+.vectorium-input:focus,
+input[type="number"]:focus,
+input[type="text"]:focus {
+  border-color: #00ffff;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+/* Range Slider */
+.vectorium-slider,
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(0, 255, 136, 0.2);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  flex: 1;
+  max-width: 100px;
+}
+
+.vectorium-slider::-webkit-slider-thumb,
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #00ff88;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vectorium-slider::-webkit-slider-thumb:hover,
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #00ffff;
+  transform: scale(1.1);
+}
+
+/* Checkbox */
+.vectorium-checkbox,
+input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #00ff88;
+  border-radius: 3px;
+  background: rgba(0, 255, 136, 0.1);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+}
+
+.vectorium-checkbox:checked,
+input[type="checkbox"]:checked {
+  background: rgba(0, 255, 136, 0.3);
+}
+
+.vectorium-checkbox:checked::after,
+input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: -3px;
+  left: 1px;
+  font-size: 12px;
+  color: #00ff88;
+  font-weight: bold;
+}
+
+/* Buttons */
+.vectorium-btn {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: bold;
+}
+
+.vectorium-btn:hover {
+  background: rgba(0, 255, 136, 0.2);
+}
+
+.vectorium-btn:active {
+  transform: translateY(0);
+}
+
+/* Spawn Button (EntitySpawner) */
+.spawn-btn {
+  width: 100%;
+  padding: 6px;
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+
+.spawn-btn-active {
+  border-width: 2px;
+  background: rgba(0, 255, 136, 0.2);
+}
+
+.spawn-mode-hint {
+  font-size: 9px;
+  font-weight: bold;
+  text-align: center;
+  padding: 4px;
+  margin-bottom: 6px;
+  background: rgba(0, 255, 136, 0.08);
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Clear Buttons Group */
+.clear-buttons {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.clear-buttons .vectorium-btn {
+  flex: 1;
+  padding: 5px;
+  font-size: 9px;
+}
+
+/* Camera Controls (CameraControls) */
+.camera-btn {
+  padding: 5px 8px;
+  min-width: 40px;
+  font-size: 9px;
+}
+
+.camera-section {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 255, 136, 0.15);
+}
+
+.camera-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.zoom-display {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffff00;
+  min-width: 50px;
+  text-align: center;
+}
+
+.camera-btn-group {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.camera-input {
+  width: 50px;
+}
+
+/* Performance Metrics (PerformanceMonitor) */
+/* NOTE: PerformanceMonitor retains its own inline styles due to complexity (1100+ lines) */
+/* Future refactor: Extract PerformanceMonitor styles when time permits */
+.sparkline-container {
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border-top: 1px solid rgba(0, 255, 136, 0.1);
+  border-bottom: 1px solid rgba(0, 255, 136, 0.1);
+  margin-bottom: 8px;
+}
+
+.sparkline-canvas {
+  width: 100%;
+  height: 38px;
+  display: block;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.sparkline-label {
+  font-size: 9px;
+  color: rgba(0, 255, 136, 0.6);
+  text-align: center;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Profiler Chart (PerformanceMonitor) */
+.profiler-chart {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.profiler-bars {
+  display: flex;
+  align-items: flex-end;
+  height: 80px;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.profiler-bar {
+  flex: 1;
+  background: linear-gradient(to top, #00ff88, rgba(0, 255, 136, 0.3));
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: height 0.2s ease;
+  box-shadow: 0 0 4px rgba(0, 255, 136, 0.3);
+}
+
+.profiler-legend {
+  display: flex;
+  justify-content: space-around;
+  font-size: 10px;
+  color: rgba(0, 255, 136, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Section Dividers */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #00ff88, transparent);
+  margin: 16px 0;
+  opacity: 0.3;
+}
+
+.config-section {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.section-header {
+  background: rgba(0, 255, 136, 0.08);
+  padding: 4px 8px;
+  margin: 0 -8px 6px -8px;
+  font-weight: bold;
+  font-size: 9px;
+  letter-spacing: 0.3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #4a9eff;
+  text-transform: uppercase;
+}
+
+.slider-value {
+  min-width: 35px;
+  text-align: right;
+  font-weight: bold;
+  color: #ffff00;
+  font-size: 10px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.3px;
+  transition: all 0.15s;
+}
+
+.status-on {
+  background: rgba(0, 255, 0, 0.2);
+  color: #00ff00;
+  border: 1px solid #00ff00;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+}
+
+.status-off {
+  background: rgba(255, 0, 0, 0.1);
+  color: #ff6666;
+  border: 1px solid #ff6666;
+}
+
+/* Info Text */
+.info-text {
+  font-size: 9px;
+  color: rgba(0, 255, 136, 0.6);
+  text-align: center;
+  margin-top: 6px;
+  padding: 4px;
+  background: rgba(0, 255, 136, 0.05);
+  border-radius: 3px;
+  font-style: italic;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .vectorium-panel {
+    min-width: 180px;
+    max-width: 280px;
+    font-size: 10px;
+  }
+  
+  .control-label,
+  .config-label {
+    min-width: 70px;
+    font-size: 9px;
+  }
+  
+  .vectorium-select,
+  select,
+  .vectorium-input,
+  input {
+    font-size: 9px;
+    padding: 3px 5px;
+  }
+}

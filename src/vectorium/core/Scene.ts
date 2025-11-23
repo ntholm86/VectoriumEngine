@@ -150,7 +150,7 @@ export class Scene {
   private renderTextBatch(textRenderer: TextRenderer): void {
     // Get text entities from DemoScene if available
     const textEntities = (this as any).getTextEntities?.();
-    console.log('🎨 renderTextBatch: textEntities =', textEntities, 'size =', textEntities?.size);
+    // console.log('🎨 renderTextBatch: textEntities =', textEntities, 'size =', textEntities?.size);
     if (!textEntities || textEntities.size === 0) return;
     
     const textIndices = this.world.getTextIndices();

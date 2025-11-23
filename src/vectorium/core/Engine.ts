@@ -16,6 +16,7 @@ import { Scene } from './Scene';
 import { DebugPanel } from '../debug/DebugPanel';
 import { EntitySpawner } from '../debug/EntitySpawner';
 import { CameraControls } from '../debug/CameraControls';
+import { UIStyleLoader } from '../ui/UIStyleLoader';
 
 // Re-export for convenience
 export { Viewport, Scene };
@@ -161,6 +162,9 @@ export class Vectorium {
   }
   
   private initializeDebugTools(): void {
+    // Inject consolidated UI styles once
+    UIStyleLoader.injectStyles();
+    
     // Initialize debug panel (Press C)
     this.debugPanel = new DebugPanel(this.runtimeConfig);
     
