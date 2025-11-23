@@ -1,20 +1,42 @@
 /* ========================================
    VECTORIUM UI CONTROLS - Consolidated Stylesheet
-   Shared styles for all UI panels (debug tools, profilers, spawners)
+   Warm, pleasant color palette with CSS variables
    ======================================== */
+
+:root {
+  /* Warm Color Palette */
+  --ui-bg: rgba(40, 35, 30, 0.95);
+  --ui-bg-light: rgba(50, 45, 40, 0.95);
+  --ui-text: #e8d4b0;
+  --ui-text-muted: #a89070;
+  --ui-accent: #d4a574;
+  --ui-accent-bright: #e8b889;
+  --ui-highlight: #c9a66b;
+  --ui-border: #5a4f42;
+  --ui-success: #98b88a;
+  --ui-error: #d88881;
+  --ui-shadow: rgba(0, 0, 0, 0.4);
+  
+  /* Font Sizes */
+  --ui-font-micro: 10px;
+  --ui-font-tiny: 11px;
+  --ui-font-small: 12px;
+  --ui-font-title: 13px;
+  --ui-font-base: 14px;
+}
 
 /* Base Panel Styles */
 .vectorium-panel {
   position: fixed;
-  background: rgba(10, 10, 20, 0.95);
-  color: #00ff88;
+  background: var(--ui-bg);
+  color: var(--ui-text);
   font-family: 'Courier New', monospace;
-  font-size: 11px;
-  border: 1px solid #00ff88;
+  font-size: var(--ui-font-base);
+  border: 1px solid var(--ui-border);
   border-radius: 4px;
   padding: 0;
   z-index: 10000;
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+  box-shadow: 0 2px 8px var(--ui-shadow);
   min-width: 200px;
   max-width: 320px;
   backdrop-filter: blur(5px);
@@ -49,8 +71,8 @@
 
 /* Panel Header */
 .vectorium-panel-header {
-  background: rgba(0, 255, 136, 0.1);
-  border-bottom: 1px solid rgba(0, 255, 136, 0.3);
+  background: var(--ui-bg-light);
+  border-bottom: 1px solid var(--ui-border);
   padding: 6px 10px;
   display: flex;
   align-items: center;
@@ -60,15 +82,16 @@
 
 .panel-title {
   font-weight: bold;
-  font-size: 11px;
+  font-size: var(--ui-font-title);
   letter-spacing: 0.5px;
+  color: var(--ui-accent-bright);
 }
 
 .panel-collapse-btn {
   background: none;
-  border: 1px solid #00ff88;
-  color: #00ff88;
-  font-size: 8px;
+  border: 1px solid var(--ui-accent);
+  color: var(--ui-accent);
+  font-size: var(--ui-font-micro);
   width: 16px;
   height: 16px;
   border-radius: 3px;
@@ -80,7 +103,8 @@
 }
 
 .panel-collapse-btn:hover {
-  background: rgba(0, 255, 136, 0.2);
+  background: var(--ui-bg-light);
+  color: var(--ui-accent-bright);
 }
 
 /* Panel Content */
@@ -100,12 +124,12 @@
 }
 
 .vectorium-panel-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 136, 0.5);
+  background: var(--ui-accent);
   border-radius: 4px;
 }
 
 .vectorium-panel-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 136, 0.7);
+  background: var(--ui-accent-bright);
 }
 
 /* Form Controls - Shared Styles */
@@ -116,14 +140,14 @@
   justify-content: space-between;
   margin-bottom: 6px;
   padding: 4px 6px;
-  background: rgba(0, 255, 136, 0.05);
+  background: var(--ui-bg-light);
   border-radius: 3px;
 }
 
 .control-label,
 .config-label {
-  font-size: 10px;
-  color: #00ffaa;
+  font-size: var(--ui-font-small);
+  color: var(--ui-highlight);
   min-width: 80px;
   margin-right: 8px;
 }
@@ -140,13 +164,13 @@
 /* Select Dropdowns */
 .vectorium-select,
 select {
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid #00ff88;
-  color: #00ff88;
+  background: var(--ui-bg-light);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
   padding: 3px 6px;
   border-radius: 3px;
   font-family: 'Courier New', monospace;
-  font-size: 10px;
+  font-size: var(--ui-font-small);
   cursor: pointer;
   outline: none;
   transition: all 0.15s;
@@ -155,26 +179,25 @@ select {
 
 .vectorium-select:hover,
 select:hover {
-  background: rgba(0, 255, 136, 0.15);
+  border-color: var(--ui-accent);
 }
 
 .vectorium-select:focus,
 select:focus {
-  border-color: #00ffff;
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  border-color: var(--ui-accent-bright);
 }
 
 /* Text Input */
 .vectorium-input,
 input[type="number"],
 input[type="text"] {
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid #00ff88;
-  color: #00ff88;
+  background: var(--ui-bg-light);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
   padding: 3px 6px;
   border-radius: 3px;
   font-family: 'Courier New', monospace;
-  font-size: 10px;
+  font-size: var(--ui-font-small);
   outline: none;
   transition: all 0.15s;
   width: 60px;
@@ -184,8 +207,7 @@ input[type="text"] {
 .vectorium-input:focus,
 input[type="number"]:focus,
 input[type="text"]:focus {
-  border-color: #00ffff;
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  border-color: var(--ui-accent-bright);
 }
 
 /* Range Slider */
@@ -193,7 +215,7 @@ input[type="text"]:focus {
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  background: rgba(0, 255, 136, 0.2);
+  background: var(--ui-border);
   height: 4px;
   border-radius: 2px;
   outline: none;
@@ -207,7 +229,7 @@ input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 12px;
   height: 12px;
-  background: #00ff88;
+  background: var(--ui-accent);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.15s;
@@ -215,7 +237,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .vectorium-slider::-webkit-slider-thumb:hover,
 input[type="range"]::-webkit-slider-thumb:hover {
-  background: #00ffff;
+  background: var(--ui-accent-bright);
   transform: scale(1.1);
 }
 
@@ -225,9 +247,9 @@ input[type="checkbox"] {
   appearance: none;
   width: 14px;
   height: 14px;
-  border: 1px solid #00ff88;
+  border: 1px solid var(--ui-border);
   border-radius: 3px;
-  background: rgba(0, 255, 136, 0.1);
+  background: var(--ui-bg-light);
   cursor: pointer;
   position: relative;
   transition: all 0.15s;
@@ -235,7 +257,8 @@ input[type="checkbox"] {
 
 .vectorium-checkbox:checked,
 input[type="checkbox"]:checked {
-  background: rgba(0, 255, 136, 0.3);
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
 }
 
 .vectorium-checkbox:checked::after,
@@ -245,19 +268,19 @@ input[type="checkbox"]:checked::after {
   top: -3px;
   left: 1px;
   font-size: 12px;
-  color: #00ff88;
+  color: var(--ui-bg);
   font-weight: bold;
 }
 
 /* Buttons */
 .vectorium-btn {
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid #00ff88;
-  color: #00ff88;
+  background: var(--ui-accent);
+  border: none;
+  color: var(--ui-bg);
   padding: 5px 10px;
   border-radius: 3px;
   font-family: 'Courier New', monospace;
-  font-size: 10px;
+  font-size: var(--ui-font-small);
   cursor: pointer;
   transition: all 0.15s;
   text-transform: uppercase;
@@ -266,11 +289,12 @@ input[type="checkbox"]:checked::after {
 }
 
 .vectorium-btn:hover {
-  background: rgba(0, 255, 136, 0.2);
+  background: var(--ui-accent-bright);
 }
 
 .vectorium-btn:active {
   transform: translateY(0);
+  opacity: 0.8;
 }
 
 /* Spawn Button (EntitySpawner) */
@@ -278,24 +302,24 @@ input[type="checkbox"]:checked::after {
   width: 100%;
   padding: 6px;
   margin-bottom: 4px;
-  font-size: 10px;
+  font-size: var(--ui-font-small);
 }
 
 .spawn-btn-active {
-  border-width: 2px;
-  background: rgba(0, 255, 136, 0.2);
+  background: var(--ui-accent-bright);
 }
 
 .spawn-mode-hint {
-  font-size: 9px;
+  font-size: var(--ui-font-tiny);
   font-weight: bold;
   text-align: center;
   padding: 4px;
   margin-bottom: 6px;
-  background: rgba(0, 255, 136, 0.08);
+  background: var(--ui-bg-light);
   border-radius: 3px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  color: var(--ui-highlight);
 }
 
 /* Clear Buttons Group */
@@ -308,20 +332,20 @@ input[type="checkbox"]:checked::after {
 .clear-buttons .vectorium-btn {
   flex: 1;
   padding: 5px;
-  font-size: 9px;
+  font-size: var(--ui-font-tiny);
 }
 
 /* Camera Controls (CameraControls) */
 .camera-btn {
   padding: 5px 8px;
   min-width: 40px;
-  font-size: 9px;
+  font-size: var(--ui-font-tiny);
 }
 
 .camera-section {
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(0, 255, 136, 0.15);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .camera-section:last-child {
@@ -330,9 +354,9 @@ input[type="checkbox"]:checked::after {
 }
 
 .zoom-display {
-  font-size: 12px;
+  font-size: var(--ui-font-base);
   font-weight: 600;
-  color: #ffff00;
+  color: var(--ui-accent-bright);
   min-width: 50px;
   text-align: center;
 }
@@ -348,13 +372,54 @@ input[type="checkbox"]:checked::after {
 }
 
 /* Performance Metrics (PerformanceMonitor) */
-/* NOTE: PerformanceMonitor retains its own inline styles due to complexity (1100+ lines) */
-/* Future refactor: Extract PerformanceMonitor styles when time permits */
+.metric-group {
+  padding: 3px 0;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  line-height: 1.35;
+}
+
+.metric-label {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-tiny);
+}
+
+.metric-value {
+  color: var(--ui-accent-bright);
+  font-weight: 600;
+  text-align: right;
+  font-size: var(--ui-font-tiny);
+  min-width: 65px;
+  display: inline-block;
+}
+
+.metric-value.warning {
+  color: var(--ui-error);
+}
+
+.metric-value.critical {
+  color: var(--ui-error);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.metric-value.good {
+  color: var(--ui-success);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
 .sparkline-container {
   padding: 8px 10px;
   background: rgba(0, 0, 0, 0.35);
-  border-top: 1px solid rgba(0, 255, 136, 0.1);
-  border-bottom: 1px solid rgba(0, 255, 136, 0.1);
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
   margin-bottom: 8px;
 }
 
@@ -367,8 +432,8 @@ input[type="checkbox"]:checked::after {
 }
 
 .sparkline-label {
-  font-size: 9px;
-  color: rgba(0, 255, 136, 0.6);
+  font-size: var(--ui-font-tiny);
+  color: var(--ui-text-muted);
   text-align: center;
   margin-top: 4px;
   text-transform: uppercase;
@@ -381,7 +446,7 @@ input[type="checkbox"]:checked::after {
   padding: 10px;
   background: rgba(0, 0, 0, 0.3);
   border-radius: 4px;
-  border: 1px solid rgba(0, 255, 136, 0.3);
+  border: 1px solid var(--ui-border);
 }
 
 .profiler-bars {
@@ -394,18 +459,17 @@ input[type="checkbox"]:checked::after {
 
 .profiler-bar {
   flex: 1;
-  background: linear-gradient(to top, #00ff88, rgba(0, 255, 136, 0.3));
+  background: linear-gradient(to top, var(--ui-accent), transparent);
   border-radius: 2px 2px 0 0;
   min-height: 2px;
   transition: height 0.2s ease;
-  box-shadow: 0 0 4px rgba(0, 255, 136, 0.3);
 }
 
 .profiler-legend {
   display: flex;
   justify-content: space-around;
-  font-size: 10px;
-  color: rgba(0, 255, 136, 0.7);
+  font-size: var(--ui-font-small);
+  color: var(--ui-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -424,15 +488,15 @@ input[type="checkbox"]:checked::after {
 }
 
 .section-header {
-  background: rgba(0, 255, 136, 0.08);
+  background: var(--ui-bg-light);
   padding: 4px 8px;
   margin: 0 -8px 6px -8px;
   font-weight: bold;
-  font-size: 9px;
+  font-size: var(--ui-font-tiny);
   letter-spacing: 0.3px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #4a9eff;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-accent);
   text-transform: uppercase;
 }
 
@@ -440,41 +504,40 @@ input[type="checkbox"]:checked::after {
   min-width: 35px;
   text-align: right;
   font-weight: bold;
-  color: #ffff00;
-  font-size: 10px;
+  color: var(--ui-accent-bright);
+  font-size: var(--ui-font-small);
 }
 
 .status-badge {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 2px;
-  font-size: 8px;
+  font-size: var(--ui-font-micro);
   font-weight: bold;
   letter-spacing: 0.3px;
   transition: all 0.15s;
 }
 
 .status-on {
-  background: rgba(0, 255, 0, 0.2);
-  color: #00ff00;
-  border: 1px solid #00ff00;
-  box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+  background: var(--ui-success);
+  color: var(--ui-bg);
+  border: none;
 }
 
 .status-off {
-  background: rgba(255, 0, 0, 0.1);
-  color: #ff6666;
-  border: 1px solid #ff6666;
+  background: var(--ui-error);
+  color: var(--ui-bg);
+  border: none;
 }
 
 /* Info Text */
 .info-text {
-  font-size: 9px;
-  color: rgba(0, 255, 136, 0.6);
+  font-size: var(--ui-font-tiny);
+  color: var(--ui-text-muted);
   text-align: center;
   margin-top: 6px;
   padding: 4px;
-  background: rgba(0, 255, 136, 0.05);
+  background: var(--ui-bg-light);
   border-radius: 3px;
   font-style: italic;
 }
@@ -484,20 +547,20 @@ input[type="checkbox"]:checked::after {
   .vectorium-panel {
     min-width: 180px;
     max-width: 280px;
-    font-size: 10px;
+    font-size: var(--ui-font-small);
   }
   
   .control-label,
   .config-label {
     min-width: 70px;
-    font-size: 9px;
+    font-size: var(--ui-font-tiny);
   }
   
   .vectorium-select,
   select,
   .vectorium-input,
   input {
-    font-size: 9px;
+    font-size: var(--ui-font-tiny);
     padding: 3px 5px;
   }
 }

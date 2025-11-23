@@ -48,15 +48,15 @@ export class CameraControls extends UIPanel {
       
       <div class="camera-section">
         <div class="section-header">🎯 POSITION</div>
-        <div class="control-row">
+        <div class="control-row" style="justify-content: center;">
           <button class="camera-btn vectorium-btn" data-action="pan-up">↑</button>
         </div>
-        <div class="control-row">
+        <div class="control-row" style="gap: 8px;">
           <button class="camera-btn vectorium-btn" data-action="pan-left">←</button>
           <button class="vectorium-btn" data-action="center" style="flex: 1;">Center</button>
           <button class="camera-btn vectorium-btn" data-action="pan-right">→</button>
         </div>
-        <div class="control-row">
+        <div class="control-row" style="justify-content: center;">
           <button class="camera-btn vectorium-btn" data-action="pan-down">↓</button>
         </div>
       </div>

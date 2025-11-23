@@ -483,7 +483,7 @@ export class PerformanceMonitor extends UIPanel {
   protected createContent(): string {
     return `
       <div class="profiler-content">
-        <div class="section-header frame-section">🎯 FRAME METRICS</div>
+        <div class="section-header">🎯 FRAME METRICS</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">FPS</span>
@@ -512,7 +512,7 @@ export class PerformanceMonitor extends UIPanel {
           <div class="sparkline-label">Frame Time History</div>
         </div>
 
-        <div class="section-header render-section">🎨 RENDER PIPELINE</div>
+        <div class="section-header">🎨 RENDER PIPELINE</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">Draw Calls</span>
@@ -548,7 +548,7 @@ export class PerformanceMonitor extends UIPanel {
           </div>
         </div>
 
-        <div class="section-header physics-section">⚛️ PHYSICS</div>
+        <div class="section-header">⚛️ PHYSICS</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">Total Time</span>
@@ -580,7 +580,7 @@ export class PerformanceMonitor extends UIPanel {
           </div>
         </div>
 
-        <div class="section-header ecs-section">⚙️ ECS METRICS</div>
+        <div class="section-header">⚙️ ECS METRICS</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">Active</span>
@@ -612,7 +612,7 @@ export class PerformanceMonitor extends UIPanel {
           </div>
         </div>
 
-        <div class="section-header update-section">⚙️ UPDATE/RENDER</div>
+        <div class="section-header">⚙️ UPDATE/RENDER</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">Update Total</span>
@@ -644,7 +644,7 @@ export class PerformanceMonitor extends UIPanel {
           </div>
         </div>
 
-        <div class="section-header memory-section">💾 MEMORY</div>
+        <div class="section-header">💾 MEMORY</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">JS Heap</span>
@@ -664,7 +664,7 @@ export class PerformanceMonitor extends UIPanel {
           </div>
         </div>
 
-        <div class="section-header perf-section">📊 PERFORMANCE</div>
+        <div class="section-header">📊 PERFORMANCE</div>
         <div class="metric-group">
           <div class="metric-row">
             <span class="metric-label">Quality</span>
@@ -687,183 +687,6 @@ export class PerformanceMonitor extends UIPanel {
     // PerformanceMonitor doesn't need event listeners - it's display only
   }
 
-  private createProfilerStyles(): void {
-    const style = document.createElement('style');
-    style.textContent = `
-      .vectorium-profiler {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        width: 305px;
-        max-height: 92vh;
-        overflow-y: auto;
-        background: linear-gradient(135deg, rgba(0, 0, 0, 0.96) 0%, rgba(5, 10, 5, 0.96) 100%);
-        color: #0f0;
-        border: 1px solid rgba(0, 255, 0, 0.3);
-        border-radius: 6px;
-        font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
-        font-size: 9px;
-        box-shadow: 
-          0 0 15px rgba(0, 255, 0, 0.1),
-          0 3px 12px rgba(0, 0, 0, 0.8),
-          inset 0 1px 0 rgba(0, 255, 0, 0.08);
-        backdrop-filter: blur(8px);
-        z-index: 10000;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .vectorium-profiler.hidden {
-        opacity: 0;
-        transform: translateX(320px) scale(0.97);
-        pointer-events: none;
-      }
-      .profiler-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 7px 10px;
-        background: linear-gradient(180deg, rgba(0, 255, 0, 0.08) 0%, rgba(0, 255, 0, 0.02) 100%);
-        border-bottom: 1px solid rgba(0, 255, 0, 0.15);
-      }
-      .profiler-title {
-        font-weight: 700;
-        font-size: 10px;
-        letter-spacing: 1.2px;
-        text-shadow: 0 0 10px rgba(0, 255, 0, 0.6);
-      }
-      .profiler-hint {
-        color: rgba(255, 255, 255, 0.25);
-        font-size: 8px;
-        font-weight: 400;
-      }
-      .profiler-content {
-        padding: 0;
-      }
-      .section-header {
-        padding: 0px 10px;
-        font-weight: 600;
-        font-size: 8px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        border-top: 1px solid rgba(0, 0, 0, 0.3);
-        margin-top: 1px;
-      }
-      .frame-section {
-        background: linear-gradient(90deg, rgba(0, 200, 255, 0.15) 0%, transparent 100%);
-        border-left: 3px solid rgba(0, 220, 255, 0.7);
-        color: #00ddff;
-        text-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
-      }
-      .render-section {
-        background: linear-gradient(90deg, rgba(255, 0, 200, 0.15) 0%, transparent 100%);
-        border-left: 3px solid rgba(255, 0, 220, 0.7);
-        color: #ff00dd;
-        text-shadow: 0 0 8px rgba(255, 0, 220, 0.5);
-      }
-      .physics-section {
-        background: linear-gradient(90deg, rgba(50, 255, 100, 0.15) 0%, transparent 100%);
-        border-left: 3px solid rgba(50, 255, 120, 0.7);
-        color: #33ff77;
-        text-shadow: 0 0 8px rgba(50, 255, 120, 0.5);
-      }
-      .ecs-section {
-        background: linear-gradient(90deg, rgba(255, 180, 0, 0.15) 0%, transparent 100%);
-        border-left: 3px solid rgba(255, 200, 0, 0.7);
-        color: #ffcc00;
-        text-shadow: 0 0 8px rgba(255, 200, 0, 0.5);
-      }
-      .update-section {
-        background: linear-gradient(90deg, rgba(120, 100, 255, 0.15) 0%, transparent 100%);
-        border-left: 3px solid rgba(140, 120, 255, 0.7);
-        color: #8877ff;
-        text-shadow: 0 0 8px rgba(140, 120, 255, 0.5);
-      }
-      .memory-section {
-        background: linear-gradient(90deg, rgba(255, 80, 80, 0.15) 0%, transparent 100%);
-        border-left: 3px solid rgba(255, 100, 100, 0.7);
-        color: #ff6666;
-        text-shadow: 0 0 8px rgba(255, 100, 100, 0.5);
-      }
-      .perf-section {
-        background: linear-gradient(90deg, rgba(100, 255, 100, 0.15) 0%, transparent 100%);
-        border-left: 3px solid rgba(120, 255, 120, 0.7);
-        color: #77ff77;
-        text-shadow: 0 0 8px rgba(120, 255, 120, 0.5);
-      }
-      .metric-group {
-        padding: 3px 10px 4px;
-      }
-      .metric-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 1.5px 0;
-        line-height: 1.35;
-        transition: background 0.15s;
-      }
-      .metric-row:hover {
-        background: rgba(0, 255, 0, 0.04);
-      }
-      .metric-label {
-        color: rgba(0, 255, 0, 0.65);
-        font-size: 8.5px;
-      }
-      .metric-value {
-        color: #ff0;
-        font-weight: 600;
-        text-align: right;
-        font-size: 9px;
-        text-shadow: 0 0 3px rgba(255, 255, 0, 0.25);
-        transition: all 0.2s;
-      }
-      .metric-value.warning {
-        color: #fa0;
-        text-shadow: 0 0 5px rgba(255, 160, 0, 0.4);
-      }
-      .metric-value.critical {
-        color: #f33;
-        text-shadow: 0 0 6px rgba(255, 50, 50, 0.5);
-        animation: pulse 1s ease-in-out infinite;
-      }
-      .metric-value.good {
-        color: #0f0;
-        text-shadow: 0 0 5px rgba(0, 255, 0, 0.35);
-      }
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.75; }
-      }
-      .vectorium-profiler::-webkit-scrollbar {
-        width: 5px;
-      }
-      .vectorium-profiler::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.4);
-        border-radius: 3px;
-      }
-      .vectorium-profiler::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, rgba(0, 255, 0, 0.35), rgba(0, 255, 0, 0.15));
-        border-radius: 3px;
-      }
-      .vectorium-profiler::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, rgba(0, 255, 0, 0.5), rgba(0, 255, 0, 0.25));
-      }
-      .sparkline-container {
-        padding: 5px 10px;
-        background: rgba(0, 0, 0, 0.35);
-        border-top: 1px solid rgba(0, 200, 255, 0.1);
-        border-bottom: 1px solid rgba(0, 200, 255, 0.1);
-      }
-      .sparkline-canvas {
-        width: 100%;
-        height: 28px;
-        display: block;
-        border-radius: 2px;
-        background: rgba(0, 0, 0, 0.6);
-      }
-    `;
-    container.appendChild(style);
-
-    return container;
-  }
-
   private initSparkline(): void {
     // Sparkline canvas and context initialization kept for future use
     // this.sparklineCanvas = this.container?.querySelector('.sparkline-canvas') as HTMLCanvasElement;
@@ -871,59 +694,6 @@ export class PerformanceMonitor extends UIPanel {
     //   this._sparklineCtx = this.sparklineCanvas.getContext('2d');
     // }
   }
-
-  /* Unused method - keeping for potential future use
-  private drawSparkline(): void {
-    if (!this.sparklineCanvas || !this.sparklineCtx || this.frameTimeRingBuffer.length < 2) return;
-
-    const ctx = this.sparklineCtx;
-    const width = this.sparklineCanvas.width;
-    const height = this.sparklineCanvas.height;
-    const targetFrameTime = 1000 / this.targetFPS;
-
-    // Clear
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(0, 0, width, height);
-
-    // Draw target line
-    const targetY = height - (targetFrameTime / 50) * height;
-    ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, targetY);
-    ctx.lineTo(width, targetY);
-    ctx.stroke();
-
-    // Draw frame times
-    const pointWidth = width / this.SPARKLINE_SIZE;
-    ctx.strokeStyle = '#FFFF00';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-
-    for (let i = 0; i < this.frameTimeRingBuffer.length; i++) {
-      const frameTime = this.frameTimeRingBuffer[i];
-      const x = i * pointWidth;
-      const y = height - Math.min((frameTime / 50) * height, height);
-      
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-
-      // Color code bad frames
-      if (frameTime > targetFrameTime * 2) {
-        ctx.fillStyle = '#FF0000';
-        ctx.fillRect(x - 1, y - 1, 3, 3);
-      } else if (frameTime > targetFrameTime * 1.5) {
-        ctx.fillStyle = '#FFA500';
-        ctx.fillRect(x - 1, y - 1, 2, 2);
-      }
-    }
-
-    ctx.stroke();
-  }
-  */
 
   private startProfilerUpdates(): void {
     this.updateTimer = window.setInterval(() => {
