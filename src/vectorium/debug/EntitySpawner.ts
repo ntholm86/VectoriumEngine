@@ -132,6 +132,14 @@ export class EntitySpawner {
           
           <div id="textConfigSection" class="text-config-section" style="display: none;">
             <div class="entity-type-section">
+              <label class="entity-type-label">📋 Text Mode:</label>
+              <select id="textMode" class="entity-type-select">
+                <option value="static">Static (Labels, No Animation)</option>
+                <option value="dynamic" selected>Dynamic (Animated, Moving)</option>
+              </select>
+            </div>
+            
+            <div class="entity-type-section">
               <label class="entity-type-label">Text Content:</label>
               <input type="text" id="textContent" class="text-input" value="Hello World" maxlength="50">
             </div>

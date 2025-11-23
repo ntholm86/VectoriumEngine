@@ -16,6 +16,23 @@ import { hslToRgb } from '../utils/ColorUtils';
 import { ShapeType } from '../shapes/ShapeType'; // 🎨 Import shape types
 import { TextPool } from '../core/TextPool'; // 🎨 Import text pool
 
+export interface TextStyle {
+  font?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  color?: string;
+  align?: 'left' | 'center' | 'right';
+  baseline?: 'top' | 'middle' | 'bottom' | 'alphabetic';
+  strokeColor?: string;
+  strokeWidth?: number;
+  shadow?: {
+    color: string;
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+  };
+}
+
 export interface EntityFactoryOptions {
   size?: number;
   sizeRange?: [number, number];
@@ -26,6 +43,9 @@ export interface EntityFactoryOptions {
   maxSpeed?: number;
   vx?: number;
   vy?: number;
+  // Text-specific options
+  textStyle?: TextStyle;
+  isStatic?: boolean;
 }
 
 /**
@@ -433,7 +453,7 @@ export function createShapeBurst(
 
 /**
  * Create a text entity (requires TextPool)
- * Text is rendered using glyph atlas with optional effects
+ * Text is rendered using WebGL texture with optional effects
  */
 export function createTextEntity(
   world: World,
@@ -441,14 +461,37 @@ export function createTextEntity(
   x: number,
   y: number,
   text: string,
-  options: EntityFactoryOptions = {}
+  options: EntityFactoryOptions = {},
+  textEntitiesMap?: Map<EntityId, { text: string; style: TextStyle }>
 ): EntityId {
   // Create base entity
   const id = createBouncingEntity(world, x, y, options);
   
+  // Hide sprite quad (text renders separately)
+  const sizes = world.getSizes();
+  sizes[id] = 0;
+  
+  // Set white color for text rendering
+  const colorR = world.getColorR();
+  const colorG = world.getColorG();
+  const colorB = world.getColorB();
+  colorR[id] = 255;
+  colorG[id] = 255;
+  colorB[id] = 255;
+  
   // Allocate text in pool
   const textIndex = textPool.allocate(text);
   world.setTextIndex(id, textIndex);
+  
+  // Mark as static if requested
+  if (options.isStatic) {
+    world.setTextStatic(id, true);
+  }
+  
+  // Store text style if provided
+  if (options.textStyle && textEntitiesMap) {
+    textEntitiesMap.set(id, { text, style: options.textStyle });
+  }
   
   return id;
 }
@@ -462,28 +505,35 @@ export function createLabelEntity(
   x: number,
   y: number,
   text: string,
-  options: EntityFactoryOptions = {}
+  options: EntityFactoryOptions = {},
+  textEntitiesMap?: Map<EntityId, { text: string; style: TextStyle }>
 ): EntityId {
   // Create entity with no velocity
   const id = world.createEntity(x, y, 0, 0);
   
-  // Set larger default size for labels
+  // Hide sprite quad
   const sizes = world.getSizes();
-  sizes[id] = options.size ?? 24;
+  sizes[id] = 0;
   
-  // Set color
-  if (options.color) {
-    const colorR = world.getColorR();
-    const colorG = world.getColorG();
-    const colorB = world.getColorB();
-    colorR[id] = Math.floor(options.color.r * 255);
-    colorG[id] = Math.floor(options.color.g * 255);
-    colorB[id] = Math.floor(options.color.b * 255);
-  }
+  // Set white color for text rendering
+  const colorR = world.getColorR();
+  const colorG = world.getColorG();
+  const colorB = world.getColorB();
+  colorR[id] = 255;
+  colorG[id] = 255;
+  colorB[id] = 255;
   
   // Allocate text
   const textIndex = textPool.allocate(text);
   world.setTextIndex(id, textIndex);
+  
+  // Mark as static
+  world.setTextStatic(id, true);
+  
+  // Store text style if provided
+  if (options.textStyle && textEntitiesMap) {
+    textEntitiesMap.set(id, { text, style: options.textStyle });
+  }
   
   return id;
 }
@@ -526,6 +576,62 @@ export function updateCounterEntity(
  */
 export type EntityFactory = (world: World, x: number, y: number, options?: EntityFactoryOptions) => EntityId;
 export type EntityBurstFactory = (world: World, x: number, y: number, count: number, options?: EntityFactoryOptions) => EntityId[];
+
+/**
+ * Build TextStyle from text configuration (used by EntitySpawner)
+ */
+export function buildTextStyle(
+  config: {
+    bold?: boolean;
+    italic?: boolean;
+    size?: number;
+    align?: 'left' | 'center' | 'right';
+    shadow?: boolean;
+    outline?: boolean;
+    glow?: boolean;
+  },
+  color: string = '#FFFFFF'
+): TextStyle {
+  // Build font string
+  let font = '';
+  if (config.bold) font += 'bold ';
+  if (config.italic) font += 'italic ';
+  font += `${config.size || 24}px Arial`;
+  
+  const style: TextStyle = {
+    font,
+    fontSize: config.size || 24,
+    fontFamily: 'Arial',
+    color: color,
+    align: config.align || 'center'
+  };
+  
+  // Add effects
+  if (config.outline) {
+    style.strokeColor = '#00FFFF';
+    style.strokeWidth = 4;
+  }
+  
+  if (config.shadow) {
+    style.shadow = {
+      color: 'rgba(255, 0, 0, 1.0)',
+      blur: 6,
+      offsetX: 4,
+      offsetY: 4
+    };
+  }
+  
+  if (config.glow) {
+    style.shadow = {
+      color: 'rgba(255, 255, 0, 1.0)',
+      blur: 20,
+      offsetX: 0,
+      offsetY: 0
+    };
+  }
+  
+  return style;
+}
 
 /**
  * Registry of available entity types

@@ -381,6 +381,7 @@ export class World {
   getPositionX(): Float32Array { return this.positionX; }
   getPositionY(): Float32Array { return this.positionY; }
   getRotation(): Uint16Array { return this.rotation; }
+  getScale(): Float32Array { return this.scale; }
   getSizes(): Float32Array { return this.size; }
   getColorR(): Uint8Array { return this.colorR; }
   getColorG(): Uint8Array { return this.colorG; }

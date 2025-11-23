@@ -1,5 +1,4 @@
 import { Vectorium, Scene } from './vectorium/core/Engine';
-import { EntityBurstFactories } from './vectorium/entities/factories';
 import { 
   createCircleEntity,
   createStar5Entity,
@@ -7,7 +6,9 @@ import {
   createHexagonEntity,
   createHeartEntity,
   createSquareEntity,
-  createDiamondEntity
+  createDiamondEntity,
+  createTextEntity,
+  buildTextStyle
 } from './vectorium/entities/factories';
 import { TextStyle } from './vectorium/rendering/TextRenderer';
 import { TextPool } from './vectorium/core/TextPool';
@@ -20,6 +21,13 @@ class DemoScene extends Scene {
   // Text entity storage (entityId -> text content and style) - kept for canvas-based fallback
   private textEntities: Map<EntityId, { text: string; style: TextStyle }> = new Map();
   
+  // Animation data for dynamic text entities
+  textAnimations: Map<number, {
+    rotationSpeed: number;
+    pulseSpeed: number;
+    pulsePhase: number;
+  }> = new Map();
+  
   setTextPool(textPool: TextPool): void {
     this.textPool = textPool;
   }
@@ -28,25 +36,50 @@ class DemoScene extends Scene {
     return this.textEntities;
   }
   
-  // Override clearAll to also clear text entities
+  // Override update to add text animations
+  override update(dt: number): void {
+    // Call parent update first (physics, animations, camera)
+    super.update(dt);
+    
+    // Update dynamic text animations
+    if (this.textAnimations.size > 0) {
+      const rotations = this.world.getRotation();
+      const scales = this.world.getScale();
+      const time = performance.now() / 1000; // seconds
+      
+      this.textAnimations.forEach((animData, entityId) => {
+        // Rotation animation
+        rotations[entityId] = (rotations[entityId] + animData.rotationSpeed * dt) % 360;
+        if (rotations[entityId] < 0) rotations[entityId] += 360;
+        
+        // Pulse animation (scale oscillation)
+        const pulseValue = Math.sin(time * animData.pulseSpeed + animData.pulsePhase);
+        scales[entityId] = 1.0 + pulseValue * 0.3; // Scale between 0.7 and 1.3
+      });
+    }
+  }
+  
+  // Override clearAll to also clear text entities and animations
   clearAll(): void {
     this.textEntities.clear();
+    this.textAnimations.clear();
     if (this.textPool) {
       this.textPool.clear();
     }
     super.clear();
   }
   
-  // Override clear to also clear text entities
+  // Override clear to also clear text entities and animations
   clear(): void {
     this.textEntities.clear();
+    this.textAnimations.clear();
     if (this.textPool) {
       this.textPool.clear();
     }
     super.clear();
   }
   
-  // Override removeLast to also remove from text entities
+  // Override removeLast to also remove from text entities and animations
   removeLast(count: number): void {
     // Get entities that will be removed
     const totalCount = this.world.getActiveCount();
@@ -57,6 +90,7 @@ class DemoScene extends Scene {
     for (let i = maxCapacity - 1; i >= 0 && removed < toRemove; i--) {
       if (this.world.isEntityActive(i)) {
         this.textEntities.delete(i); // Remove from text map
+        this.textAnimations.delete(i); // Remove from animations
         const textIndex = this.world.getTextIndices()[i];
         if (textIndex >= 0 && this.textPool) {
           this.textPool.free(textIndex);
@@ -181,75 +215,40 @@ class DemoScene extends Scene {
     effects: { bold?: boolean; italic?: boolean; shadow?: boolean; outline?: boolean; glow?: boolean },
     align: 'left' | 'center' | 'right' = 'left',
     fontSize: number = 32,
-    isStatic: boolean = false,  // 🎨 NEW: Mark text as static (cached)
-    color: string = '#FFFFFF'  // 🎨 NEW: Custom text color
+    isStatic: boolean = false,
+    color: string = '#FFFFFF'
   ): void {
     if (!this.textPool) return;
     
-    // Create entity with no velocity
-    const id = this.world.createEntity(x, y, 0, 0);
+    // Build text style using factory helper
+    const textStyle = buildTextStyle(
+      {
+        bold: effects.bold,
+        italic: effects.italic,
+        size: fontSize,
+        align: align,
+        shadow: effects.shadow,
+        outline: effects.outline,
+        glow: effects.glow
+      },
+      color
+    );
     
-    // Hide sprite quad
-    const sizes = this.world.getSizes();
-    sizes[id] = 0;
-    
-    // Set white color
-    const colorR = this.world.getColorR();
-    const colorG = this.world.getColorG();
-    const colorB = this.world.getColorB();
-    colorR[id] = 255;
-    colorG[id] = 255;
-    colorB[id] = 255;
-    
-    // Allocate text
-    const textIndex = this.textPool.allocate(text);
-    this.world.setTextIndex(id, textIndex);
-    
-    // 🎨 Mark as static if requested (for caching optimization)
-    if (isStatic) {
-      this.world.setTextStatic(id, true);
-    }
-    
-    // Build style
-    let font = '';
-    if (effects.bold) font += 'bold ';
-    if (effects.italic) font += 'italic ';
-    font += `${fontSize}px Arial`;
-    
-    const textStyle: TextStyle = {
-      font,
-      fontSize: fontSize,
-      fontFamily: 'Arial',
-      color: color,
-      align: align
-    };
-    
-    // Add effects
-    if (effects.outline) {
-      textStyle.strokeColor = '#00FFFF'; // Bright cyan outline for visibility
-      textStyle.strokeWidth = 4;
-    }
-    
-    if (effects.shadow) {
-      textStyle.shadow = {
-        color: 'rgba(255, 0, 0, 1.0)', // Bright red shadow for visibility
-        blur: 6,
-        offsetX: 4,
-        offsetY: 4
-      };
-    }
-    
-    if (effects.glow) {
-      textStyle.shadow = {
-        color: 'rgba(255, 255, 0, 1.0)', // Bright yellow glow for visibility
-        blur: 20,
-        offsetX: 0,
-        offsetY: 0
-      };
-    }
-    
-    // Store for canvas fallback
-    this.textEntities.set(id, { text, style: textStyle });
+    // Create text entity using factory (no velocity for demo labels)
+    createTextEntity(
+      this.world,
+      this.textPool,
+      x,
+      y,
+      text,
+      {
+        vx: 0,
+        vy: 0,
+        textStyle,
+        isStatic
+      },
+      this.textEntities
+    );
   }
 }
 
@@ -325,7 +324,7 @@ function spawnWithPhysicsAndVisual(
   
   const shapeFactory = shapeFactories[visualType];
   
-  // Handle text entities separately
+  // Handle text entities using factory pattern
   if (visualType === 'text' && textConfig) {
     const textPool = (scene as any).textPool;
     if (!textPool) {
@@ -333,74 +332,90 @@ function spawnWithPhysicsAndVisual(
       return;
     }
     
+    // Build text style from config
+    const textStyle = buildTextStyle({
+      ...textConfig,
+      align: textConfig.align as 'left' | 'center' | 'right'
+    });
+    
+    // Static text spawns in a grid pattern with no velocity
+    // Dynamic text spawns with velocity and animations
+    const isStaticMode = textConfig.mode === 'static';
+    
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 150 + Math.random() * 250;
-      const vx = Math.cos(angle) * speed;
-      const vy = Math.sin(angle) * speed;
+      let spawnX = x;
+      let spawnY = y;
+      let vx = 0;
+      let vy = 0;
       
-      // Create entity
-      const id = scene.world.createEntity(x, y, vx, vy);
+      if (isStaticMode) {
+        // Static: Grid pattern, no velocity
+        const cols = Math.ceil(Math.sqrt(count));
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        
+        // For static text, adjust spawn X so all alignments start at same visual position
+        // This makes it easy to compare alignment modes side-by-side
+        const align = textConfig.align as 'left' | 'center' | 'right';
+        let baseX = x;
+        
+        // Estimate text width (rough approximation for positioning)
+        const estimatedTextWidth = textConfig.content.length * textConfig.size * 0.6;
+        
+        if (align === 'center') {
+          // Center-aligned: offset right by half width so left edge aligns with click point
+          baseX = x + estimatedTextWidth / 2;
+        } else if (align === 'right') {
+          // Right-aligned: offset right by full width so left edge aligns with click point
+          baseX = x + estimatedTextWidth;
+        }
+        // Left-aligned: no offset needed
+        
+        spawnX = baseX + col * 150;
+        spawnY = y + row * 60;
+      } else {
+        // Dynamic: Radial explosion with velocity
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 150 + Math.random() * 250;
+        vx = Math.cos(angle) * speed;
+        vy = Math.sin(angle) * speed;
+      }
       
-      // Set size to 0 to hide sprite quad (text will be rendered separately)
-      const sizes = scene.world.getSizes();
-      sizes[id] = 0; // Hide the sprite quad
-      
-      // Set white color for text
-      const colorR = scene.world.getColorR();
-      const colorG = scene.world.getColorG();
-      const colorB = scene.world.getColorB();
-      colorR[id] = 255;
-      colorG[id] = 255;
-      colorB[id] = 255;
-      
-      // Allocate text in TextPool
+      // Get text content
       const text = textConfig.mode === 'dynamic' ? `#${i}` : textConfig.content;
-      const textIndex = textPool.allocate(text);
       
-      // Set text index in ECS
-      scene.world.setTextIndex(id, textIndex);
+      // Create text entity using factory
+      const id = createTextEntity(
+        scene.world,
+        textPool,
+        spawnX,
+        spawnY,
+        text,
+        {
+          vx,
+          vy,
+          textStyle,
+          isStatic: isStaticMode
+        },
+        scene.getTextEntities()
+      );
       
-      // Store style in textEntities map for canvas fallback
-      let font = '';
-      if (textConfig.bold) font += 'bold ';
-      if (textConfig.italic) font += 'italic ';
-      font += `${textConfig.size}px Arial`;
-      
-      const textStyle: TextStyle = {
-        font,
-        fontSize: textConfig.size,
-        fontFamily: 'Arial',
-        color: '#FFFFFF',
-        align: textConfig.align as 'left' | 'center' | 'right'
-      };
-      
-      // Add effects
-      if (textConfig.outline) {
-        textStyle.strokeColor = '#000000';
-        textStyle.strokeWidth = 2;
-      }
-      
-      if (textConfig.shadow) {
-        textStyle.shadow = {
-          color: 'rgba(0, 0, 0, 0.5)',
-          blur: 4,
-          offsetX: 2,
-          offsetY: 2
+      // Add animations to dynamic text
+      if (!isStaticMode) {
+        // Random rotation animation
+        const rotations = scene.world.getRotation();
+        rotations[id] = Math.floor(Math.random() * 360);
+        
+        // Store animation data for update loop
+        const animData = {
+          rotationSpeed: (Math.random() - 0.5) * 180, // -90 to +90 degrees per second
+          pulseSpeed: 1 + Math.random() * 2, // 1-3 Hz
+          pulsePhase: Math.random() * Math.PI * 2
         };
+        
+        // Store in scene for animation updates
+        (scene as DemoScene).textAnimations.set(id, animData);
       }
-      
-      if (textConfig.glow) {
-        textStyle.shadow = {
-          color: 'rgba(255, 255, 255, 0.8)',
-          blur: 10,
-          offsetX: 0,
-          offsetY: 0
-        };
-      }
-      
-      // Store for canvas fallback
-      scene.getTextEntities().set(id, { text, style: textStyle });
       
       // Apply physics
       switch (physicsMode) {
