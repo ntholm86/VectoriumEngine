@@ -4,7 +4,6 @@
  */
 
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
-import { TextRenderer } from '../rendering/TextRenderer';
 
 export type EntityId = number;
 
@@ -20,7 +19,7 @@ export interface Entity {
   x: number;
   y: number;
   update(dt: number): void;
-  render(renderer: WebGLBatchRenderer, textRenderer: TextRenderer): void;
+  render(renderer: WebGLBatchRenderer): void;
   destroy(): void;
 }
 
@@ -217,7 +216,7 @@ export class BouncingEntity implements Entity {
   }
   
   update(_dt: number): void {}
-  render(_renderer: WebGLBatchRenderer, _textRenderer: TextRenderer): void {}
+  render(_renderer: WebGLBatchRenderer): void {}
   destroy(): void {}
 }
 

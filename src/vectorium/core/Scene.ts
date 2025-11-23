@@ -105,33 +105,38 @@ export class Scene {
     }
   }
 
-  render(renderer: WebGLBatchRenderer, textRenderer: TextRenderer, textBatchRenderer?: any, textPool?: any): void {
+  render(renderer: WebGLBatchRenderer, textRenderer: TextRenderer, _textPool?: any): void {
     const startTime = performance.now();
     
-    // 🎨 2-PASS RENDERING: Shapes → Text
+    // 🎨 UNIFIED RENDERING PIPELINE: Sprites → Shapes → Text (all through WebGLBatchRenderer)
     // Pass 1: Render sprites and shapes
     const batchStart = performance.now();
     this.renderECSBatch(renderer);
     this.perfMetrics.renderBatch = performance.now() - batchStart;
     
-    // Pass 2: Render text (if any text entities exist)
+    // Pass 2: Render text (TextRenderer → creates textures → WebGLBatchRenderer)
     const textStart = performance.now();
-    // Check both textEntityCount and textEntities Map
+    
+    // TextRenderer handles ALL text rendering (static, dynamic, effects)
     const textEntities = (this as any).getTextEntities?.();
     if (textRenderer && textEntities && textEntities.size > 0) {
-      // Use TextBatchRenderer if available (proper glyph atlas approach)
-      if (textBatchRenderer && textPool) {
-        this.renderTextBatchOptimized(textBatchRenderer);
-      } else {
-        // Fallback to canvas-based TextRenderer
-        this.renderTextBatch(textRenderer);
-      }
+      this.renderTextBatch(textRenderer);
     }
     const textTime = performance.now() - textStart;
     
     this.perfMetrics.renderCustom = textTime; // Track text rendering time
     this.perfMetrics.renderTotal = performance.now() - startTime;
-    this.perfMetrics.customRenderCount = textEntities ? textEntities.size : 0;
+    
+    // Count text entities from World.textIndices
+    const textIndices = this.world.getTextIndices();
+    const flags = this.world.getFlags();
+    let textEntityCount = 0;
+    for (let i = 0; i < this.world.getTotalCount(); i++) {
+      if ((flags[i] & this.world.FLAG_ACTIVE) && textIndices[i] >= 0) {
+        textEntityCount++;
+      }
+    }
+    this.perfMetrics.customRenderCount = textEntityCount;
     
     if (this.enableWarnings && this.perfMetrics.renderTotal > this.renderTimeWarningThreshold) {
       console.warn(`⚠️ VECTORIUM RENDER: ${this.perfMetrics.renderTotal.toFixed(2)}ms | Batch=${this.perfMetrics.renderBatch.toFixed(2)}ms | Text=${textTime.toFixed(2)}ms`);
@@ -139,12 +144,13 @@ export class Scene {
   }
   
   /**
-   * 🎨 Render text entities using TextBatchRenderer
-   * O(1) early exit if no text entities
+   * 🎨 Render text entities using TextRenderer
+   * TextRenderer creates textures and passes them to WebGLBatchRenderer
    */
   private renderTextBatch(textRenderer: TextRenderer): void {
     // Get text entities from DemoScene if available
     const textEntities = (this as any).getTextEntities?.();
+    console.log('🎨 renderTextBatch: textEntities =', textEntities, 'size =', textEntities?.size);
     if (!textEntities || textEntities.size === 0) return;
     
     const textIndices = this.world.getTextIndices();
@@ -153,15 +159,10 @@ export class Scene {
     const flags = this.world.getFlags();
     const count = this.world.getTotalCount();
     
-    // Render each text entity
     for (let id = 0; id < count; id++) {
-      // Skip inactive entities (but don't check FLAG_VISIBLE since we hide text from shape renderer)
       if (!(flags[id] & this.world.FLAG_ACTIVE)) continue;
-      
-      // Skip non-text entities
       if (textIndices[id] < 0) continue;
       
-      // Get text data
       const textData = textEntities.get(id);
       if (!textData) continue;
       
@@ -173,54 +174,9 @@ export class Scene {
       const screenX = (worldX - this.camera.x) * this.camera.getZoom() + this.canvasWidth / 2;
       const screenY = (worldY - this.camera.y) * this.camera.getZoom() + this.canvasHeight / 2;
       
-      // Render text at screen position
+      // Render text at screen position (TextRenderer → WebGLBatchRenderer)
       textRenderer.drawText(textData.text, screenX, screenY, textData.style);
     }
-  }
-  
-  /**
-   * 🚀 OPTIMIZED: Render text using TextBatchRenderer (glyph atlas)
-   * Much faster than canvas-based approach for many text entities
-   */
-  private renderTextBatchOptimized(textBatchRenderer: any): void {
-    const textIndices = this.world.getTextIndices();
-    const posX = this.world.getPositionX();
-    const posY = this.world.getPositionY();
-    const colorR = this.world.getColorR();
-    const colorG = this.world.getColorG();
-    const colorB = this.world.getColorB();
-    const alphas = this.world.getAlphas();
-    const flags = this.world.getFlags();
-    const count = this.world.getTotalCount();
-    
-    // Transform positions to screen space
-    const screenX = new Float32Array(count);
-    const screenY = new Float32Array(count);
-    const zoom = this.camera.getZoom();
-    const camX = this.camera.x;
-    const camY = this.camera.y;
-    const centerX = this.canvasWidth / 2;
-    const centerY = this.canvasHeight / 2;
-    
-    for (let id = 0; id < count; id++) {
-      if (!(flags[id] & this.world.FLAG_ACTIVE)) continue;
-      if (textIndices[id] < 0) continue;
-      
-      screenX[id] = (posX[id] - camX) * zoom + centerX;
-      screenY[id] = (posY[id] - camY) * zoom + centerY;
-    }
-    
-    // Batch render all text entities in one draw call
-    textBatchRenderer.renderText(
-      textIndices,
-      screenX,
-      screenY,
-      colorR,
-      colorG,
-      colorB,
-      alphas,
-      count
-    );
   }
   
   /**

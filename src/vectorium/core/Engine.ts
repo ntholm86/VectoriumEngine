@@ -6,8 +6,7 @@
 import { FeatureDetector, EngineConfig } from './FeatureDetector';
 import { RuntimeConfig } from './RuntimeConfig';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
-import { TextRenderer, TextStyle } from '../rendering/TextRenderer';
-import { TextBatchRenderer } from '../rendering/TextBatchRenderer';
+import { TextRenderer } from '../rendering/TextRenderer';
 import { TextPool } from './TextPool';
 import { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { BufferPool } from '../memory/Pooling';
@@ -28,7 +27,6 @@ export class Vectorium {
   readonly featureDetector: FeatureDetector;
   readonly renderer: WebGLBatchRenderer;
   readonly textRenderer: TextRenderer;
-  readonly textBatchRenderer: TextBatchRenderer;
   readonly textPool: TextPool;
   readonly performanceMonitor: PerformanceMonitor;
   readonly bufferPool: BufferPool;
@@ -81,15 +79,13 @@ export class Vectorium {
     const useWebGL2 = this.config.preferWebGL2 && this.featureDetector.capabilities.hasWebGL2;
     this.renderer = new WebGLBatchRenderer(this.canvas, useWebGL2);
     
-    // Initialize text renderer (uses same WebGL context, no overlay canvas)
+    // Initialize text renderer (renders text as textures → WebGLBatchRenderer)
     this.textRenderer = new TextRenderer(this.config.width, this.config.height);
     this.textRenderer.setGLContext(this.renderer.getContext());
     this.textRenderer.setBatchRenderer(this.renderer);
     
-    // Initialize TextPool and TextBatchRenderer (proper glyph atlas approach)
+    // Initialize TextPool for ECS text entities
     this.textPool = new TextPool(10000);
-    const gl2Context = this.renderer.getContext() as WebGL2RenderingContext;
-    this.textBatchRenderer = new TextBatchRenderer(gl2Context, this.textPool, 32, 'Arial');
     
     // Initialize performance monitor
     this.performanceMonitor = new PerformanceMonitor(
@@ -248,10 +244,6 @@ export class Vectorium {
     const dt = Math.min((now - this.lastTime) / 1000, 0.1); // Cap at 100ms
     this.lastTime = now;
     
-    // Apply adaptive quality settings to text renderer
-    const qualitySettings = this.performanceMonitor.getQualitySettings();
-    this.textRenderer.setResolutionScale(qualitySettings.resolutionScale);
-    
     // Update scene
     if (this.currentScene && this.currentScene.active) {
       // Expose current scene and world globally for profiler access
@@ -268,11 +260,11 @@ export class Vectorium {
     // Render WebGL
     this.renderer.begin(this.canvas.width, this.canvas.height);
     
-    // Clear and begin text rendering
+    // Begin text rendering
     this.textRenderer.begin();
     
     if (this.currentScene && this.currentScene.active) {
-      this.currentScene.render(this.renderer, this.textRenderer, this.textBatchRenderer, this.textPool);
+      this.currentScene.render(this.renderer, this.textRenderer, this.textPool);
       
       // Record culling statistics if available
       const visibleCount = (this.currentScene as any).visibleCount;
@@ -291,8 +283,7 @@ export class Vectorium {
     
     // Record metrics from rendering
     this.performanceMonitor.recordWebGLDrawCalls(this.renderer.getDrawCallCount());
-    this.performanceMonitor.recordTextDrawCalls(this.textRenderer.getDrawCallCount());
-    this.performanceMonitor.recordTextMemory(this.textRenderer.getMemoryUsage());
+    // Text rendering now unified through WebGLBatchRenderer (included in draw call count above)
     
     // Record physics metrics
     if (this.currentScene) {
@@ -307,31 +298,18 @@ export class Vectorium {
   };
 
   private renderDebugInfo(): void {
+    // TODO: Reimplement debug rendering using unified text pipeline
+    // For now, debug info is disabled since TextRenderer was removed
+    // Debug panel still shows FPS and metrics in the UI
+    
     const metrics = this.performanceMonitor.getMetrics();
     
-    // Draw background for debug text
+    // Draw background for debug overlay
     this.renderer.drawRect(5, 5, 240, 120, { r: 0, g: 0, b: 0 }, 0.7);
     
-    // Draw debug text using text renderer
-    const textStyle: TextStyle = {
-      fontSize: 14,
-      fontFamily: 'monospace',
-      color: '#00FF00',
-      align: 'left',
-      baseline: 'top'
-    };
-    
-    const lineHeight = 18;
-    const startX = 10;
-    const startY = 10;
-    
-    this.textRenderer.drawText(`FPS: ${Math.round(metrics.fps)}`, startX, startY, textStyle);
-    this.textRenderer.drawText(`Frame: ${metrics.frameTime.toFixed(2)}ms`, startX, startY + lineHeight, textStyle);
-    this.textRenderer.drawText(`WebGL Calls: ${metrics.webglDrawCalls}`, startX, startY + lineHeight * 2, textStyle);
-    this.textRenderer.drawText(`Text Calls: ${metrics.textDrawCalls}`, startX, startY + lineHeight * 3, textStyle);
-    this.textRenderer.drawText(`Memory: ${Math.round(metrics.memory)}MB`, startX, startY + lineHeight * 4, textStyle);
-    this.textRenderer.drawText(`Text Mem: ${metrics.textMemory.toFixed(2)}MB`, startX, startY + lineHeight * 5, textStyle);
-    this.textRenderer.drawText(`Quality: ${metrics.quality.toUpperCase()}`, startX, startY + lineHeight * 6, textStyle);
+    // Debug text will be reimplemented using WebGLBatchRenderer.drawBulkText()
+    // when we add helper methods for simple text rendering
+    console.log(`FPS: ${Math.round(metrics.fps)} | Frame: ${metrics.frameTime.toFixed(2)}ms`);
   }
 
   resize(width: number, height: number): void {
@@ -349,7 +327,6 @@ export class Vectorium {
     this.config.width = width;
     this.config.height = height;
     this.renderer.resize(width, height);
-    this.textRenderer.resize(width, height);
     
     // Update scene canvas dimensions for physics
     if (this.currentScene) {
@@ -374,10 +351,10 @@ export class Vectorium {
     
     return {
       ...this.performanceMonitor.getMetrics(),
-      drawCalls: this.renderer.getDrawCallCount() + this.textRenderer.getDrawCallCount(),
+      drawCalls: this.renderer.getDrawCallCount(),
       webglDrawCalls: this.renderer.getDrawCallCount(),
-      textDrawCalls: this.textRenderer.getDrawCallCount(),
-      textMemory: this.textRenderer.getMemoryUsage(),
+      textDrawCalls: 0, // Text now unified through WebGLBatchRenderer
+      textMemory: 0, // Included in main renderer memory
       // Detailed scene metrics
       updateTotal: sceneMetrics.updateTotal,
       updatePhysics: sceneMetrics.updatePhysics,
@@ -590,12 +567,5 @@ export class Vectorium {
     this.renderer.destroy();
     this.textRenderer.destroy();
     this.bufferPool.clear();
-  }
-
-  /**
-   * Draw text on the screen (convenience method)
-   */
-  drawText(text: string, x: number, y: number, style?: TextStyle): void {
-    this.textRenderer.drawText(text, x, y, style);
   }
 }

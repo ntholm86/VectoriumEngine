@@ -102,10 +102,17 @@ export class TextRenderer {
     const fontSize = style?.fontSize || this.defaultStyle.fontSize;
     const fontFamily = style?.fontFamily || this.defaultStyle.fontFamily;
     const color = style?.color || this.defaultStyle.color;
-    const font = `${fontSize}px ${fontFamily}`;
+    const font = style?.font || `${fontSize}px ${fontFamily}`;
     
     // Create cache key
-    const cacheKey = `${text}_${font}_${color}`;
+    // Build cache key with ALL style properties to ensure each unique combination gets its own texture
+    const shadowKey = style?.shadow ? 
+      `_s${style.shadow.color}_${style.shadow.blur}_${style.shadow.offsetX}_${style.shadow.offsetY}` : '';
+    const strokeKey = style?.strokeColor && style?.strokeWidth ?
+      `_st${style.strokeColor}_${style.strokeWidth}` : '';
+    const alignKey = style?.align ? `_a${style.align}` : '';
+    const baselineKey = style?.baseline ? `_b${style.baseline}` : '';
+    const cacheKey = `${text}_${font}_${color}${shadowKey}${strokeKey}${alignKey}${baselineKey}`;
     
     // Check cache
     let textureInfo = this.textCache.get(cacheKey);
@@ -133,9 +140,35 @@ export class TextRenderer {
       // Clear background
       this.ctx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
       
-      // Draw text
+      // Apply text effects
+      const textX = 2;
+      const textY = 2;
+      
+      // Apply shadow if specified
+      if (style?.shadow) {
+        this.ctx.shadowColor = style.shadow.color;
+        this.ctx.shadowBlur = style.shadow.blur;
+        this.ctx.shadowOffsetX = style.shadow.offsetX;
+        this.ctx.shadowOffsetY = style.shadow.offsetY;
+      } else {
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowOffsetX = 0;
+        this.ctx.shadowOffsetY = 0;
+      }
+      
+      // Apply stroke (outline) if specified
+      if (style?.strokeColor && style?.strokeWidth) {
+        this.ctx.strokeStyle = style.strokeColor;
+        this.ctx.lineWidth = style.strokeWidth;
+        this.ctx.lineJoin = 'round';
+        this.ctx.miterLimit = 2;
+        this.ctx.strokeText(text, textX, textY);
+      }
+      
+      // Draw text fill
       this.ctx.fillStyle = color;
-      this.ctx.fillText(text, 2, 2);
+      this.ctx.fillText(text, textX, textY);
       
       // Create WebGL texture
       const texture = this.gl.createTexture();
@@ -177,9 +210,18 @@ export class TextRenderer {
       }
     }
     
+    // Calculate X position based on alignment
+    let alignOffsetX = 0;
+    const align = style?.align || 'left';
+    if (align === 'center') {
+      alignOffsetX = -textureInfo.width / 2;
+    } else if (align === 'right') {
+      alignOffsetX = -textureInfo.width;
+    }
+    
     // Render text quad through batch renderer (uses same optimization pipeline as sprites)
     this.batchRenderer.drawSprite({
-      x: x + textureInfo.width / 2,
+      x: x + textureInfo.width / 2 + alignOffsetX,
       y: y + textureInfo.height / 2,
       width: textureInfo.width,
       height: textureInfo.height,

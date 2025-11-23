@@ -14,7 +14,7 @@ export class EntitySpawner {
   private activeButton: string = 'spawn100';
   private physicsMode: 'none' | 'gravity' | 'collision' | 'full' = 'none';
   private visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' | 'text' = 'sprite';
-  private textMode: 'static' | 'dynamic' = 'static';
+  private textMode: 'static' | 'dynamic' = 'dynamic';
   private textContent: string = 'Hello World';
   private textBold: boolean = false;
   private textItalic: boolean = false;
@@ -132,14 +132,6 @@ export class EntitySpawner {
           
           <div id="textConfigSection" class="text-config-section" style="display: none;">
             <div class="entity-type-section">
-              <label class="entity-type-label">📝 Text Mode:</label>
-              <select id="textMode" class="entity-type-select">
-                <option value="static">Static Text</option>
-                <option value="dynamic">Dynamic Text (Counter)</option>
-              </select>
-            </div>
-            
-            <div id="staticTextConfig" class="entity-type-section">
               <label class="entity-type-label">Text Content:</label>
               <input type="text" id="textContent" class="text-input" value="Hello World" maxlength="50">
             </div>
@@ -250,7 +242,6 @@ export class EntitySpawner {
     const textModeSelect = this.container.querySelector('#textMode') as HTMLSelectElement;
     textModeSelect?.addEventListener('change', (e) => {
       this.textMode = (e.target as HTMLSelectElement).value as typeof this.textMode;
-      this.updateStaticTextVisibility();
     });
     
     // Text content input
@@ -384,13 +375,7 @@ export class EntitySpawner {
     }
   }
   
-  private updateStaticTextVisibility(): void {
-    if (!this.container) return;
-    const staticTextConfig = this.container.querySelector('#staticTextConfig') as HTMLDivElement;
-    if (staticTextConfig) {
-      staticTextConfig.style.display = this.textMode === 'static' ? 'block' : 'none';
-    }
-  }
+  // Removed: updateStaticTextVisibility() - static text mode not yet implemented
   
   private on(id: string, event: string, handler: (e: Event) => void): void {
     const el = this.container?.querySelector(`#${id}`);

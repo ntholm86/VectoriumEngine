@@ -79,6 +79,7 @@ export class World {
   readonly FLAG_PHYSICS = 1 << 2;
   readonly FLAG_COLLIDABLE = 1 << 3;
   readonly FLAG_ROTATING = 1 << 4;
+  readonly FLAG_TEXT_STATIC = 1 << 5;  // 🎨 Text is static (cached, doesn't change)
   
   // Animation type enum
   readonly ANIM_ROTATE = 0;
@@ -521,6 +522,26 @@ export class World {
     }
     
     this.textIndex[id] = textIndex;
+  }
+  
+  /**
+   * 🎨 Mark text entity as static (doesn't change, can be cached)
+   * @param id Entity ID
+   * @param isStatic true=static (cached), false=dynamic (regenerated each frame)
+   */
+  setTextStatic(id: EntityId, isStatic: boolean): void {
+    if (isStatic) {
+      this.flags[id] |= this.FLAG_TEXT_STATIC;
+    } else {
+      this.flags[id] &= ~this.FLAG_TEXT_STATIC;
+    }
+  }
+  
+  /**
+   * 🎨 Check if text entity is static
+   */
+  isTextStatic(id: EntityId): boolean {
+    return (this.flags[id] & this.FLAG_TEXT_STATIC) !== 0;
   }
   
   /**

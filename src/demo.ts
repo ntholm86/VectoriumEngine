@@ -1,7 +1,3 @@
-/**
- * Vectorium Engine - Interactive Demo
- */
-
 import { Vectorium, Scene } from './vectorium/core/Engine';
 import { EntityBurstFactories } from './vectorium/entities/factories';
 import { 
@@ -75,13 +71,185 @@ class DemoScene extends Scene {
   
   async load(): Promise<void> {
     this.setWorldBoundsMultiplier(1.0);
-    // Spawn initial entities using factory functions
-    this.spawnBurst(EntityBurstFactories.bouncing, 
-      this.worldWidth / 2, 
-      this.worldHeight / 2, 
-      10, 
-      { rainbow: false }
-    );
+    
+    // 🎨 DEBUG: Spawn test text entities with different effects
+    if (!this.textPool) {
+      console.error('TextPool not available');
+      return;
+    }
+    
+    const startX = 100;
+    const startY = 100;
+    const spacing = 60;
+    
+    // === DYNAMIC TEXT (Left Column) ===
+    console.log('🔄 Creating DYNAMIC text examples (regenerated each frame)');
+    
+    // 1. Plain text (no effects)
+    this.spawnDebugText('Plain Text', startX, startY, {}, 'left', 32, false, '#00FFFF');
+    
+    // 2. Bold text
+    this.spawnDebugText('Bold Text', startX, startY + spacing, { bold: true }, 'left', 32, false, '#FFFF00');
+    
+    // 3. Italic text
+    this.spawnDebugText('Italic Text', startX, startY + spacing * 2, { italic: true }, 'left', 32, false, '#FF00FF');
+    
+    // 4. Shadow effect
+    this.spawnDebugText('Shadow Text', startX, startY + spacing * 3, { shadow: true }, 'left', 32, false);
+    
+    // 5. Outline effect
+    this.spawnDebugText('Outline Text', startX, startY + spacing * 4, { outline: true }, 'left', 32, false);
+    
+    // 6. Glow effect
+    this.spawnDebugText('Glow Text', startX, startY + spacing * 5, { glow: true }, 'left', 32, false);
+    
+    // 7. HEAVY EFFECTS (dynamic)
+    this.spawnDebugText('HEAVY EFFECTS', startX, startY + spacing * 6, {
+      bold: true,
+      italic: true,
+      shadow: true,
+      outline: true,
+      glow: true
+    }, 'left', 32, false);
+    
+    // 8. Letter spacing
+    this.spawnDebugText('L e t t e r   S p a c i n g', startX, startY + spacing * 7, {}, 'left', 32, false);
+    
+    // === STATIC TEXT (Right Column) ===
+    console.log('✨ Creating STATIC text examples (cached, optimized)');
+    
+    const staticX = startX + 700;
+    
+    // 1. Plain text (static)
+    this.spawnDebugText('Plain Text [STATIC]', staticX, startY, {}, 'left', 32, true, '#FF8800');
+    
+    // 2. Bold text (static)
+    this.spawnDebugText('Bold Text [STATIC]', staticX, startY + spacing, { bold: true }, 'left', 32, true, '#00FF00');
+    
+    // 3. Italic text (static)
+    this.spawnDebugText('Italic Text [STATIC]', staticX, startY + spacing * 2, { italic: true }, 'left', 32, true, '#FF69B4');
+    
+    // 4. Shadow effect (static)
+    this.spawnDebugText('Shadow Text [STATIC]', staticX, startY + spacing * 3, { shadow: true }, 'left', 32, true);
+    
+    // 5. Outline effect (static)
+    this.spawnDebugText('Outline Text [STATIC]', staticX, startY + spacing * 4, { outline: true }, 'left', 32, true);
+    
+    // 6. Glow effect (static)
+    this.spawnDebugText('Glow Text [STATIC]', staticX, startY + spacing * 5, { glow: true }, 'left', 32, true);
+    
+    // 7. HEAVY EFFECTS (static)
+    this.spawnDebugText('HEAVY EFFECTS [STATIC]', staticX, startY + spacing * 6, {
+      bold: true,
+      italic: true,
+      shadow: true,
+      outline: true,
+      glow: true
+    }, 'left', 32, true);
+    
+    // 8. Bacon ipsum text (static)
+    this.spawnDebugText('Bacon ipsum short loin [STATIC]', staticX, startY + spacing * 7.5, {}, 'left', 24, true);
+    
+    // === ALIGNMENT TESTS (Middle Column) ===
+    const alignX = startX + 400;
+    this.spawnDebugText('Left Aligned', alignX, startY, {}, 'left', 32, true);
+    this.spawnDebugText('Center Aligned', alignX, startY + spacing, {}, 'center', 32, true);
+    this.spawnDebugText('Right Aligned', alignX, startY + spacing * 2, {}, 'right', 32, true);
+    
+    // === LINE HEIGHT TEST ===
+    this.spawnDebugText('Line 1 of text', alignX, startY + spacing * 3, {}, 'left', 32, true);
+    this.spawnDebugText('Line 2 of text', alignX, startY + spacing * 3 + 40, {}, 'left', 32, true);
+    this.spawnDebugText('Line 3 of text', alignX, startY + spacing * 3 + 80, {}, 'left', 32, true);
+    
+    // === PARAGRAPH TESTS ===
+    const baconText = 'Bacon ipsum dolor amet short loin pork chop turkey';
+    this.spawnDebugText(baconText, 100, 580, {}, 'left', 28, false);
+    
+    const baconText2 = 'Ribeye bresaola ham hock hamburger porchetta';
+    this.spawnDebugText(baconText2, 100, 615, {}, 'left', 24, false);
+    
+    const baconText3 = 'Tri-tip chuck beef ribs meatloaf shoulder';
+    this.spawnDebugText(baconText3, 100, 645, { bold: true }, 'left', 20, false);
+    
+    console.log(`📊 Text entities: ${this.world.getTextEntityCount()} total`);
+  }
+  
+  private spawnDebugText(
+    text: string, 
+    x: number, 
+    y: number, 
+    effects: { bold?: boolean; italic?: boolean; shadow?: boolean; outline?: boolean; glow?: boolean },
+    align: 'left' | 'center' | 'right' = 'left',
+    fontSize: number = 32,
+    isStatic: boolean = false,  // 🎨 NEW: Mark text as static (cached)
+    color: string = '#FFFFFF'  // 🎨 NEW: Custom text color
+  ): void {
+    if (!this.textPool) return;
+    
+    // Create entity with no velocity
+    const id = this.world.createEntity(x, y, 0, 0);
+    
+    // Hide sprite quad
+    const sizes = this.world.getSizes();
+    sizes[id] = 0;
+    
+    // Set white color
+    const colorR = this.world.getColorR();
+    const colorG = this.world.getColorG();
+    const colorB = this.world.getColorB();
+    colorR[id] = 255;
+    colorG[id] = 255;
+    colorB[id] = 255;
+    
+    // Allocate text
+    const textIndex = this.textPool.allocate(text);
+    this.world.setTextIndex(id, textIndex);
+    
+    // 🎨 Mark as static if requested (for caching optimization)
+    if (isStatic) {
+      this.world.setTextStatic(id, true);
+    }
+    
+    // Build style
+    let font = '';
+    if (effects.bold) font += 'bold ';
+    if (effects.italic) font += 'italic ';
+    font += `${fontSize}px Arial`;
+    
+    const textStyle: TextStyle = {
+      font,
+      fontSize: fontSize,
+      fontFamily: 'Arial',
+      color: color,
+      align: align
+    };
+    
+    // Add effects
+    if (effects.outline) {
+      textStyle.strokeColor = '#00FFFF'; // Bright cyan outline for visibility
+      textStyle.strokeWidth = 4;
+    }
+    
+    if (effects.shadow) {
+      textStyle.shadow = {
+        color: 'rgba(255, 0, 0, 1.0)', // Bright red shadow for visibility
+        blur: 6,
+        offsetX: 4,
+        offsetY: 4
+      };
+    }
+    
+    if (effects.glow) {
+      textStyle.shadow = {
+        color: 'rgba(255, 255, 0, 1.0)', // Bright yellow glow for visibility
+        blur: 20,
+        offsetX: 0,
+        offsetY: 0
+      };
+    }
+    
+    // Store for canvas fallback
+    this.textEntities.set(id, { text, style: textStyle });
   }
 }
 
