@@ -603,7 +603,7 @@ export function buildTextStyle(
     fontSize: config.size || 24,
     fontFamily: 'Arial',
     color: color,
-    align: config.align || 'center'
+    align: config.align || 'left'  // Default to left alignment (standard text behavior)
   };
   
   // Add effects
@@ -665,3 +665,145 @@ export const EntityBurstFactories = {
 } as const;
 
 export type EntityType = keyof typeof EntityFactories;
+
+// ==================== Phase 1: Textured Sprite Factories ====================
+
+/**
+ * Create a textured sprite entity
+ * @param world ECS World
+ * @param textureManager TextureManager instance
+ * @param x World X position
+ * @param y World Y position
+ * @param textureUrl Texture URL or path
+ * @param size Sprite size (width/height)
+ * @param options Optional settings
+ */
+export async function createSprite(
+  world: World,
+  textureManager: any, // TextureManager
+  x: number,
+  y: number,
+  textureUrl: string,
+  size: number = 64,
+  options: {
+    vx?: number;
+    vy?: number;
+    frame?: string;  // Optional atlas frame name
+    interactive?: boolean;
+  } = {}
+): Promise<EntityId> {
+  // Load texture if not cached
+  const texture = await textureManager.loadTexture(textureUrl);
+  
+  // Create entity
+  const id = world.createEntity(x, y, options.vx || 0, options.vy || 0);
+  
+  // Set size
+  world.setSize(id, size);
+  
+  // Set texture (full texture by default)
+  if (options.frame) {
+    // Use atlas frame
+    const frame = textureManager.getFrame(textureUrl, options.frame);
+    if (frame) {
+      const uvs = textureManager.frameToUV(frame, texture.width, texture.height);
+      world.setTexture(id, texture.id, uvs.u0, uvs.v0, uvs.u1, uvs.v1);
+    } else {
+      world.setTexture(id, texture.id);
+    }
+  } else {
+    // Use full texture
+    world.setTexture(id, texture.id);
+  }
+  
+  // Mark as interactive if requested
+  if (options.interactive) {
+    world.setInteractive(id);
+  }
+  
+  return id;
+}
+
+/**
+ * Create an animated sprite entity
+ * @param world ECS World
+ * @param animManager AnimationManager instance
+ * @param textureManager TextureManager instance
+ * @param x World X position
+ * @param y World Y position
+ * @param textureUrl Texture URL
+ * @param animationName Animation name
+ * @param size Sprite size
+ */
+export function createAnimatedSprite(
+  world: World,
+  animManager: any, // AnimationManager
+  textureManager: any, // TextureManager
+  x: number,
+  y: number,
+  textureUrl: string,
+  animationName: string,
+  size: number = 64,
+  options: {
+    vx?: number;
+    vy?: number;
+    loop?: boolean;
+    interactive?: boolean;
+  } = {}
+): EntityId {
+  // Get texture (must be pre-loaded)
+  const texture = textureManager.getTexture(textureUrl);
+  if (!texture) {
+    throw new Error(`Texture not loaded: ${textureUrl}`);
+  }
+  
+  // Get animation
+  const anim = animManager.getFrameAnimation(animationName);
+  if (!anim) {
+    throw new Error(`Animation not found: ${animationName}`);
+  }
+  
+  // Create entity
+  const id = world.createEntity(x, y, options.vx || 0, options.vy || 0);
+  
+  // Set size
+  world.setSize(id, size);
+  
+  // Set initial texture
+  world.setTexture(id, texture.id);
+  
+  // Start animation
+  world.playAnimation(id, anim.id, options.loop !== false);
+  
+  // Mark as interactive if requested
+  if (options.interactive) {
+    world.setInteractive(id);
+  }
+  
+  return id;
+}
+
+/**
+ * Create a button entity (textured sprite with click callback)
+ */
+export async function createButton(
+  world: World,
+  textureManager: any,
+  inputManager: any,
+  x: number,
+  y: number,
+  textureUrl: string,
+  size: number,
+  onClick: () => void
+): Promise<EntityId> {
+  // Create sprite
+  const id = await createSprite(world, textureManager, x, y, textureUrl, size, {
+    interactive: true
+  });
+  
+  // Register click callback
+  inputManager.onClick(id, onClick);
+  
+  return id;
+}
+

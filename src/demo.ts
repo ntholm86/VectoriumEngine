@@ -14,6 +14,41 @@ import { TextStyle } from './vectorium/rendering/TextRenderer';
 import { TextPool } from './vectorium/core/TextPool';
 import type { EntityId } from './vectorium/core/World';
 
+/**
+ * 🎮 VECTORIUM DEMO - Phase 1 Complete
+ * 
+ * Features demonstrated:
+ * - ✅ GPU-accelerated shapes (circle, star, triangle, hexagon, heart, square, diamond)
+ * - ✅ Text rendering with effects (shadow, outline, glow, bold, italic)
+ * - ✅ Physics modes (gravity, collision, boundary)
+ * - ✅ Input system (mouse, keyboard, touch)
+ * - ✅ Camera system (zoom, pan, shake)
+ * - ✅ Performance monitoring
+ * - 🆕 Texture system (load & render sprites)
+ * - 🆕 Animation system (frame animations & tweens)
+ * 
+ * HOW TO USE TEXTURES:
+ * 1. Select "Sprite" from Visual Type dropdown
+ * 2. Enter texture URL in "Texture URL" field (e.g., "/assets/sprite.png")
+ * 3. Click canvas to spawn textured entities
+ * 
+ * HOW TO USE ANIMATIONS:
+ * Frame Animation:
+ * 1. Select "Frame Animation" from Animation dropdown
+ * 2. Set FPS (1-60) and toggle Loop
+ * 3. Requires sprite atlas with frame data
+ * 
+ * Tween Animation:
+ * 1. Select "Tween Animation" from Animation dropdown
+ * 2. Choose property to animate (scale, position, alpha, etc.)
+ * 3. Set duration (100-5000ms) and easing function
+ * 4. Spawned entities will animate automatically
+ * 
+ * Note: Texture and animation systems are initialized but require
+ * asset loading. See TextureManager.loadTexture() and 
+ * AnimationManager.createFrameAnimation() for manual setup.
+ */
+
 class DemoScene extends Scene {
   // Reference to engine's text pool
   private textPool: TextPool | null = null;
@@ -106,6 +141,75 @@ class DemoScene extends Scene {
   async load(): Promise<void> {
     this.setWorldBoundsMultiplier(1.0);
     
+    // 🎬 TEST: Spawn 10 squares with scale animation
+    console.log('🎬 Spawning 10 test squares with SCALE + BOUNCE animation');
+    const animManager = (this as any).animationManager;
+    if (animManager) {
+      for (let i = 0; i < 10; i++) {
+        const x = 400 + i * 80;
+        const y = 400;
+        const size = 40;
+        const color = { r: 1, g: 0.3, b: 0.3 };
+        
+        // Create square entity
+        const id = this.world.createEntity(x, y, 0, 0);
+        const sizes = this.world.getSizes();
+        sizes[id] = size;
+        
+        // Set color
+        const colorR = this.world.getColorR();
+        const colorG = this.world.getColorG();
+        const colorB = this.world.getColorB();
+        colorR[id] = Math.floor(color.r * 255);
+        colorG[id] = Math.floor(color.g * 255);
+        colorB[id] = Math.floor(color.b * 255);
+        
+        // Apply scale tween with bounce easing
+        const bounceFn = (t: number) => {
+          const n1 = 7.5625;
+          const d1 = 2.75;
+          if (t < 1 / d1) {
+            return n1 * t * t;
+          } else if (t < 2 / d1) {
+            return n1 * (t -= 1.5 / d1) * t + 0.75;
+          } else if (t < 2.5 / d1) {
+            return n1 * (t -= 2.25 / d1) * t + 0.9375;
+          } else {
+            return n1 * (t -= 2.625 / d1) * t + 0.984375;
+          }
+        };
+        
+        const tweenName = `test_scale_bounce_${i}`;
+        const tween = animManager.createTween({
+          name: tweenName,
+          properties: [2], // Scale property
+          duration: 2000, // 2 seconds
+          easing: bounceFn
+        });
+        
+        // Set tween values
+        const tweenIds = this.world.getTweenIds();
+        const tweenTimes = this.world.getTweenTimes();
+        const tweenActive = this.world.getTweenActive();
+        const tweenStartValues = this.world.getTweenStartValues();
+        const tweenEndValues = this.world.getTweenEndValues();
+        const scales = this.world.getScale();
+        
+        tweenIds[id] = tween.id;
+        tweenTimes[id] = 0;
+        tweenActive[id] = 1;
+        
+        const baseIndex = id * 4;
+        tweenStartValues[baseIndex] = 1.0;
+        tweenEndValues[baseIndex] = 3.0; // Scale to 3x
+        scales[id] = 1.0; // Start at 1x
+        
+        console.log(`  Entity ${id}: scale tween 1.0 → 3.0 over 2s with bounce`);
+      }
+    }
+    
+    return;
+    
     // 🎨 DEBUG: Spawn test text entities with different effects
     if (!this.textPool) {
       console.error('TextPool not available');
@@ -181,14 +285,22 @@ class DemoScene extends Scene {
       glow: true
     }, 'left', 32, true);
     
-    // 8. Bacon ipsum text (static)
-    this.spawnDebugText('Bacon ipsum short loin [STATIC]', staticX, startY + spacing * 7.5, {}, 'left', 24, true);
+    // 8. Letter spacing (static)
+    this.spawnDebugText('L e t t e r   S p a c i n g   [ S T A T I C ]', staticX, startY + spacing * 7, {}, 'left', 28, true);
     
-    // === ALIGNMENT TESTS (Middle Column) ===
+    // 9. Bacon ipsum text (static)
+    this.spawnDebugText('Bacon ipsum short loin [STATIC]', staticX, startY + spacing * 8, {}, 'left', 24, true);
+    
+    // === ALIGNMENT TESTS (Middle Column - Dynamic) ===
     const alignX = startX + 400;
-    this.spawnDebugText('Left Aligned', alignX, startY, {}, 'left', 32, true);
-    this.spawnDebugText('Center Aligned', alignX, startY + spacing, {}, 'center', 32, true);
-    this.spawnDebugText('Right Aligned', alignX, startY + spacing * 2, {}, 'right', 32, true);
+    this.spawnDebugText('Left Aligned', alignX, startY, {}, 'left', 32, false);
+    this.spawnDebugText('Center Aligned', alignX, startY + spacing, {}, 'center', 32, false);
+    this.spawnDebugText('Right Aligned', alignX, startY + spacing * 2, {}, 'right', 32, false);
+    
+    // === ALIGNMENT TESTS (Static variants) ===
+    this.spawnDebugText('Left Aligned [STATIC]', alignX, startY + spacing * 4.5, {}, 'left', 28, true);
+    this.spawnDebugText('Center Aligned [STATIC]', alignX, startY + spacing * 5.5, {}, 'center', 28, true);
+    this.spawnDebugText('Right Aligned [STATIC]', alignX, startY + spacing * 6.5, {}, 'right', 28, true);
     
     // === LINE HEIGHT TEST ===
     this.spawnDebugText('Line 1 of text', alignX, startY + spacing * 3, {}, 'left', 32, true);
@@ -262,6 +374,7 @@ function initDemo() {
   
   // Pass TextPool reference to scene for text entity management
   scene.setTextPool((engine as any).textPool);
+  (scene as any).animationManager = engine.getAnimationManager();
   
   engine.registerScene('demo', scene);
   
@@ -272,6 +385,8 @@ function initDemo() {
     const physicsMode = spawner?.getPhysicsMode() ?? 'none';
     const visualType = spawner?.getVisualType() ?? 'sprite';
     const textConfig = spawner?.getTextConfig();
+    const textureConfig = spawner?.getTextureConfig();
+    const animationConfig = spawner?.getAnimationConfig();
     
     // Conditional shake based on spawn count
     engine.getCamera()?.shakeIf(count, [
@@ -280,7 +395,7 @@ function initDemo() {
     ]);
     
     // 🚀 Spawn entities with independent physics and visual settings
-    spawnWithPhysicsAndVisual(scene, x, y, count, physicsMode, visualType, textConfig);
+    spawnWithPhysicsAndVisual(scene, x, y, count, physicsMode, visualType, textConfig, textureConfig, animationConfig);
   });
   
   // Start engine
@@ -288,7 +403,7 @@ function initDemo() {
 }
 
 /**
- * Unified spawn function: Physics Mode + Visual Type
+ * Unified spawn function: Physics Mode + Visual Type + Texture + Animation
  * Separates physics behavior from visual rendering
  */
 function spawnWithPhysicsAndVisual(
@@ -298,7 +413,9 @@ function spawnWithPhysicsAndVisual(
   count: number,
   physicsMode: 'none' | 'gravity' | 'collision' | 'full',
   visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' | 'text',
-  textConfig?: { mode: string; content: string; bold: boolean; italic: boolean; size: number; align: string; shadow: boolean; outline: boolean; glow: boolean }
+  textConfig?: { mode: string; content: string; bold: boolean; italic: boolean; size: number; align: string; shadow: boolean; outline: boolean; glow: boolean },
+  textureConfig?: { textureUrl: string },
+  animationConfig?: { type: 'none' | 'frame' | 'tween'; fps: number; loop: boolean; tweenProperty: string; tweenDuration: number; tweenEasing: string }
 ): void {
   const colors = [
     { r: 1, g: 0.2, b: 0.2 },   // Red
@@ -471,6 +588,11 @@ function spawnWithPhysicsAndVisual(
     colorG[id] = Math.floor(color.g * 255);
     colorB[id] = Math.floor(color.b * 255);
     
+    // Apply tween animation if configured
+    if (animationConfig && animationConfig.type === 'tween') {
+      applyTweenToEntity(scene, id, animationConfig);
+    }
+    
     // Apply physics based on mode
     switch (physicsMode) {
       case 'none':
@@ -488,6 +610,119 @@ function spawnWithPhysicsAndVisual(
         break;
     }
   }
+}
+
+/**
+ * Apply tween animation to an entity
+ */
+function applyTweenToEntity(
+  scene: DemoScene,
+  entityId: number,
+  config: { tweenProperty: string; tweenDuration: number; tweenEasing: string }
+): void {
+  const animManager = (scene as any).animationManager;
+  if (!animManager) {
+    console.warn('AnimationManager not available');
+    return;
+  }
+  
+  // Map property name to index (x=0, y=1, scale=2, size=3, alpha=4)
+  const propertyMap: Record<string, number> = {
+    x: 0,
+    y: 1,
+    scale: 2,
+    size: 3,
+    alpha: 4
+  };
+  
+  const propertyIndex = propertyMap[config.tweenProperty];
+  if (propertyIndex === undefined) {
+    console.warn(`Unknown tween property: ${config.tweenProperty}`);
+    return;
+  }
+  
+  // Map easing name to function
+  const easingMap: Record<string, (t: number) => number> = {
+    linear: (t) => t,
+    easeInOut: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+    bounce: (t) => {
+      const n1 = 7.5625;
+      const d1 = 2.75;
+      if (t < 1 / d1) {
+        return n1 * t * t;
+      } else if (t < 2 / d1) {
+        return n1 * (t -= 1.5 / d1) * t + 0.75;
+      } else if (t < 2.5 / d1) {
+        return n1 * (t -= 2.25 / d1) * t + 0.9375;
+      } else {
+        return n1 * (t -= 2.625 / d1) * t + 0.984375;
+      }
+    }
+  };
+  
+  const easingFn = easingMap[config.tweenEasing] || easingMap.linear;
+  
+  // Get current value as start
+  let startValue = 0;
+  let endValue = 0;
+  
+  const world = scene.world;
+  const posX = world.getX();
+  const posY = world.getY();
+  const scales = world.getScale();
+  const sizes = world.getSizes();
+  const alphas = world.getAlpha();
+  
+  switch (propertyIndex) {
+    case 0: // x
+      startValue = posX[entityId];
+      endValue = startValue + (Math.random() - 0.5) * 600; // Much larger movement
+      break;
+    case 1: // y
+      startValue = posY[entityId];
+      endValue = startValue + (Math.random() - 0.5) * 600; // Much larger movement
+      break;
+    case 2: // scale
+      startValue = scales[entityId];
+      endValue = 0.1 + Math.random() * 2.5; // Scale from 0.1x to 2.6x (dramatic!)
+      break;
+    case 3: // size
+      startValue = sizes[entityId];
+      endValue = startValue * (0.2 + Math.random() * 2); // 0.2x to 2.2x (very visible)
+      break;
+    case 4: // alpha
+      startValue = alphas[entityId];
+      endValue = Math.random() * 0.5; // Fade to 0-50% (more visible)
+      break;
+  }
+  
+  // Create or get tween definition
+  const tweenName = `${config.tweenProperty}_${config.tweenDuration}_${config.tweenEasing}`;
+  let tween = animManager.getTween(tweenName);
+  
+  if (!tween) {
+    tween = animManager.createTween({
+      name: tweenName,
+      properties: [propertyIndex],
+      duration: config.tweenDuration,
+      easing: easingFn
+    });
+  }
+  
+  // Apply tween to entity
+  const tweenIds = world.getTweenIds();
+  const tweenTimes = world.getTweenTimes();
+  const tweenActive = world.getTweenActive();
+  const tweenStartValues = world.getTweenStartValues();
+  const tweenEndValues = world.getTweenEndValues();
+  
+  tweenIds[entityId] = tween.id;
+  tweenTimes[entityId] = 0;
+  tweenActive[entityId] = 1;
+  
+  const baseIndex = entityId * 4;
+  tweenStartValues[baseIndex] = startValue;
+  tweenEndValues[baseIndex] = endValue;
 }
 
 // Initialize

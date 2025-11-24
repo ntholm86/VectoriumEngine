@@ -15,6 +15,10 @@
   </style>
 </head>
 <body>
+  <script>
+    // Clear camera controls visibility on page load (reset to default hidden state)
+    localStorage.removeItem('vectorium-camera-controls-visible');
+  </script>
   <script type="module" src="/src/demo.ts"></script>
 </body>
 </html>

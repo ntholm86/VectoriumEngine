@@ -6,12 +6,20 @@
 
 import { Scene } from '../core/Engine';
 import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
+import type { InputManager } from '../input/InputManager';
 
 export class EntitySpawner extends UIPanel {
   private clickSpawnCount = 100; // Number of entities to spawn per click
   private activeButton: string = 'spawn100';
   private physicsMode: 'none' | 'gravity' | 'collision' | 'full' = 'none';
   private visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' | 'text' = 'sprite';
+  private textureUrl: string = '';
+  private animationType: 'none' | 'frame' | 'tween' = 'none';
+  private animationFPS: number = 12;
+  private animationLoop: boolean = true;
+  private tweenProperty: 'x' | 'y' | 'scale' | 'size' | 'alpha' = 'scale';
+  private tweenDuration: number = 1000;
+  private tweenEasing: 'linear' | 'easeInOut' | 'bounce' = 'easeInOut';
   private textMode: 'static' | 'dynamic' = 'dynamic';
   private textContent: string = 'Hello World';
   private textBold: boolean = false;
@@ -23,7 +31,7 @@ export class EntitySpawner extends UIPanel {
   private textGlow: boolean = false;
   private spawnCallbacks: Map<string, () => void> = new Map();
   
-  constructor(_scene: Scene) {
+  constructor(_scene: Scene, inputManager: InputManager) {
     const config: UIPanelConfig = {
       id: 'entity-spawner',
       title: '🎮 SPAWN ENTITIES',
@@ -32,7 +40,7 @@ export class EntitySpawner extends UIPanel {
       defaultVisible: true,
       collapsible: true
     };
-    super(config);
+    super(config, inputManager);
   }
   
   /**
@@ -70,6 +78,29 @@ export class EntitySpawner extends UIPanel {
       shadow: this.textShadow,
       outline: this.textOutline,
       glow: this.textGlow
+    };
+  }
+  
+  /**
+   * Get texture configuration
+   */
+  getTextureConfig() {
+    return {
+      textureUrl: this.textureUrl
+    };
+  }
+  
+  /**
+   * Get animation configuration
+   */
+  getAnimationConfig() {
+    return {
+      type: this.animationType,
+      fps: this.animationFPS,
+      loop: this.animationLoop,
+      tweenProperty: this.tweenProperty,
+      tweenDuration: this.tweenDuration,
+      tweenEasing: this.tweenEasing
     };
   }
   
@@ -126,6 +157,67 @@ export class EntitySpawner extends UIPanel {
             <option value="text">📝 Text</option>
           </optgroup>
         </select>
+      </div>
+      
+      <div id="textureConfigSection" class="hidden">
+        <div class="ui-row">
+          <label class="ui-label">🖼️ Texture URL:</label>
+          <input type="text" id="textureUrl" value="" placeholder="/assets/sprite.png" class="flex-1">
+        </div>
+      </div>
+      
+      <div class="ui-row">
+        <label class="ui-label">🎬 Animation:</label>
+        <select id="animationType">
+          <option value="none">None</option>
+          <option value="frame">Frame Animation</option>
+          <option value="tween">Tween Animation</option>
+        </select>
+      </div>
+      
+      <div id="frameAnimSection" class="hidden">
+        <div class="ui-row">
+          <label class="ui-label">FPS:</label>
+          <div class="ui-value">
+            <input type="range" id="animationFPS" min="1" max="60" value="12">
+            <span id="animationFPSValue" class="checkbox-group"><span>12fps</span></span>
+          </div>
+        </div>
+        <div class="ui-row">
+          <label class="ui-label">Loop:</label>
+          <label class="checkbox-group">
+            <input type="checkbox" id="animationLoop" checked>
+            <span>Loop Animation</span>
+          </label>
+        </div>
+      </div>
+      
+      <div id="tweenAnimSection" class="hidden">
+        <div class="ui-row">
+          <label class="ui-label">Property:</label>
+          <select id="tweenProperty">
+            <option value="scale" selected>Scale</option>
+            <option value="x">Position X</option>
+            <option value="y">Position Y</option>
+            <option value="size">Size</option>
+            <option value="alpha">Alpha</option>
+          </select>
+        </div>
+        <div class="ui-row">
+          <label class="ui-label">Duration:</label>
+          <div class="ui-value">
+            <input type="range" id="tweenDuration" min="100" max="5000" value="1000" step="100">
+            <span id="tweenDurationValue" class="checkbox-group"><span>1000ms</span></span>
+          </div>
+        </div>
+        <div class="ui-row">
+          <label class="ui-label">Easing:</label>
+          <select id="tweenEasing">
+            <option value="linear">Linear</option>
+            <option value="easeInOut" selected>Ease In/Out</option>
+            <option value="bounce">Bounce</option>
+          </select>
+        </div>
       </div>
       
       <div id="textConfigSection" class="hidden">
@@ -232,6 +324,44 @@ export class EntitySpawner extends UIPanel {
     this.on('visualType', 'change', (e) => {
       this.visualType = (e.target as HTMLSelectElement).value as typeof this.visualType;
       this.updateTextConfigVisibility();
+      this.updateTextureConfigVisibility();
+    });
+    
+    // Texture URL input
+    this.on('textureUrl', 'input', (e) => {
+      this.textureUrl = (e.target as HTMLInputElement).value;
+    });
+    
+    // Animation type selector
+    this.on('animationType', 'change', (e) => {
+      this.animationType = (e.target as HTMLSelectElement).value as typeof this.animationType;
+      this.updateAnimationConfigVisibility();
+    });
+    
+    // Frame animation controls
+    const animationFPSValue = this.container.querySelector('#animationFPSValue');
+    this.on('animationFPS', 'input', (e) => {
+      this.animationFPS = parseInt((e.target as HTMLInputElement).value);
+      if (animationFPSValue) animationFPSValue.textContent = `${this.animationFPS}fps`;
+    });
+    
+    this.on('animationLoop', 'change', (e) => {
+      this.animationLoop = (e.target as HTMLInputElement).checked;
+    });
+    
+    // Tween animation controls
+    this.on('tweenProperty', 'change', (e) => {
+      this.tweenProperty = (e.target as HTMLSelectElement).value as typeof this.tweenProperty;
+    });
+    
+    const tweenDurationValue = this.container.querySelector('#tweenDurationValue');
+    this.on('tweenDuration', 'input', (e) => {
+      this.tweenDuration = parseInt((e.target as HTMLInputElement).value);
+      if (tweenDurationValue) tweenDurationValue.textContent = `${this.tweenDuration}ms`;
+    });
+    
+    this.on('tweenEasing', 'change', (e) => {
+      this.tweenEasing = (e.target as HTMLSelectElement).value as typeof this.tweenEasing;
     });
     
     // Text mode selector
@@ -324,6 +454,37 @@ export class EntitySpawner extends UIPanel {
         textConfigSection.classList.remove('hidden');
       } else {
         textConfigSection.classList.add('hidden');
+      }
+    }
+  }
+  
+  private updateTextureConfigVisibility(): void {
+    if (!this.container) return;
+    const textureConfigSection = this.container.querySelector('#textureConfigSection') as HTMLDivElement;
+    if (textureConfigSection) {
+      if (this.visualType === 'sprite') {
+        textureConfigSection.classList.remove('hidden');
+      } else {
+        textureConfigSection.classList.add('hidden');
+      }
+    }
+  }
+  
+  private updateAnimationConfigVisibility(): void {
+    if (!this.container) return;
+    const frameAnimSection = this.container.querySelector('#frameAnimSection') as HTMLDivElement;
+    const tweenAnimSection = this.container.querySelector('#tweenAnimSection') as HTMLDivElement;
+    
+    if (frameAnimSection && tweenAnimSection) {
+      if (this.animationType === 'frame') {
+        frameAnimSection.classList.remove('hidden');
+        tweenAnimSection.classList.add('hidden');
+      } else if (this.animationType === 'tween') {
+        frameAnimSection.classList.add('hidden');
+        tweenAnimSection.classList.remove('hidden');
+      } else {
+        frameAnimSection.classList.add('hidden');
+        tweenAnimSection.classList.add('hidden');
       }
     }
   }

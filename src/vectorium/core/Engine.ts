@@ -18,6 +18,14 @@ import { EntitySpawner } from '../debug/EntitySpawner';
 import { CameraControls } from '../debug/CameraControls';
 import { UIStyleLoader } from '../ui/UIStyleLoader';
 
+// 🚀 Phase 1: New Systems
+import { TextureManager } from '../rendering/TextureManager';
+import { AnimationManager } from '../animation/AnimationManager';
+import { AnimationSystem } from '../animation/AnimationSystem';
+import { AssetLoader } from '../assets/AssetLoader';
+import { LoadingManager } from '../assets/LoadingManager';
+import { InputManager } from '../input/InputManager';
+
 // Re-export for convenience
 export { Viewport, Scene };
 export type { Entity, EntityId, EntityFlags } from './Entity';
@@ -32,6 +40,13 @@ export class Vectorium {
   readonly performanceMonitor: PerformanceMonitor;
   readonly bufferPool: BufferPool;
   readonly runtimeConfig: RuntimeConfig;
+  
+  // 🚀 Phase 1: New Systems
+  readonly textureManager: TextureManager;
+  readonly animationManager: AnimationManager;
+  readonly loadingManager: LoadingManager;
+  readonly assetLoader: AssetLoader;
+  private inputManager: InputManager | null = null;  // Created when scene loads
   
   private scenes = new Map<string, Scene>();
   private currentScene: Scene | null = null;
@@ -101,6 +116,12 @@ export class Vectorium {
     // Initialize buffer pool
     this.bufferPool = new BufferPool();
     
+    // 🚀 Phase 1: Initialize new systems
+    this.textureManager = new TextureManager(this.renderer.getContext() as WebGL2RenderingContext);
+    this.animationManager = new AnimationManager();
+    this.loadingManager = new LoadingManager();
+    this.assetLoader = new AssetLoader(this.textureManager, this.loadingManager);
+    
     // Setup runtime config change handler
     this.setupRuntimeConfig();
     
@@ -165,11 +186,8 @@ export class Vectorium {
     // Inject consolidated UI styles once
     UIStyleLoader.injectStyles();
     
-    // Initialize debug panel (Press C)
-    this.debugPanel = new DebugPanel(this.runtimeConfig);
-    
-    // Note: Entity spawner and camera controls need a scene/camera
-    // They will be initialized in loadScene()
+    // Note: DebugPanel, Entity spawner and camera controls need InputManager
+    // They will be initialized in loadScene() after InputManager is created
   }
 
   registerScene(name: string, scene: Scene): void {
@@ -196,10 +214,29 @@ export class Vectorium {
     
     await this.currentScene.load();
     
+    // 🚀 Phase 1: Initialize InputManager with scene's world and spatial hash
+    this.inputManager = new InputManager(
+      this.canvas,
+      this.currentScene.world,
+      this.currentScene.getSpatialHash()
+    );
+    
+    // Initialize PerformanceMonitor UI now that InputManager exists
+    this.performanceMonitor.initializeUI(this.inputManager);
+    
+    // 🚀 Phase 1: Create and set AnimationSystem for this scene
+    const animSystem = new AnimationSystem(this.currentScene.world, this.animationManager);
+    this.currentScene.setAnimationSystem(animSystem);
+    
     // Initialize scene-specific debug tools
     if (this.config.enableDebugTools) {
+      // Initialize debug panel (Press C) - needs InputManager
+      if (!this.debugPanel) {
+        this.debugPanel = new DebugPanel(this.runtimeConfig, this.inputManager);
+      }
+      
       // Entity spawner (Press E)
-      this.entitySpawner = new EntitySpawner(this.currentScene);
+      this.entitySpawner = new EntitySpawner(this.currentScene, this.inputManager);
       this.entitySpawner.registerCallbacks({
         remove1K: () => {
           // Remove last 1K entities using pure ECS
@@ -211,7 +248,7 @@ export class Vectorium {
       // Camera controls (Press V)
       const camera = this.getCamera();
       if (camera) {
-        this.cameraControls = new CameraControls(camera, this.runtimeConfig);
+        this.cameraControls = new CameraControls(camera, this.runtimeConfig, this.inputManager);
       }
     }
     
@@ -255,6 +292,16 @@ export class Vectorium {
       (window as any).vectoriumCurrentWorld = this.currentScene.world;
       
       this.currentScene.update(dt);
+      
+      // 🚀 Phase 1: Update InputManager with camera transform
+      // Note: Spatial hash is already populated by physics update
+      if (this.inputManager) {
+        const camera = this.getCamera();
+        if (camera) {
+          this.inputManager.updateCamera(camera.x, camera.y, camera.getZoom());
+        }
+        this.inputManager.update(dt);
+      }
       
       // Record entities processed for performance monitoring
       this.performanceMonitor.recordEntitiesProcessed(this.currentScene.perfMetrics.ecsActiveEntities);
@@ -305,8 +352,6 @@ export class Vectorium {
     // TODO: Reimplement debug rendering using unified text pipeline
     // For now, debug info is disabled since TextRenderer was removed
     // Debug panel still shows FPS and metrics in the UI
-    
-    const metrics = this.performanceMonitor.getMetrics();
     
     // Draw background for debug overlay
     this.renderer.drawRect(5, 5, 240, 120, { r: 0, g: 0, b: 0 }, 0.7);
@@ -432,6 +477,57 @@ export class Vectorium {
    */
   getCamera(): Camera | null {
     return this.currentScene ? this.currentScene.getCamera() : null;
+  }
+  
+  // 🚀 Phase 1: New System Getters
+  
+  /**
+   * Get the texture manager
+   */
+  getTextureManager(): TextureManager {
+    return this.textureManager;
+  }
+  
+  /**
+   * Get the animation manager
+   */
+  getAnimationManager(): AnimationManager {
+    return this.animationManager;
+  }
+  
+  /**
+   * Get the loading manager
+   */
+  getLoadingManager(): LoadingManager {
+    return this.loadingManager;
+  }
+  
+  /**
+   * Get the asset loader
+   */
+  getAssetLoader(): AssetLoader {
+    return this.assetLoader;
+  }
+  
+  /**
+   * Get the input manager (available after scene loads)
+   */
+  getInputManager(): InputManager | null {
+    return this.inputManager;
+  }
+  
+  /**
+   * Get the current world (available after scene loads)
+   */
+  getWorld() {
+    return this.currentScene ? this.currentScene.world : null;
+  }
+  
+  /**
+   * Get the spatial hash (available after scene loads)
+   */
+  getSpatialHash() {
+    return this.currentScene ? this.currentScene.getSpatialHash() : null;
   }
 
   /**

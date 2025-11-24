@@ -211,17 +211,22 @@ export class TextRenderer {
     }
     
     // Calculate X position based on alignment
+    // drawSprite treats (x,y) as CENTER of sprite
+    // For alignment, x represents where the alignment edge/center should be
     let alignOffsetX = 0;
     const align = style?.align || 'left';
+    
     if (align === 'center') {
-      alignOffsetX = -textureInfo.width / 2;
+      alignOffsetX = 0; // Center: sprite center at x
+    } else if (align === 'left') {
+      alignOffsetX = textureInfo.width / 2; // Left edge at x → sprite center at x + width/2
     } else if (align === 'right') {
-      alignOffsetX = -textureInfo.width;
+      alignOffsetX = -textureInfo.width / 2; // Right edge at x → sprite center at x - width/2
     }
     
     // Render text quad through batch renderer (uses same optimization pipeline as sprites)
     this.batchRenderer.drawSprite({
-      x: x + textureInfo.width / 2 + alignOffsetX,
+      x: x + alignOffsetX,
       y: y + textureInfo.height / 2,
       width: textureInfo.width,
       height: textureInfo.height,

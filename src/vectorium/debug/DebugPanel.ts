@@ -6,11 +6,12 @@
 
 import { RuntimeConfig } from '../core/RuntimeConfig';
 import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
+import type { InputManager } from '../input/InputManager';
 
 export class DebugPanel extends UIPanel {
   private runtimeConfig: RuntimeConfig;
 
-  constructor(config: RuntimeConfig) {
+  constructor(config: RuntimeConfig, inputManager: InputManager) {
     super({
       id: 'debug-panel',
       title: '⚙️ CONFIG',
@@ -18,7 +19,7 @@ export class DebugPanel extends UIPanel {
       position: 'top-left',
       defaultVisible: false,
       collapsible: true
-    });
+    }, inputManager);
     this.runtimeConfig = config;
   }
 

@@ -4,6 +4,7 @@
  */
 
 import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
+import type { InputManager } from '../input/InputManager';
 
 export type QualityLevel = 'ultra' | 'high' | 'medium' | 'low' | 'potato';
 
@@ -160,11 +161,18 @@ export class PerformanceMonitor extends UIPanel {
       defaultVisible: true,
       collapsible: true
     };
-    super(panelConfig);
+    // Pass null for deferred initialization
+    super(panelConfig, null);
     
     this.targetFPS = targetFPS;
     this.currentQuality = initialQuality;
-    
+  }
+  
+  /**
+   * Initialize UI with InputManager (call after InputManager is created)
+   */
+  initializeUI(inputManager: InputManager): void {
+    this.setInputManager(inputManager);
     this.initSparkline();
     this.startProfilerUpdates();
   }
@@ -697,7 +705,7 @@ export class PerformanceMonitor extends UIPanel {
 
   private startProfilerUpdates(): void {
     this.updateTimer = window.setInterval(() => {
-      if (this.profilerVisible) {
+      if (this.visible) {
         this.updateProfilerUI();
       }
     }, 100); // 10Hz updates

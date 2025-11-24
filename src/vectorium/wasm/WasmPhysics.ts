@@ -119,17 +119,13 @@ export class WasmPhysics {
     // ============================================================================
     t0 = performance.now();
     
-    // 🚀 P0 OPTIMIZATION: Use pre-computed counter instead of scanning
-    // PERFORMANCE: Skip collision phase entirely if no entities have collisions
-    if (collisionsEnabled && collisionEntityCount > 0) {
-      this.spatialHash.clear();
-      
-      // Build spatial hash - only insert entities with collisions enabled
-      for (let i = 0; i < entityCount; i++) {
-        if (collisionsEnabled[i]) {
-          this.spatialHash.insert(i, positionX[i], positionY[i]);
-        }
-      }
+    // Always clear and rebuild spatial hash with ALL entities
+    // This is needed for both collision detection AND input picking
+    this.spatialHash.clear();
+    
+    // Insert ALL entities into spatial hash (needed for input picking)
+    for (let i = 0; i < entityCount; i++) {
+      this.spatialHash.insert(i, positionX[i], positionY[i]);
     }
     
     this.metrics.collisionBuildTime = performance.now() - t0;
@@ -139,7 +135,7 @@ export class WasmPhysics {
     // ============================================================================
     t0 = performance.now();
     
-    // PERFORMANCE: Skip collision phase entirely if no entities have collisions
+    // 🚀 P0 OPTIMIZATION: Skip collision phase entirely if no entities have collisions
     if (collisionsEnabled && collisionEntityCount > 0) {
       // CRITICAL FIX: Resize delta buffers if needed
       if (entityCount > this.maxEntities) {
@@ -485,8 +481,16 @@ export class WasmPhysics {
     return {
       ...this.metrics,
       totalPhysicsTime: this.metrics.gravityTime + this.metrics.collisionBuildTime + 
-                        this.metrics.collisionDetectTime + this.metrics.boundaryTime
+                        this.metrics.collisionDetectTime + this.metrics.boundaryTime,
+      spatialHashStats: this.spatialHash.stats
     };
+  }
+  
+  /**
+   * Get the spatial hash for external use (e.g., InputManager)
+   */
+  getSpatialHash(): SpatialHash {
+    return this.spatialHash;
   }
 }
 

@@ -7,12 +7,13 @@
 import { Camera } from '../core/Camera';
 import { RuntimeConfig } from '../core/RuntimeConfig';
 import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
+import type { InputManager } from '../input/InputManager';
 
 export class CameraControls extends UIPanel {
   private camera: Camera;
   private runtimeConfig: RuntimeConfig;
 
-  constructor(camera: Camera, config: RuntimeConfig) {
+  constructor(camera: Camera, config: RuntimeConfig, inputManager: InputManager) {
     super({
       id: 'camera-controls',
       title: '📹 CAMERA',
@@ -20,7 +21,7 @@ export class CameraControls extends UIPanel {
       position: 'bottom-right',
       defaultVisible: false,
       collapsible: true
-    });
+    }, inputManager);
     this.camera = camera;
     this.runtimeConfig = config;
     this.startUpdateLoop();

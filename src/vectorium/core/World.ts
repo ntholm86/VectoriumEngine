@@ -64,6 +64,25 @@ export class World {
   private shapeType: Uint8Array;     // 0=sprite (default), 1=circle, 2=triangle, 3=star, etc.
   private textIndex: Int32Array;     // -1=no text, >=0=index into textPool
   
+  // 🚀 Phase 1: Texture System Arrays (22 bytes per entity)
+  private textureIds: Uint16Array;   // Texture ID (0 = no texture)
+  private uvU0: Uint16Array;         // UV coordinates (0-65535)
+  private uvV0: Uint16Array;
+  private uvU1: Uint16Array;
+  private uvV1: Uint16Array;
+  
+  // 🚀 Phase 1: Animation System Arrays (50 bytes per entity)
+  private frameAnimIds: Uint16Array;      // Frame animation ID (0 = none)
+  private frameIndices: Uint16Array;      // Current frame index
+  private frameTimes: Float32Array;       // Time in current frame (ms)
+  private animLoop: Uint8Array;           // Loop flag (0/1)
+  
+  private tweenIds: Uint16Array;          // Tween ID (0 = none)
+  private tweenTimes: Float32Array;       // Tween progress (ms)
+  private tweenActive: Uint8Array;        // Tween active flag (0/1)
+  private tweenStartValues: Float32Array; // Start values (up to 4 properties)
+  private tweenEndValues: Float32Array;   // End values (up to 4 properties)
+  
   // 🚀 WASM Physics Engine
   private wasmPhysics: WasmPhysics;
   
@@ -136,6 +155,25 @@ export class World {
     // Initialize shape & text properties
     this.shapeType = new Uint8Array(maxEntities);  // Default: 0 (sprite)
     this.textIndex = new Int32Array(maxEntities).fill(-1);  // Default: -1 (no text)
+    
+    // 🚀 Phase 1: Initialize texture arrays
+    this.textureIds = new Uint16Array(maxEntities);
+    this.uvU0 = new Uint16Array(maxEntities);
+    this.uvV0 = new Uint16Array(maxEntities);
+    this.uvU1 = new Uint16Array(maxEntities).fill(65535);  // Default: full texture (1.0)
+    this.uvV1 = new Uint16Array(maxEntities).fill(65535);
+    
+    // 🚀 Phase 1: Initialize animation arrays
+    this.frameAnimIds = new Uint16Array(maxEntities);
+    this.frameIndices = new Uint16Array(maxEntities);
+    this.frameTimes = new Float32Array(maxEntities);
+    this.animLoop = new Uint8Array(maxEntities);
+    
+    this.tweenIds = new Uint16Array(maxEntities);
+    this.tweenTimes = new Float32Array(maxEntities);
+    this.tweenActive = new Uint8Array(maxEntities);
+    this.tweenStartValues = new Float32Array(maxEntities * 4);  // 4 properties max
+    this.tweenEndValues = new Float32Array(maxEntities * 4);
   }
   
   /**
@@ -193,6 +231,22 @@ export class World {
     // 🎨 Initialize shape & text properties
     this.shapeType[id] = 0;  // Default: sprite
     this.textIndex[id] = -1;  // Default: no text
+    
+    // 🚀 Phase 1: Initialize texture properties
+    this.textureIds[id] = 0;  // No texture by default
+    this.uvU0[id] = 0;
+    this.uvV0[id] = 0;
+    this.uvU1[id] = 65535;
+    this.uvV1[id] = 65535;
+    
+    // 🚀 Phase 1: Initialize animation properties
+    this.frameAnimIds[id] = 0;
+    this.frameIndices[id] = 0;
+    this.frameTimes[id] = 0;
+    this.animLoop[id] = 0;
+    this.tweenIds[id] = 0;
+    this.tweenTimes[id] = 0;
+    this.tweenActive[id] = 0;
     
     // 🚀 P0 OPTIMIZATION: Track animation count (default: all entities animated)
     this.animatedEntityCount++;
@@ -279,6 +333,13 @@ export class World {
    */
   getPhysicsMetrics(): any {
     return this.wasmPhysics.getMetrics();
+  }
+  
+  /**
+   * Get the spatial hash (for InputManager entity picking)
+   */
+  getSpatialHash() {
+    return this.wasmPhysics.getSpatialHash();
   }
   
   /**
@@ -387,6 +448,7 @@ export class World {
   getColorG(): Uint8Array { return this.colorG; }
   getColorB(): Uint8Array { return this.colorB; }
   getAlphas(): Float32Array { return this.alpha; }
+  getAlpha(): Float32Array { return this.alpha; } // Alias for compatibility
   getFlags(): Uint32Array { return this.flags; }
   getMass(): Float32Array { return this.mass; }
   getRestitution(): Float32Array { return this.restitution; }
@@ -428,7 +490,7 @@ export class World {
    * Get memory usage statistics
    */
   getMemoryUsage(): { arrays: number; total: number; perEntity: number } {
-    const arrayCount = 22; // Number of typed arrays (20 + shapeType + textIndex)
+    const arrayCount = 38; // Updated for Phase 1 (22 base + 5 texture + 9 animation + 2 shape/text)
     const bytesPerEntity = 
       4 + 4 +  // positionX, positionY (Float32)
       4 + 4 +  // velocityX, velocityY (Float32)
@@ -438,7 +500,12 @@ export class World {
       4 + 4 +  // alpha, flags (Float32, Uint32)
       1 +  // animationType (Uint8)
       4 + 4 + 4 + 4 + 1 + 4 +  // animation state (Float32 × 5, Int8 × 1)
-      1 + 4;  // 🎨 shapeType (Uint8), textIndex (Int32)
+      1 + 4 +  // 🎨 shapeType (Uint8), textIndex (Int32)
+      // 🚀 Phase 1: Texture System (22 bytes)
+      2 + 2 + 2 + 2 + 2 +  // textureId, uvU0, uvV0, uvU1, uvV1 (Uint16 × 5)
+      // 🚀 Phase 1: Animation System (50 bytes)
+      2 + 2 + 4 + 1 +  // frameAnimId, frameIndex, frameTime, animLoop
+      2 + 4 + 1 + 16 + 16;  // tweenId, tweenTime, tweenActive, startValues, endValues
     
     const totalBytes = this.maxEntities * bytesPerEntity;
     
@@ -550,9 +617,165 @@ export class World {
    */
   getDebugInfo(): string {
     const active = this.getActiveCount();
-    const memory = this.getMemoryUsage();
-    const memoryMB = (memory.total / 1024 / 1024).toFixed(2);
+    return `World: ${active}/${this.entityCount} entities | Collisions: ${this.collisionEntityCount} | Gravity: ${this.gravityEntityCount} | Animated: ${this.animatedEntityCount} | Shapes: ${this.shapeEntityCount} | Text: ${this.textEntityCount}`;
+  }
+  
+  // ==================== Phase 1: Texture System Getters ====================
+  
+  /**
+   * Get texture ID array
+   */
+  getTextureIds(): Uint16Array {
+    return this.textureIds;
+  }
+  
+  /**
+   * Get UV coordinate arrays
+   */
+  getUVU0(): Uint16Array { return this.uvU0; }
+  getUVV0(): Uint16Array { return this.uvV0; }
+  getUVU1(): Uint16Array { return this.uvU1; }
+  getUVV1(): Uint16Array { return this.uvV1; }
+  
+  /**
+   * Set texture for entity
+   */
+  setTexture(
+    id: EntityId,
+    textureId: number,
+    u0: number = 0,
+    v0: number = 0,
+    u1: number = 65535,
+    v1: number = 65535
+  ): void {
+    this.textureIds[id] = textureId;
+    this.uvU0[id] = u0;
+    this.uvV0[id] = v0;
+    this.uvU1[id] = u1;
+    this.uvV1[id] = v1;
+  }
+  
+  /**
+   * Set texture from atlas frame
+   */
+  setTextureFrame(
+    id: EntityId,
+    textureId: number,
+    frameX: number,
+    frameY: number,
+    frameWidth: number,
+    frameHeight: number,
+    textureWidth: number,
+    textureHeight: number
+  ): void {
+    const u0 = Math.floor((frameX / textureWidth) * 65535);
+    const v0 = Math.floor((frameY / textureHeight) * 65535);
+    const u1 = Math.floor(((frameX + frameWidth) / textureWidth) * 65535);
+    const v1 = Math.floor(((frameY + frameHeight) / textureHeight) * 65535);
     
-    return `ECS World: ${active}/${this.entityCount} active, ${memoryMB}MB, ${this.freeList.length} recycled`;
+    this.setTexture(id, textureId, u0, v0, u1, v1);
+  }
+  
+  // ==================== Phase 1: Animation System Getters ====================
+  
+  /**
+   * Get frame animation arrays
+   */
+  getFrameAnimIds(): Uint16Array { return this.frameAnimIds; }
+  getFrameIndices(): Uint16Array { return this.frameIndices; }
+  getFrameTimes(): Float32Array { return this.frameTimes; }
+  getAnimLoop(): Uint8Array { return this.animLoop; }
+  
+  /**
+   * Get tween arrays
+   */
+  getTweenIds(): Uint16Array { return this.tweenIds; }
+  getTweenTimes(): Float32Array { return this.tweenTimes; }
+  getTweenActive(): Uint8Array { return this.tweenActive; }
+  getTweenStartValues(): Float32Array { return this.tweenStartValues; }
+  getTweenEndValues(): Float32Array { return this.tweenEndValues; }
+  
+  /**
+   * Play frame animation on entity
+   */
+  playAnimation(id: EntityId, animationId: number, loop: boolean = true): void {
+    this.frameAnimIds[id] = animationId;
+    this.frameIndices[id] = 0;
+    this.frameTimes[id] = 0;
+    this.animLoop[id] = loop ? 1 : 0;
+  }
+  
+  /**
+   * Stop frame animation
+   */
+  stopAnimation(id: EntityId): void {
+    this.frameAnimIds[id] = 0;
+    this.frameIndices[id] = 0;
+    this.frameTimes[id] = 0;
+  }
+  
+  /**
+   * Start tween on entity
+   */
+  startTween(
+    id: EntityId,
+    tweenId: number,
+    startValues: number[],
+    endValues: number[]
+  ): void {
+    this.tweenIds[id] = tweenId;
+    this.tweenTimes[id] = 0;
+    this.tweenActive[id] = 1;
+    
+    // Store start/end values (up to 4 properties)
+    const baseIndex = id * 4;
+    for (let i = 0; i < Math.min(4, startValues.length); i++) {
+      this.tweenStartValues[baseIndex + i] = startValues[i];
+      this.tweenEndValues[baseIndex + i] = endValues[i];
+    }
+  }
+  
+  /**
+   * Stop tween
+   */
+  stopTween(id: EntityId): void {
+    this.tweenIds[id] = 0;
+    this.tweenActive[id] = 0;
+  }
+  
+  /**
+   * Set interactive flag for entity
+   */
+  setInteractive(id: EntityId): void {
+    this.flags[id] |= (1 << 5);  // Interactive flag (bit 5)
+  }
+  
+  /**
+   * Set size for entity
+   */
+  setSize(id: EntityId, size: number): void {
+    this.size[id] = size;
+  }
+  
+  /**
+   * Get entity count
+   */
+  getCount(): number {
+    return this.entityCount;
+  }
+  
+  /**
+   * Get X position array
+   */
+  getX(): Float32Array {
+    return this.positionX;
+  }
+  
+  /**
+   * Get Y position array
+   */
+  getY(): Float32Array {
+    return this.positionY;
   }
 }
+

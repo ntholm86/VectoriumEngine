@@ -2,7 +2,10 @@
  * Vectorium UI Panel - Base Class
  * Provides common functionality for all UI panels (debug tools, profilers, spawners)
  * Eliminates code duplication and provides consistent behavior
+ * Integrated with InputManager for coordinated input handling
  */
+
+import type { InputManager } from '../input/InputManager';
 
 export interface UIPanelConfig {
   id: string;                    // Unique identifier (e.g., 'entity-spawner')
@@ -19,13 +22,40 @@ export abstract class UIPanel {
   protected container: HTMLDivElement | null = null;
   protected visible: boolean;
   protected collapsed: boolean = false;
-  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  protected inputManager: InputManager;
+  private unregisterKey: (() => void) | null = null;
+  private keyboardSetupDeferred = false;
 
-  constructor(config: UIPanelConfig) {
+  constructor(config: UIPanelConfig, inputManager: InputManager | null) {
     this.config = config;
     this.visible = config.defaultVisible;
+    this.inputManager = inputManager!;
+    
+    if (!inputManager) {
+      // Defer everything until setInputManager is called
+      this.keyboardSetupDeferred = true;
+      this.loadVisibility();
+      return;
+    }
+    
     this.loadVisibility();
     // Defer createUI to next tick to allow child constructor to complete
+    setTimeout(() => {
+      this.createUI();
+      this.setupKeyboardShortcut();
+    }, 0);
+  }
+  
+  /**
+   * Set InputManager and initialize UI (for deferred initialization)
+   */
+  public setInputManager(inputManager: InputManager): void {
+    if (!this.keyboardSetupDeferred) return;
+    
+    this.inputManager = inputManager;
+    this.keyboardSetupDeferred = false;
+    
+    // Now create UI
     setTimeout(() => {
       this.createUI();
       this.setupKeyboardShortcut();
@@ -96,18 +126,13 @@ export abstract class UIPanel {
   }
 
   /**
-   * Setup keyboard shortcut
+   * Setup keyboard shortcut (uses InputManager)
    */
   private setupKeyboardShortcut(): void {
-    this.keyHandler = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      if (key === this.config.keyboardShortcut.toLowerCase() &&
-          !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
-        this.toggle();
-        e.preventDefault();
-      }
-    };
-    window.addEventListener('keydown', this.keyHandler);
+    // Use InputManager for coordinated input handling
+    this.unregisterKey = this.inputManager.onKey(this.config.keyboardShortcut, () => {
+      this.toggle();
+    });
   }
 
   /**
@@ -173,8 +198,9 @@ export abstract class UIPanel {
    * Destroy panel (cleanup)
    */
   public destroy(): void {
-    if (this.keyHandler) {
-      window.removeEventListener('keydown', this.keyHandler);
+    if (this.unregisterKey) {
+      this.unregisterKey();
+      this.unregisterKey = null;
     }
     if (this.container && this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);

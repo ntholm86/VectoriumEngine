@@ -14,12 +14,18 @@ import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
 import type { EntityBurstFactory } from '../entities/factories';
 
+// 🚀 Phase 1: Animation System
+import type { AnimationSystem } from '../animation/AnimationSystem';
+
 export class Scene {
   name: string;
   active: boolean = false;
   
   // 🚀 Pure ECS World - all entity data lives here
   public world: World;
+  
+  // 🚀 Phase 1: Animation System (set by Engine)
+  private animationSystem: AnimationSystem | null = null;
   
   // Viewport manages all resolution and world bounds
   // Initialize with HD resolution (will be updated by Engine.loadScene)
@@ -89,6 +95,12 @@ export class Scene {
     
     const animStart = performance.now();
     this.world.updateAnimations(dt);
+    
+    // 🚀 Phase 1: Update frame animations and tweens
+    if (this.animationSystem) {
+      this.animationSystem.update(dt);
+    }
+    
     this.perfMetrics.updateAnimation = performance.now() - animStart;
     
     this.perfMetrics.updateEntitySync = 0; // No sync needed!
@@ -201,6 +213,17 @@ export class Scene {
     const totalCount = this.world.getActiveCount();
     const shapeCount = this.world.getShapeEntityCount();
     
+    // 🎬 Apply scale to sizes (for animation system)
+    const scales = this.world.getScale();
+    const scaledSizes = new Float32Array(sizes.length);
+    for (let i = 0; i < sizes.length; i++) {
+      scaledSizes[i] = sizes[i] * scales[i];
+      // Debug: Log scale application for first 10 entities
+      if (i < 10 && scales[i] !== 1.0) {
+        console.log(`Entity ${i}: size=${sizes[i].toFixed(2)}, scale=${scales[i].toFixed(2)}, scaledSize=${scaledSizes[i].toFixed(2)}`);
+      }
+    }
+    
     // Smart culling: Auto-disable when scene = viewport (all entities always visible)
     // This avoids culling overhead when there's nothing to cull
     const worldScale = this.viewport.worldScale;
@@ -226,7 +249,7 @@ export class Scene {
       // 🎨 Check if we have shapes to render separately
       if (shapeCount > 0 && renderer.isGPUAccelerationEnabled()) {
         renderer.drawBulkShapes(
-          posX, posY, rotation, sizes,
+          posX, posY, rotation, scaledSizes,
           colorR, colorG, colorB, alphas, shapeTypes,
           flags, totalCount, this.world.FLAG_VISIBLE,
           this.camera.x, this.camera.y, this.camera.getZoom()
@@ -234,7 +257,7 @@ export class Scene {
       } else {
         // Standard sprite rendering
         renderer.drawBulk(
-          posX, posY, rotation, sizes,
+          posX, posY, rotation, scaledSizes,
           colorR, colorG, colorB, alphas,
           flags, totalCount, this.world.FLAG_VISIBLE,
           this.camera.x, this.camera.y, this.camera.getZoom()
@@ -254,7 +277,7 @@ export class Scene {
     const visibleCount = this.camera.cullEntities(
       posX,
       posY,
-      sizes,
+      scaledSizes,
       totalCount,
       this.visibleIndices
     );
@@ -264,7 +287,7 @@ export class Scene {
     if (shapeCount > 0 && renderer.isGPUAccelerationEnabled()) {
       // Shapes rendering (currently non-indexed)
       renderer.drawBulkShapes(
-        posX, posY, rotation, sizes,
+        posX, posY, rotation, scaledSizes,
         colorR, colorG, colorB, alphas, shapeTypes,
         flags, totalCount, this.world.FLAG_VISIBLE,
         this.camera.x, this.camera.y, this.camera.getZoom()
@@ -272,7 +295,7 @@ export class Scene {
     } else {
       // Standard indexed rendering
       renderer.drawBulkIndexed(
-        posX, posY, rotation, sizes,
+        posX, posY, rotation, scaledSizes,
         colorR, colorG, colorB, alphas,
         flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
         this.camera.x, this.camera.y, this.camera.getZoom()
@@ -300,6 +323,27 @@ export class Scene {
    */
   getCamera(): Camera {
     return this.camera;
+  }
+  
+  /**
+   * Get the spatial hash for entity picking
+   */
+  getSpatialHash() {
+    return this.world.getSpatialHash();
+  }
+  
+  /**
+   * Get world instance
+   */
+  getWorld(): World {
+    return this.world;
+  }
+  
+  /**
+   * Set animation system (called by Engine)
+   */
+  setAnimationSystem(animSystem: AnimationSystem): void {
+    this.animationSystem = animSystem;
   }
   
   /**

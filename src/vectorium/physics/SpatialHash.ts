@@ -169,6 +169,21 @@ export class SpatialHash {
   }
   
   /**
+   * Query entities at a specific point (for entity picking)
+   * Returns all entities in the cell containing the point
+   */
+  queryPoint(x: number, y: number): number[] {
+    const cx = Math.floor(x * this.invCellSize);
+    const cy = Math.floor(y * this.invCellSize);
+    const k = this.key(cx, cy);
+    const bucket = this.cells.get(k);
+    
+    this.stats.queries++;
+    return bucket ? [...bucket] : [];
+  }
+
+  
+  /**
    * Get performance statistics
    */
   getStats() {
