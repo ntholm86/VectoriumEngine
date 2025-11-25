@@ -22,6 +22,7 @@ export class VectoriumBuilder {
   private enableEntitySpawner: boolean = false;
   private clickToSpawnOptions?: { shakeThresholds?: { min: number; intensity: number; duration: number }[] };
   private initialSceneName?: string;
+  private shouldExposeGlobals: boolean = false;
 
   /**
    * Set the canvas element (required)
@@ -94,6 +95,10 @@ export class VectoriumBuilder {
    */
   enableDebugTools(enabled: boolean = true): this {
     this.config.enableDebugTools = enabled;
+    // Auto-enable global exposure for console debugging
+    if (enabled) {
+      this.shouldExposeGlobals = true;
+    }
     return this;
   }
 
@@ -154,6 +159,15 @@ export class VectoriumBuilder {
   }
 
   /**
+   * Expose engine globals to window for console debugging
+   * Automatically enabled when enableDebugTools() is used
+   */
+  withExposeGlobals(enabled: boolean = true): this {
+    this.shouldExposeGlobals = enabled;
+    return this;
+  }
+
+  /**
    * Build and return the configured Vectorium instance
    */
   build(): Vectorium {
@@ -172,6 +186,7 @@ export class VectoriumBuilder {
     if (this.enableEntitySpawner && this.initialSceneName) {
       const sceneName = this.initialSceneName;
       const clickOptions = this.clickToSpawnOptions;
+      const exposeGlobals = this.shouldExposeGlobals;
       const origLoadScene = engine.loadScene.bind(engine);
       let isFirstLoad = true;
       
@@ -181,6 +196,23 @@ export class VectoriumBuilder {
           isFirstLoad = false;
           engine.setupEntitySpawner();
           engine.enableClickToSpawn(clickOptions);
+          if (exposeGlobals) {
+            engine.exposeGlobals();
+          }
+        }
+        return;
+      };
+    } else if (this.shouldExposeGlobals && this.initialSceneName) {
+      // Just expose globals, no entity spawner
+      const sceneName = this.initialSceneName;
+      const origLoadScene = engine.loadScene.bind(engine);
+      let isFirstLoad = true;
+      
+      engine.loadScene = async function(name: string) {
+        await origLoadScene(name);
+        if (isFirstLoad && name === sceneName) {
+          isFirstLoad = false;
+          engine.exposeGlobals();
         }
         return;
       };

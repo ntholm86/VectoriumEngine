@@ -78,7 +78,7 @@ function initDemo() {
     .withFullscreenCanvas()
     .withQuality('high')
     .withTargetFPS(60)
-    .enableDebugTools()
+    .enableDebugTools() // 🍭 Auto-enables global exposure!
     .withScene('demo', new DemoScene('demo'))
     .withEntitySpawner()
     .build();
@@ -86,9 +86,6 @@ function initDemo() {
   // Start engine
   engine.loadScene('demo').then(() => {
     engine.start();
-    
-    // 🍭 Expose engine globally for console debugging
-    engine.exposeGlobals();
   });
 }
 
