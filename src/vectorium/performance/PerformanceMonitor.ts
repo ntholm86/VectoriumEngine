@@ -492,26 +492,26 @@ export class PerformanceMonitor extends UIPanel {
     return `
       <div class="profiler-content">
         <div class="section-header">🎯 FRAME METRICS</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">FPS</span>
-            <span class="metric-value" data-metric="fps">60.0</span>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">FPS</span>
+            <span class="ui-value" data-metric="fps">60.0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Average</span>
-            <span class="metric-value" data-metric="fpsavg">60.0</span>
+          <div class="ui-row">
+            <span class="ui-label">└─ Average</span>
+            <span class="ui-value" data-metric="fpsavg">60.0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Frame Time</span>
-            <span class="metric-value" data-metric="frame">16.67ms</span>
+          <div class="ui-row">
+            <span class="ui-label">Frame Time</span>
+            <span class="ui-value" data-metric="frame">16.67ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Min/Max</span>
-            <span class="metric-value" data-metric="minmax">16/17ms</span>
+          <div class="ui-row">
+            <span class="ui-label">Min/Max</span>
+            <span class="ui-value" data-metric="minmax">16/17ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Variance</span>
-            <span class="metric-value" data-metric="variance">±0.5ms</span>
+          <div class="ui-row">
+            <span class="ui-label">Variance</span>
+            <span class="ui-value" data-metric="variance">±0.5ms</span>
           </div>
         </div>
 
@@ -521,170 +521,170 @@ export class PerformanceMonitor extends UIPanel {
         </div>
 
         <div class="section-header">🎨 RENDER PIPELINE</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">Draw Calls</span>
-            <span class="metric-value" data-metric="drawcalls">0</span>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Draw Calls</span>
+            <span class="ui-value" data-metric="drawcalls">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ WebGL</span>
-            <span class="metric-value" data-metric="webgl">0</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ WebGL</span>
+            <span class="ui-value" data-metric="webgl">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Text</span>
-            <span class="metric-value" data-metric="text">0</span>
+          <div class="ui-row">
+            <span class="ui-label">└─ Text</span>
+            <span class="ui-value" data-metric="text">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Vertices</span>
-            <span class="metric-value" data-metric="vertices">0</span>
+          <div class="ui-row">
+            <span class="ui-label">Vertices</span>
+            <span class="ui-value" data-metric="vertices">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Triangles</span>
-            <span class="metric-value" data-metric="triangles">0K</span>
+          <div class="ui-row">
+            <span class="ui-label">Triangles</span>
+            <span class="ui-value" data-metric="triangles">0K</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Batch Eff</span>
-            <span class="metric-value" data-metric="batch">0%</span>
+          <div class="ui-row">
+            <span class="ui-label">Batch Eff</span>
+            <span class="ui-value" data-metric="batch">0%</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Upload</span>
-            <span class="metric-value" data-metric="upload">0MB</span>
+          <div class="ui-row">
+            <span class="ui-label">Upload</span>
+            <span class="ui-value" data-metric="upload">0MB</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">States</span>
-            <span class="metric-value" data-metric="states">0</span>
+          <div class="ui-row">
+            <span class="ui-label">States</span>
+            <span class="ui-value" data-metric="states">0</span>
           </div>
         </div>
 
         <div class="section-header">⚛️ PHYSICS</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">Total Time</span>
-            <span class="metric-value" data-metric="physicstime">0.00ms</span>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Total Time</span>
+            <span class="ui-value" data-metric="physicstime">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Gravity</span>
-            <span class="metric-value" data-metric="gravitytime">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ Gravity</span>
+            <span class="ui-value" data-metric="gravitytime">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Hash Build</span>
-            <span class="metric-value" data-metric="hashbuild">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ Hash Build</span>
+            <span class="ui-value" data-metric="hashbuild">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Collision</span>
-            <span class="metric-value" data-metric="collisiontime">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ Collision</span>
+            <span class="ui-value" data-metric="collisiontime">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Boundary</span>
-            <span class="metric-value" data-metric="boundarytime">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">└─ Boundary</span>
+            <span class="ui-value" data-metric="boundarytime">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Checks</span>
-            <span class="metric-value" data-metric="collisionchecks">0</span>
+          <div class="ui-row">
+            <span class="ui-label">Checks</span>
+            <span class="ui-value" data-metric="collisionchecks">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Cells/Bucket</span>
-            <span class="metric-value" data-metric="hashcells">0/0</span>
+          <div class="ui-row">
+            <span class="ui-label">Cells/Bucket</span>
+            <span class="ui-value" data-metric="hashcells">0/0</span>
           </div>
         </div>
 
         <div class="section-header">⚙️ ECS METRICS</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">Active</span>
-            <span class="metric-value" data-metric="active">0</span>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Active</span>
+            <span class="ui-value" data-metric="active">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Shapes</span>
-            <span class="metric-value" data-metric="shapes">0</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ Shapes</span>
+            <span class="ui-value" data-metric="shapes">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Text</span>
-            <span class="metric-value" data-metric="textentities">0</span>
+          <div class="ui-row">
+            <span class="ui-label">└─ Text</span>
+            <span class="ui-value" data-metric="textentities">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Rendered</span>
-            <span class="metric-value" data-metric="rendered">0</span>
+          <div class="ui-row">
+            <span class="ui-label">Rendered</span>
+            <span class="ui-value" data-metric="rendered">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Culled</span>
-            <span class="metric-value" data-metric="culled">0</span>
+          <div class="ui-row">
+            <span class="ui-label">Culled</span>
+            <span class="ui-value" data-metric="culled">0</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Culling Eff</span>
-            <span class="metric-value" data-metric="cullingeff">0%</span>
+          <div class="ui-row">
+            <span class="ui-label">Culling Eff</span>
+            <span class="ui-value" data-metric="cullingeff">0%</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Time/Entity</span>
-            <span class="metric-value" data-metric="timeperentity">0μs</span>
+          <div class="ui-row">
+            <span class="ui-label">Time/Entity</span>
+            <span class="ui-value" data-metric="timeperentity">0μs</span>
           </div>
         </div>
 
         <div class="section-header">⚙️ UPDATE/RENDER</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">Update Total</span>
-            <span class="metric-value" data-metric="updatetotal">0.00ms</span>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Update Total</span>
+            <span class="ui-value" data-metric="updatetotal">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Physics</span>
-            <span class="metric-value" data-metric="updatephysics">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ Physics</span>
+            <span class="ui-value" data-metric="updatephysics">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Animation</span>
-            <span class="metric-value" data-metric="updateanimation">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ Animation</span>
+            <span class="ui-value" data-metric="updateanimation">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Sync</span>
-            <span class="metric-value" data-metric="updateentitysync">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">└─ Sync</span>
+            <span class="ui-value" data-metric="updateentitysync">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Render Total</span>
-            <span class="metric-value" data-metric="rendertotal">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">Render Total</span>
+            <span class="ui-value" data-metric="rendertotal">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">├─ Batch</span>
-            <span class="metric-value" data-metric="renderbatch">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">├─ Batch</span>
+            <span class="ui-value" data-metric="renderbatch">0.00ms</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">└─ Custom</span>
-            <span class="metric-value" data-metric="rendercustom">0.00ms</span>
+          <div class="ui-row">
+            <span class="ui-label">└─ Custom</span>
+            <span class="ui-value" data-metric="rendercustom">0.00ms</span>
           </div>
         </div>
 
         <div class="section-header">💾 MEMORY</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">JS Heap</span>
-            <span class="metric-value" data-metric="memory">0MB</span>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">JS Heap</span>
+            <span class="ui-value" data-metric="memory">0MB</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Vertex Buf</span>
-            <span class="metric-value" data-metric="vbuffer">0MB</span>
+          <div class="ui-row">
+            <span class="ui-label">Vertex Buf</span>
+            <span class="ui-value" data-metric="vbuffer">0MB</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Index Buf</span>
-            <span class="metric-value" data-metric="ibuffer">0MB</span>
+          <div class="ui-row">
+            <span class="ui-label">Index Buf</span>
+            <span class="ui-value" data-metric="ibuffer">0MB</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Text Atlas</span>
-            <span class="metric-value" data-metric="textatlas">0MB</span>
+          <div class="ui-row">
+            <span class="ui-label">Text Atlas</span>
+            <span class="ui-value" data-metric="textatlas">0MB</span>
           </div>
         </div>
 
         <div class="section-header">📊 PERFORMANCE</div>
-        <div class="metric-group">
-          <div class="metric-row">
-            <span class="metric-label">Quality</span>
-            <span class="metric-value" data-metric="quality">HIGH</span>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Quality</span>
+            <span class="ui-value" data-metric="quality">HIGH</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Score</span>
-            <span class="metric-value" data-metric="score">100</span>
+          <div class="ui-row">
+            <span class="ui-label">Score</span>
+            <span class="ui-value" data-metric="score">100</span>
           </div>
-          <div class="metric-row">
-            <span class="metric-label">Bottleneck</span>
-            <span class="metric-value" data-metric="bottleneck">BALANCED</span>
+          <div class="ui-row">
+            <span class="ui-label">Bottleneck</span>
+            <span class="ui-value" data-metric="bottleneck">BALANCED</span>
           </div>
         </div>
       </div>
@@ -720,9 +720,9 @@ export class PerformanceMonitor extends UIPanel {
       if (el) {
         el.textContent = value;
         if (colorClass) {
-          el.className = `metric-value ${colorClass}`;
+          el.className = `ui-value ${colorClass}`;
         } else {
-          el.className = 'metric-value';
+          el.className = 'ui-value';
         }
       }
     };

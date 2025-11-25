@@ -5,7 +5,7 @@
  */
 
 import { RuntimeConfig } from '../core/RuntimeConfig';
-import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
+import { UIPanel } from '../ui/UIPanel';
 import type { InputManager } from '../input/InputManager';
 
 export class DebugPanel extends UIPanel {

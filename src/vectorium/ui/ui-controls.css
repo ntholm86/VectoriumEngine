@@ -92,6 +92,7 @@
   max-width: 320px;
   backdrop-filter: var(--ui-blur);
   transition: var(--ui-transition);
+  height: auto;
 }
 
 .vectorium-panel.hidden {
@@ -143,8 +144,7 @@
 
 .vectorium-panel-content {
   padding: var(--ui-padding-lg);
-  max-height: 70vh;
-  overflow-y: auto;
+  height: auto;
 }
 
 .vectorium-panel-content::-webkit-scrollbar { width: var(--ui-padding-lg); }
@@ -157,8 +157,8 @@
    ============================================ */
 
 .ui-section {
-  margin-bottom: var(--ui-margin-md);
-  padding-bottom: var(--ui-padding-md);
+  margin-bottom: var(--ui-margin-xs);
+  padding-bottom: var(--ui-padding-xs);
   border-bottom: var(--ui-border-main);
 }
 
@@ -184,8 +184,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--ui-margin-sm);
-  padding: var(--ui-padding-sm) var(--ui-padding-md);
+  margin-bottom: 0;
+  padding: var(--ui-padding-xs) var(--ui-padding-md);
   background: var(--ui-bg-light);
   border-radius: var(--ui-border-radius-md);
 }
@@ -395,41 +395,18 @@ input[type="checkbox"]:checked::after {
    METRICS & DISPLAY VALUES
    ============================================ */
 
-.metric-group {
-  padding: var(--ui-padding-xs) 0;
-}
-
-.metric-row {
-  display: flex;
-  justify-content: space-between;
-  padding: var(--ui-gap-xs) 0;
-  line-height: var(--ui-line-height);
-}
-
-.metric-label {
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-tiny);
-}
-
-.metric-value,
 .zoom-display {
   color: var(--ui-accent-bright);
   font-weight: 600;
-  text-align: right;
-  font-size: var(--ui-font-tiny);
-  min-width: var(--ui-value-min-width);
+  text-align: center;
+  font-size: var(--ui-font-base);
+  min-width: var(--ui-zoom-display-width);
   display: inline-block;
 }
 
-.zoom-display {
-  font-size: var(--ui-font-base);
-  min-width: var(--ui-zoom-display-width);
-  text-align: center;
-}
-
-.metric-value[data-state="warning"] { color: var(--ui-error); }
-.metric-value[data-state="critical"] { color: var(--ui-error); animation: pulse 1s ease-in-out infinite; }
-.metric-value[data-state="good"] { color: var(--ui-success); }
+.ui-value[data-state="warning"] { color: var(--ui-error); }
+.ui-value[data-state="critical"] { color: var(--ui-error); animation: pulse 1s ease-in-out infinite; }
+.ui-value[data-state="good"] { color: var(--ui-success); }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }

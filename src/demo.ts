@@ -2,11 +2,25 @@ import { Vectorium, Scene } from './vectorium/core/Engine';
 import { 
   createCircleEntity,
   createStar5Entity,
+  createStar6Entity,
   createTriangleEntity,
+  createPentagonEntity,
   createHexagonEntity,
+  createOctagonEntity,
   createHeartEntity,
   createSquareEntity,
   createDiamondEntity,
+  createPentagramEntity,
+  createVesicaEntity,
+  createMoonEntity,
+  createCrossEntity,
+  createEggEntity,
+  createRoundedXEntity,
+  createPieEntity,
+  createArcEntity,
+  createRingEntity,
+  createTrapezoidEntity,
+  createHorseshoeEntity,
   createTextEntity,
   buildTextStyle
 } from './vectorium/entities/factories';
@@ -140,75 +154,6 @@ class DemoScene extends Scene {
   
   async load(): Promise<void> {
     this.setWorldBoundsMultiplier(1.0);
-    
-    // 🎬 TEST: Spawn 10 squares with scale animation
-    console.log('🎬 Spawning 10 test squares with SCALE + BOUNCE animation');
-    const animManager = (this as any).animationManager;
-    if (animManager) {
-      for (let i = 0; i < 10; i++) {
-        const x = 400 + i * 80;
-        const y = 400;
-        const size = 40;
-        const color = { r: 1, g: 0.3, b: 0.3 };
-        
-        // Create square entity
-        const id = this.world.createEntity(x, y, 0, 0);
-        const sizes = this.world.getSizes();
-        sizes[id] = size;
-        
-        // Set color
-        const colorR = this.world.getColorR();
-        const colorG = this.world.getColorG();
-        const colorB = this.world.getColorB();
-        colorR[id] = Math.floor(color.r * 255);
-        colorG[id] = Math.floor(color.g * 255);
-        colorB[id] = Math.floor(color.b * 255);
-        
-        // Apply scale tween with bounce easing
-        const bounceFn = (t: number) => {
-          const n1 = 7.5625;
-          const d1 = 2.75;
-          if (t < 1 / d1) {
-            return n1 * t * t;
-          } else if (t < 2 / d1) {
-            return n1 * (t -= 1.5 / d1) * t + 0.75;
-          } else if (t < 2.5 / d1) {
-            return n1 * (t -= 2.25 / d1) * t + 0.9375;
-          } else {
-            return n1 * (t -= 2.625 / d1) * t + 0.984375;
-          }
-        };
-        
-        const tweenName = `test_scale_bounce_${i}`;
-        const tween = animManager.createTween({
-          name: tweenName,
-          properties: [2], // Scale property
-          duration: 2000, // 2 seconds
-          easing: bounceFn
-        });
-        
-        // Set tween values
-        const tweenIds = this.world.getTweenIds();
-        const tweenTimes = this.world.getTweenTimes();
-        const tweenActive = this.world.getTweenActive();
-        const tweenStartValues = this.world.getTweenStartValues();
-        const tweenEndValues = this.world.getTweenEndValues();
-        const scales = this.world.getScale();
-        
-        tweenIds[id] = tween.id;
-        tweenTimes[id] = 0;
-        tweenActive[id] = 1;
-        
-        const baseIndex = id * 4;
-        tweenStartValues[baseIndex] = 1.0;
-        tweenEndValues[baseIndex] = 3.0; // Scale to 3x
-        scales[id] = 1.0; // Start at 1x
-        
-        console.log(`  Entity ${id}: scale tween 1.0 → 3.0 over 2s with bounce`);
-      }
-    }
-    
-    return;
     
     // 🎨 DEBUG: Spawn test text entities with different effects
     if (!this.textPool) {
@@ -412,7 +357,7 @@ function spawnWithPhysicsAndVisual(
   y: number,
   count: number,
   physicsMode: 'none' | 'gravity' | 'collision' | 'full',
-  visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' | 'text',
+  visualType: 'sprite' | 'circle' | 'star5' | 'star6' | 'triangle' | 'pentagon' | 'hexagon' | 'octagon' | 'heart' | 'square' | 'diamond' | 'pentagram' | 'vesica' | 'moon' | 'cross' | 'egg' | 'roundedx' | 'pie' | 'arc' | 'ring' | 'trapezoid' | 'horseshoe' | 'text',
   textConfig?: { mode: string; content: string; bold: boolean; italic: boolean; size: number; align: string; shadow: boolean; outline: boolean; glow: boolean },
   textureConfig?: { textureUrl: string },
   animationConfig?: { type: 'none' | 'frame' | 'tween'; fps: number; loop: boolean; tweenProperty: string; tweenDuration: number; tweenEasing: string }
@@ -432,11 +377,25 @@ function spawnWithPhysicsAndVisual(
     sprite: null,
     circle: createCircleEntity,
     star5: createStar5Entity,
+    star6: createStar6Entity,
     triangle: createTriangleEntity,
+    pentagon: createPentagonEntity,
     hexagon: createHexagonEntity,
+    octagon: createOctagonEntity,
     heart: createHeartEntity,
     square: createSquareEntity,
     diamond: createDiamondEntity,
+    pentagram: createPentagramEntity,
+    vesica: createVesicaEntity,
+    moon: createMoonEntity,
+    cross: createCrossEntity,
+    egg: createEggEntity,
+    roundedx: createRoundedXEntity,
+    pie: createPieEntity,
+    arc: createArcEntity,
+    ring: createRingEntity,
+    trapezoid: createTrapezoidEntity,
+    horseshoe: createHorseshoeEntity,
   };
   
   const shapeFactory = shapeFactories[visualType];

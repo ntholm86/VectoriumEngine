@@ -140,8 +140,14 @@ export class AnimationSystem {
       
       // Check if complete
       if (progress >= 1.0) {
-        tweenActive[i] = 0;
-        tweenIds[i] = 0;
+        // Reverse the tween (ping-pong animation)
+        const baseIndex = i * 4;
+        for (let p = 0; p < tween.properties.length; p++) {
+          const temp = tweenStartValues[baseIndex + p];
+          tweenStartValues[baseIndex + p] = tweenEndValues[baseIndex + p];
+          tweenEndValues[baseIndex + p] = temp;
+        }
+        tweenTimes[i] = 0; // Restart
       }
     }
   }

@@ -427,6 +427,138 @@ export function createHeartEntity(
 }
 
 /**
+ * Create a pentagram entity (5-point outlined star)
+ */
+export function createPentagramEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.PENTAGRAM, options);
+}
+
+/**
+ * Create a vesica entity (almond/eye shape)
+ */
+export function createVesicaEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.VESICA, options);
+}
+
+/**
+ * Create a moon entity (crescent)
+ */
+export function createMoonEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.MOON, options);
+}
+
+/**
+ * Create a cross entity
+ */
+export function createCrossEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.CROSS, options);
+}
+
+/**
+ * Create an egg entity
+ */
+export function createEggEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.EGG, options);
+}
+
+/**
+ * Create a rounded X entity
+ */
+export function createRoundedXEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.ROUNDED_X, options);
+}
+
+/**
+ * Create a pie entity (wedge/slice)
+ */
+export function createPieEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.PIE, options);
+}
+
+/**
+ * Create an arc entity
+ */
+export function createArcEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.ARC, options);
+}
+
+/**
+ * Create a ring entity (donut)
+ */
+export function createRingEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.RING, options);
+}
+
+/**
+ * Create a trapezoid entity
+ */
+export function createTrapezoidEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.TRAPEZOID, options);
+}
+
+/**
+ * Create a horseshoe entity
+ */
+export function createHorseshoeEntity(
+  world: World,
+  x: number,
+  y: number,
+  options: EntityFactoryOptions = {}
+): EntityId {
+  return createShapeEntity(world, x, y, ShapeType.HORSESHOE, options);
+}
+
+/**
  * Create a burst of shapes radiating from a point
  */
 export function createShapeBurst(

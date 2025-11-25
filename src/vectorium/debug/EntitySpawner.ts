@@ -147,11 +147,29 @@ export class EntitySpawner extends UIPanel {
           <optgroup label="GPU-Accelerated Shapes">
             <option value="circle">⚪ Circle</option>
             <option value="star5">⭐ 5-Point Star</option>
+            <option value="star6">✡️ 6-Point Star</option>
+            <option value="pentagram">🌟 Pentagram</option>
             <option value="triangle">🔺 Triangle</option>
+            <option value="pentagon">⬟ Pentagon</option>
             <option value="hexagon">⬡ Hexagon</option>
+            <option value="octagon">⯃ Octagon</option>
             <option value="heart">❤️ Heart</option>
             <option value="square">⬛ Square</option>
             <option value="diamond">💠 Diamond</option>
+            <option value="cross">✚ Cross</option>
+            <option value="roundedx">✖️ Rounded X</option>
+          </optgroup>
+          <optgroup label="Organic Shapes">
+            <option value="vesica">👁️ Vesica</option>
+            <option value="moon">🌙 Moon</option>
+            <option value="egg">🥚 Egg</option>
+          </optgroup>
+          <optgroup label="Arc Shapes">
+            <option value="pie">🍕 Pie</option>
+            <option value="arc">🌈 Arc</option>
+            <option value="ring">🍩 Ring</option>
+            <option value="trapezoid">▱ Trapezoid</option>
+            <option value="horseshoe">🧲 Horseshoe</option>
           </optgroup>
           <optgroup label="Text Rendering">
             <option value="text">📝 Text</option>

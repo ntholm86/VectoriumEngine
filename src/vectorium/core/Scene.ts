@@ -211,17 +211,12 @@ export class Scene {
     const shapeTypes = this.world.getShapeTypes(); // 🎨 Shape types array
     
     const totalCount = this.world.getActiveCount();
-    const shapeCount = this.world.getShapeEntityCount();
     
     // 🎬 Apply scale to sizes (for animation system)
     const scales = this.world.getScale();
     const scaledSizes = new Float32Array(sizes.length);
     for (let i = 0; i < sizes.length; i++) {
       scaledSizes[i] = sizes[i] * scales[i];
-      // Debug: Log scale application for first 10 entities
-      if (i < 10 && scales[i] !== 1.0) {
-        console.log(`Entity ${i}: size=${sizes[i].toFixed(2)}, scale=${scales[i].toFixed(2)}, scaledSize=${scaledSizes[i].toFixed(2)}`);
-      }
     }
     
     // Smart culling: Auto-disable when scene = viewport (all entities always visible)
@@ -246,8 +241,8 @@ export class Scene {
     
     if (!shouldCull) {
       // No culling - render all entities
-      // 🎨 Check if we have shapes to render separately
-      if (shapeCount > 0 && renderer.isGPUAccelerationEnabled()) {
+      // 🎨 Unified rendering: drawBulkShapes handles BOTH shapes and sprites
+      if (renderer.isGPUAccelerationEnabled()) {
         renderer.drawBulkShapes(
           posX, posY, rotation, scaledSizes,
           colorR, colorG, colorB, alphas, shapeTypes,
@@ -255,7 +250,7 @@ export class Scene {
           this.camera.x, this.camera.y, this.camera.getZoom()
         );
       } else {
-        // Standard sprite rendering
+        // Fallback: Standard sprite rendering (WebGL1 or GPU disabled)
         renderer.drawBulk(
           posX, posY, rotation, scaledSizes,
           colorR, colorG, colorB, alphas,
@@ -283,9 +278,9 @@ export class Scene {
     );
     
     // 🔥 ZERO COPY: Render directly from source arrays using indices!
-    // 🎨 Note: For now, shapes use non-indexed path (TODO: optimize in Phase 3)
-    if (shapeCount > 0 && renderer.isGPUAccelerationEnabled()) {
-      // Shapes rendering (currently non-indexed)
+    // 🎨 Unified rendering: drawBulkShapes handles BOTH shapes and sprites
+    if (renderer.isGPUAccelerationEnabled()) {
+      // Unified rendering (shapes + sprites in one pass)
       renderer.drawBulkShapes(
         posX, posY, rotation, scaledSizes,
         colorR, colorG, colorB, alphas, shapeTypes,
@@ -293,7 +288,7 @@ export class Scene {
         this.camera.x, this.camera.y, this.camera.getZoom()
       );
     } else {
-      // Standard indexed rendering
+      // Fallback: Standard indexed rendering
       renderer.drawBulkIndexed(
         posX, posY, rotation, scaledSizes,
         colorR, colorG, colorB, alphas,

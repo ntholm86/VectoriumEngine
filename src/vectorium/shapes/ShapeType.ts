@@ -75,7 +75,73 @@ export enum ShapeType {
    * Heart: Romantic heart shape
    * GPU math: Parametric curve SDF
    */
-  HEART = 10
+  HEART = 10,
+  
+  /**
+   * Pentagram: 5-pointed outlined star
+   * GPU math: Star outline with inner pentagon
+   */
+  PENTAGRAM = 11,
+  
+  /**
+   * Vesica: Almond/eye shape (lens intersection)
+   * GPU math: Two overlapping circles
+   */
+  VESICA = 12,
+  
+  /**
+   * Moon: Crescent moon shape
+   * GPU math: Circle subtracted from circle
+   */
+  MOON = 13,
+  
+  /**
+   * Cross: Plus/cross shape
+   * GPU math: Two intersecting rectangles
+   */
+  CROSS = 14,
+  
+  /**
+   * Egg: Oval egg shape
+   * GPU math: Parametric egg curve
+   */
+  EGG = 15,
+  
+  /**
+   * Rounded X: X shape with rounded corners
+   * GPU math: Diagonal cross with smoothing
+   */
+  ROUNDED_X = 16,
+  
+  /**
+   * Pie: Pie slice/wedge shape
+   * GPU math: Angular sector of circle
+   */
+  PIE = 17,
+  
+  /**
+   * Arc: Curved arc segment
+   * GPU math: Ring segment with angular bounds
+   */
+  ARC = 18,
+  
+  /**
+   * Ring: Donut/ring shape
+   * GPU math: Annular region between two circles
+   */
+  RING = 19,
+  
+  /**
+   * Trapezoid: Isosceles trapezoid
+   * GPU math: Four-sided polygon with parallel sides
+   */
+  TRAPEZOID = 20,
+  
+  /**
+   * Horseshoe: U-shaped curve
+   * GPU math: Partial ring with open ends
+   */
+  HORSESHOE = 21
 }
 
 /**
@@ -92,5 +158,16 @@ export const ShapeTypeNames: Record<ShapeType, string> = {
   [ShapeType.PENTAGON]: 'Pentagon',
   [ShapeType.OCTAGON]: 'Octagon',
   [ShapeType.DIAMOND]: 'Diamond',
-  [ShapeType.HEART]: 'Heart'
+  [ShapeType.HEART]: 'Heart',
+  [ShapeType.PENTAGRAM]: 'Pentagram',
+  [ShapeType.VESICA]: 'Vesica',
+  [ShapeType.MOON]: 'Moon',
+  [ShapeType.CROSS]: 'Cross',
+  [ShapeType.EGG]: 'Egg',
+  [ShapeType.ROUNDED_X]: 'Rounded X',
+  [ShapeType.PIE]: 'Pie',
+  [ShapeType.ARC]: 'Arc',
+  [ShapeType.RING]: 'Ring',
+  [ShapeType.TRAPEZOID]: 'Trapezoid',
+  [ShapeType.HORSESHOE]: 'Horseshoe'
 };

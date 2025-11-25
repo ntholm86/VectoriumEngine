@@ -247,18 +247,18 @@ void main() {
   vec3 projected = uProjection * vec3(aPosition, 1.0);
   gl_Position = vec4(projected.xy, 0.0, 1.0);
   
-  // Unpack metadata: [R8|G8|B8|A4|ShapeType4]
+  // Unpack metadata: [R8|G8|B8|A3|ShapeType5]
   uint r = (aMetadata >> 0u) & 0xFFu;
   uint g = (aMetadata >> 8u) & 0xFFu;
   uint b = (aMetadata >> 16u) & 0xFFu;
-  uint a = (aMetadata >> 24u) & 0xFu;
-  uint shapeType = (aMetadata >> 28u) & 0xFu;
+  uint a = (aMetadata >> 24u) & 0x7u;  // 3 bits for alpha (0-7)
+  uint shapeType = (aMetadata >> 27u) & 0x1Fu;  // 5 bits for shapeType (0-31)
   
   vColor = vec4(
     float(r) / 255.0,
     float(g) / 255.0,
     float(b) / 255.0,
-    float(a) / 15.0
+    float(a) / 7.0  // Map 0-7 to 0.0-1.0
   );
   
   vShapeUV = aUV * 2.0 - 1.0;
@@ -287,26 +287,43 @@ float sdBox(vec2 p, vec2 b) {
   return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
 }
 
-float sdTriangle(vec2 p) {
+float sdTriangle(vec2 p, float r) {
+  // Equilateral Triangle - from Inigo Quilezles
   const float k = sqrt(3.0);
-  p.x = abs(p.x) - 1.0;
-  p.y = p.y + 1.0 / k;
-  if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) / 2.0;
-  p.x -= clamp(p.x, -2.0, 0.0);
-  return -length(p) * sign(p.y);
+  p.x = abs(p.x) - r;
+  p.y = p.y + r/k;
+  if (p.x + k*p.y > 0.0) p = vec2(p.x - k*p.y, -k*p.x - p.y)/2.0;
+  p.x -= clamp(p.x, -2.0*r, 0.0);
+  return -length(p)*sign(p.y);
 }
 
-float sdPolygon(vec2 p, float r, int n) {
-  float an = PI / float(n);
-  float en = PI / float(n);
-  vec2 acs = vec2(cos(en), sin(en));
-  
-  float bn = mod(atan(p.x, p.y), 2.0 * an) - an;
-  p = length(p) * vec2(cos(bn), abs(sin(bn)));
-  p -= r * acs;
-  p.y += clamp(-p.y, 0.0, r * acs.y);
-  
-  return length(p) * sign(p.x);
+float sdPentagon(vec2 p, float r) {
+  // Regular Pentagon - from Inigo Quilezles
+  const vec3 k = vec3(0.809016994, 0.587785252, 0.726542528);
+  p.x = abs(p.x);
+  p -= 2.0*min(dot(vec2(-k.x,k.y),p),0.0)*vec2(-k.x,k.y);
+  p -= 2.0*min(dot(vec2(k.x,k.y),p),0.0)*vec2(k.x,k.y);
+  p -= vec2(clamp(p.x, -r*k.z, r*k.z), r);
+  return length(p)*sign(p.y);
+}
+
+float sdHexagon(vec2 p, float r) {
+  // Regular Hexagon - from Inigo Quilezles
+  const vec3 k = vec3(-0.866025404, 0.5, 0.577350269);
+  p = abs(p);
+  p -= 2.0*min(dot(k.xy,p),0.0)*k.xy;
+  p -= vec2(clamp(p.x, -k.z*r, k.z*r), r);
+  return length(p)*sign(p.y);
+}
+
+float sdOctagon(vec2 p, float r) {
+  // Regular Octagon - from Inigo Quilezles
+  const vec3 k = vec3(-0.9238795325, 0.3826834323, 0.4142135623);
+  p = abs(p);
+  p -= 2.0*min(dot(vec2(k.x,k.y),p),0.0)*vec2(k.x,k.y);
+  p -= 2.0*min(dot(vec2(-k.x,k.y),p),0.0)*vec2(-k.x,k.y);
+  p -= vec2(clamp(p.x, -k.z*r, k.z*r), r);
+  return length(p)*sign(p.y);
 }
 
 float sdStar5(vec2 p, float r, float rf) {
@@ -322,49 +339,179 @@ float sdStar5(vec2 p, float r, float rf) {
   return length(p - ba * h) * sign(p.y * ba.x - p.x * ba.y);
 }
 
-float sdStar6(vec2 p, float r) {
-  const float k = sqrt(3.0);
+float sdRhombus(vec2 p, vec2 b) {
   p = abs(p);
-  p -= vec2(clamp(p.x, -k * r, k * r), r);
-  
-  float d1 = length(p) * sign(p.y);
-  
-  p = vec2(p.x * k + p.y, -p.x + p.y * k) / 2.0;
-  p -= vec2(clamp(p.x, -k * r, k * r), r);
-  
-  float d2 = length(p) * sign(p.y);
-  
-  return min(d1, d2);
+  float h = clamp((-2.0*dot(p,b)+dot(b,b))/dot(b,b), 0.0, 1.0);
+  float d = length(p - b*vec2(1.0-h, 1.0+h));
+  return d * sign(p.x*b.y + p.y*b.x - b.x*b.y);
+}
+
+float sdStar6(vec2 p, float r) {
+  // Hexagram (6-point star / Star of David) from Inigo Quilezles
+  const vec4 k = vec4(-0.5, 0.8660254038, 0.5773502692, 1.7320508076);
+  p = abs(p);
+  p -= 2.0*min(dot(k.xy,p),0.0)*k.xy;
+  p -= 2.0*min(dot(k.yx,p),0.0)*k.yx;
+  p -= vec2(clamp(p.x, r*k.z, r*k.w), r);
+  return length(p)*sign(p.y);
 }
 
 float sdHeart(vec2 p) {
+  // Heart - from Inigo Quilezles
   p.x = abs(p.x);
-  if (p.y + p.x > 1.0) {
-    return sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - sqrt(2.0) / 4.0;
-  }
+  if (p.y + p.x > 1.0)
+    return sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - sqrt(2.0)/4.0;
   return sqrt(min(dot(p - vec2(0.0, 1.0), p - vec2(0.0, 1.0)),
-                  dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0)))) * sign(p.x - p.y);
+                  dot(p - 0.5*max(p.x + p.y, 0.0), p - 0.5*max(p.x + p.y, 0.0)))) * sign(p.x - p.y);
+}
+
+float sdPentagram(vec2 p, float r) {
+  // Pentagram - from Inigo Quilezles
+  const float k1x = 0.809016994; // cos(π/5)
+  const float k2x = 0.309016994; // sin(π/10)
+  const float k1y = 0.587785252; // sin(π/5)
+  const float k2y = 0.951056516; // cos(π/10)
+  const float k1z = 0.726542528; // tan(π/5)
+  const vec2 v1 = vec2(k1x, -k1y);
+  const vec2 v2 = vec2(-k1x, -k1y);
+  const vec2 v3 = vec2(k2x, -k2y);
+  p.x = abs(p.x);
+  p -= 2.0*max(dot(v1,p),0.0)*v1;
+  p -= 2.0*max(dot(v2,p),0.0)*v2;
+  p.x = abs(p.x);
+  p.y -= r;
+  return length(p - v3*clamp(dot(p,v3), 0.0, k1z*r)) * sign(p.y*v3.x - p.x*v3.y);
+}
+
+float sdVesica(vec2 p, float w, float h) {
+  // Vesica (almond shape) - from Inigo Quilezles
+  float d = 0.5*(w*w - h*h)/h;
+  p = abs(p);
+  vec3 c = (w*p.y < d*(p.x - w)) ? vec3(0.0, w, 0.0) : vec3(-d, 0.0, d + h);
+  return length(p - c.yx) - c.z;
+}
+
+float sdMoon(vec2 p, float d, float ra, float rb) {
+  // Moon (crescent) - from Inigo Quilezles
+  p.y = abs(p.y);
+  float a = (ra*ra - rb*rb + d*d)/(2.0*d);
+  float b = sqrt(max(ra*ra - a*a, 0.0));
+  if (d*(p.x*b - p.y*a) > d*d*max(b - p.y, 0.0))
+    return length(p - vec2(a, b));
+  return max((length(p) - ra), -(length(p - vec2(d, 0)) - rb));
+}
+
+float sdCross(vec2 p, vec2 b, float r) {
+  // Cross - from Inigo Quilezles
+  p = abs(p);
+  p = (p.y > p.x) ? p.yx : p.xy;
+  vec2 q = p - b;
+  float k = max(q.y, q.x);
+  vec2 w = (k > 0.0) ? q : vec2(b.y - p.x, -k);
+  return sign(k)*length(max(w, 0.0)) + r;
+}
+
+float sdEgg(vec2 p, float he, float ra, float rb, float bu) {
+  // Egg - from Inigo Quilezles (simplified)
+  float r = 0.5*(he + ra + rb)/bu;
+  float da = r - ra;
+  float db = r - rb;
+  float y = (db*db - da*da - he*he)/(2.0*he);
+  float x = sqrt(da*da - y*y);
+  p.x = abs(p.x);
+  float k = p.y*x - p.x*y;
+  if (k > 0.0 && k < he*(p.x + x))
+    return length(p + vec2(x, y)) - r;
+  return min(length(p) - ra, length(vec2(p.x, p.y - he)) - rb);
+}
+
+float sdRoundedX(vec2 p, float w, float r) {
+  // Rounded X - from Inigo Quilezles
+  p = abs(p);
+  return length(p - min(p.x + p.y, w)*0.5) - r;
+}
+
+float sdPie(vec2 p, vec2 c, float r) {
+  // Pie slice - from Inigo Quilezles
+  p.x = abs(p.x);
+  float l = length(p) - r;
+  float m = length(p - c*clamp(dot(p, c), 0.0, r));
+  return max(l, m*sign(c.y*p.x - c.x*p.y));
+}
+
+float sdArc(vec2 p, vec2 sc, float ra, float rb) {
+  // Arc - from Inigo Quilezles
+  p.x = abs(p.x);
+  return ((sc.y*p.x > sc.x*p.y) ? length(p - sc*ra) : abs(length(p) - ra)) - rb;
+}
+
+float sdRing(vec2 p, vec2 n, float r, float th) {
+  // Ring - from Inigo Quilezles
+  p.x = abs(p.x);
+  p = mat2(n.x, n.y, -n.y, n.x)*p;
+  return max(abs(length(p) - r) - th*0.5,
+             length(vec2(p.x, max(0.0, abs(r - p.y) - th*0.5)))*sign(p.x));
+}
+
+float sdTrapezoid(vec2 p, float r1, float r2, float he) {
+  // Isosceles Trapezoid - from Inigo Quilezles
+  vec2 k1 = vec2(r2, he);
+  vec2 k2 = vec2(r2 - r1, 2.0*he);
+  p.x = abs(p.x);
+  vec2 ca = vec2(p.x - min(p.x, (p.y < 0.0) ? r1 : r2), abs(p.y) - he);
+  vec2 cb = p - k1 + k2*clamp(dot(k1 - p, k2)/dot(k2, k2), 0.0, 1.0);
+  float s = (cb.x < 0.0 && ca.y < 0.0) ? -1.0 : 1.0;
+  return s*sqrt(min(dot(ca, ca), dot(cb, cb)));
+}
+
+float sdHorseshoe(vec2 p, vec2 c, float r, vec2 w) {
+  // Horseshoe - from Inigo Quilezles
+  p.x = abs(p.x);
+  float l = length(p);
+  p = mat2(-c.x, c.y, c.y, c.x)*p;
+  p = vec2((p.y > 0.0 || p.x > 0.0) ? p.x : l*sign(-c.x),
+           (p.x > 0.0) ? p.y : l);
+  p = vec2(p.x, abs(p.y - r)) - w;
+  return length(max(p, 0.0)) + min(0.0, max(p.x, p.y));
+}
+
+float sdDonut(vec2 p, float r1, float r2) {
+  // Simple donut (annular circle)
+  float d = length(p);
+  return abs(d - r1) - r2;
 }
 
 float getShapeSDF(vec2 uv, int shapeType) {
   float dist = 1.0;
   
-  if (shapeType == 1) dist = sdCircle(uv, 0.9);
-  else if (shapeType == 2) dist = sdTriangle(uv * 1.2);
+  // shapeType == 0: Regular sprite/square (no SDF, render as filled)
+  if (shapeType == 0) dist = sdBox(uv, vec2(1.0));
+  else if (shapeType == 1) dist = sdCircle(uv, 0.9);
+  else if (shapeType == 2) dist = sdTriangle(uv, 0.9);
   else if (shapeType == 3) dist = sdStar5(uv, 0.7, 0.4);
   else if (shapeType == 4) dist = sdStar6(uv, 0.5);
-  else if (shapeType == 5) dist = sdPolygon(uv, 0.9, 6);
+  else if (shapeType == 5) dist = sdHexagon(uv, 0.9);
   else if (shapeType == 6) dist = sdBox(uv, vec2(0.8));
-  else if (shapeType == 7) dist = sdPolygon(uv, 0.9, 5);
-  else if (shapeType == 8) dist = sdPolygon(uv, 0.9, 8);
-  else if (shapeType == 9) {
-    // DIAMOND: Rotate UV by 45 degrees then render as box
-    // GLSL mat2 is column-major: mat2(col1_x, col1_y, col2_x, col2_y)
-    // For 45° rotation: cos(45°)=0.707, sin(45°)=0.707
-    vec2 rotated = mat2(0.707, 0.707, -0.707, 0.707) * uv;
-    dist = sdBox(rotated, vec2(0.7));
-  }
+  else if (shapeType == 7) dist = sdPentagon(uv, 0.9);
+  else if (shapeType == 8) dist = sdOctagon(uv, 0.9);
+  else if (shapeType == 9) dist = sdRhombus(uv, vec2(0.6, 0.8));
   else if (shapeType == 10) dist = sdHeart(uv * 1.5);
+  else if (shapeType == 11) dist = sdPentagram(uv, 0.7);
+  else if (shapeType == 12) dist = sdVesica(uv, 0.8, 0.6);
+  else if (shapeType == 13) dist = sdMoon(uv, 0.3, 0.8, 0.6);
+  else if (shapeType == 14) {
+    // Cross: Two intersecting rectangles
+    float d1 = sdBox(uv, vec2(0.15, 0.7));
+    float d2 = sdBox(uv, vec2(0.7, 0.15));
+    dist = min(d1, d2);
+  }
+  else if (shapeType == 15) dist = sdEgg(uv, 0.7, 0.5, 0.3, 0.8);
+  else if (shapeType == 16) dist = sdRoundedX(uv, 0.9, 0.1);
+  else if (shapeType == 17) dist = sdPie(uv, vec2(0.966, 0.259), 0.8); // 15° pie (small slice)
+  else if (shapeType == 18) dist = sdArc(uv, vec2(0.707, 0.707), 0.75, 0.12); // 45° arc
+  else if (shapeType == 19) dist = abs(length(uv) - 0.7) - 0.15; // Simple donut/ring
+  else if (shapeType == 20) dist = sdTrapezoid(uv, 0.4, 0.7, 0.5);
+  else if (shapeType == 21) dist = sdHorseshoe(uv, vec2(0.866, 0.5), 0.7, vec2(0.15, 0.15));
   
   return dist;
 }
@@ -996,12 +1143,13 @@ void main() {
         const screenHwCos = screenHw * cos;
         const screenHwSin = screenHw * sin;
         
-        // Pack metadata: [R8|G8|B8|A4|ShapeType4]
+        // Pack metadata: [R8|G8|B8|A3|ShapeType5]
         const r = colorR[i];
         const g = colorG[i];
         const b = colorB[i];
-        const a = Math.min(15, Math.floor(alphas[i] * 15));
-        const metadata = r | (g << 8) | (b << 16) | (a << 24) | (shapeType << 28);
+        const a = Math.min(7, Math.floor(alphas[i] * 7));  // 3 bits (0-7)
+        // Use >>> 0 to ensure unsigned 32-bit integer (prevents sign bit issues)
+        const metadata = (r | (g << 8) | (b << 16) | (a << 24) | (shapeType << 27)) >>> 0;
         
         const floatOffset = visibleCount * 20; // 5 floats × 4 vertices
         visibleCount++;
