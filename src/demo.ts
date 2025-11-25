@@ -1,29 +1,13 @@
 // 🍭 Using new syntax sugar imports!
 import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
-import { EntitySpawnService } from './vectorium/entities/EntitySpawnService';
 
 /**
- * 🎮 VECTORIUM DEMO - Using Syntax Sugar! 🍭
- * 
- * Features demonstrated:
- * - ✅ VectoriumBuilder for clean engine configuration
- * - ✅ Automatic service injection (no manual wiring!)
- * - ✅ Scene.getTextPool(), getAnimationManager(), etc.
- * - ✅ Text rendering with effects
- * - ✅ EntitySpawnService for easy entity creation
+ * 🎮 VECTORIUM DEMO
  */
 
 class DemoScene extends Scene {
-  async load(): Promise<void> {
-    this.setWorldBoundsMultiplier(1.0);
-    this.spawnService = new EntitySpawnService(this);
-    console.log('✅ Scene loaded - Services auto-injected! 🍭');
-  }
-  
-  // Custom render method to draw debug text
   override render(renderer: any, textRenderer: any, textPool?: any): void {
-    // Call parent render first (entities, shapes, etc.)
     super.render(renderer, textRenderer, textPool);
     
     const startX = 100;
@@ -95,13 +79,9 @@ function initDemo() {
     .withQuality('high')
     .withTargetFPS(60)
     .enableDebugTools()
+    .withScene('demo', new DemoScene('demo'))
+    .withEntitySpawner()
     .build();
-  
-  const scene = new DemoScene('demo', 2000000);
-  engine.registerScene('demo', scene);
-  
-  // 🍭 Automatic click-to-spawn (handles config, shake, spawning)
-  engine.enableClickToSpawn();
   
   // Start engine
   engine.loadScene('demo').then(() => {

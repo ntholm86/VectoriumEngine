@@ -612,6 +612,25 @@ export class Vectorium {
   }
 
   /**
+   * Setup EntitySpawnService on the current scene automatically
+   * Called by VectoriumBuilder when .withEntitySpawner() is used
+   */
+  setupEntitySpawner(): void {
+    if (!this.currentScene) {
+      console.warn('⚠️ Cannot setup EntitySpawner: No scene loaded');
+      return;
+    }
+    
+    const scene = this.currentScene;
+    
+    // Lazy import to avoid circular dependencies
+    import('../entities/EntitySpawnService').then(({ EntitySpawnService }) => {
+      (scene as any).spawnService = new EntitySpawnService(scene);
+      console.log('✅ EntitySpawnService auto-configured');
+    });
+  }
+
+  /**
    * Expose engine, scene, and performance monitor globally for console access
    * Also adds runPerfTest() helper function
    */

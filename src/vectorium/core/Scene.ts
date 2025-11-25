@@ -107,9 +107,13 @@ export class Scene {
     ecsTotalEntities: 0
   };
 
-  constructor(name: string, maxEntities = 2000000) { // Increased to 2M for extreme testing
+  constructor(name: string, maxEntities = 2000000, worldBoundsMultiplier = 1.0) { // Increased to 2M for extreme testing
     this.name = name;
     this.world = new World(maxEntities);
+    
+    // Initialize viewport with world bounds multiplier
+    this.viewport = new Viewport(this.viewport.width, this.viewport.height, worldBoundsMultiplier);
+    
     // Initialize camera centered on viewport
     this.camera = new Camera(
       this.viewport.width, 
