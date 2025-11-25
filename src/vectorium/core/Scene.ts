@@ -19,22 +19,60 @@ import { SceneServicesContainer } from './SceneServices';
 // 🚀 Behavior System
 import { SceneBehaviorManager, type SceneBehavior } from '../behaviors/SceneBehavior';
 
+/**
+ * Scene class - Unity MonoBehaviour pattern
+ * 
+ * Architecture:
+ * - Scene OWNS its world and camera (fundamental resources)
+ * - Scene COMPOSES services (delegates access via getters)
+ * - Other classes (like EntitySpawnService) extend ServiceAwareBase
+ * 
+ * This matches Unity's pattern where:
+ * - GameObject/Scene are resource managers
+ * - MonoBehaviours are service consumers via GetComponent
+ */
 export class Scene {
   name: string;
   active: boolean = false;
   
-  // 🚀 Pure ECS World - all entity data lives here
+  // 🚀 Pure ECS World - Scene owns this instance
   public world: World;
-  
-  // 🚀 Type-safe service container
-  protected readonly services = new SceneServicesContainer();
   
   // 🚀 Behavior system for composition
   protected readonly behaviors = new SceneBehaviorManager(this);
   
+  // 🍭 Text animation tracking (managed automatically by base class)
+  private textAnimations = new Map<EntityId, {
+    rotationSpeed: number;
+    pulseSpeed: number;
+    pulsePhase: number;
+  }>();
+  
+  // 🍭 Text entity storage (entityId -> text content and style)
+  private textEntities = new Map<EntityId, { text: string; style: any }>();
+  
+  // 🍭 Reference to spawn service (auto-registered)
+  public spawnService: any = null;
+  
   // Viewport manages all resolution and world bounds
   // Initialize with HD resolution (will be updated by Engine.loadScene)
   protected viewport: Viewport = Viewport.HD();
+  
+  // 🚀 Service container (composition, not inheritance)
+  protected readonly services = new SceneServicesContainer();
+  
+  // 🚀 Service delegation getters (delegate to services container)
+  protected get renderer() { return this.services.renderer; }
+  protected get textRenderer() { return this.services.textRenderer; }
+  protected get canvas() { return this.services.canvas; }
+  protected get textPool() { return this.services.textPool; }
+  protected get animationManager() { return this.services.animationManager; }
+  protected get animationSystem() { return this.services.animationSystem; }
+  protected get inputManager() { return this.services.inputManager; }
+  protected get textureManager() { return this.services.textureManager; }
+  protected get assetLoader() { return this.services.assetLoader; }
+  protected get loadingManager() { return this.services.loadingManager; }
+  protected get runtimeConfig() { return this.services.runtimeConfig; }
   
   // Convenience accessors (delegate to Viewport)
   protected get canvasWidth(): number { return this.viewport.width; }
@@ -42,7 +80,7 @@ export class Scene {
   protected get worldWidth(): number { return this.viewport.worldWidth; }
   protected get worldHeight(): number { return this.viewport.worldHeight; }
   
-  // Camera for frustum culling
+  // Camera for frustum culling - Scene owns this instance
   private camera: Camera;
   private cullingEnabled = true;
   
@@ -83,15 +121,30 @@ export class Scene {
     this.visibleIndices = new Uint32Array(maxEntities);
   }
 
+  /**
+   * Get text entities map (for rendering and EntitySpawnService)
+   */
+  getTextEntities(): Map<EntityId, { text: string; style: any }> {
+    return this.textEntities;
+  }
+  
   async load(): Promise<void> {
     // Override in subclasses
   }
-
+  
+  // ============================================================================
+  // 🎯 OVERRIDE ServiceAwareBase getters for world/camera
+  // Scene manages its own world/camera instances (not from services container)
+  // ============================================================================
+  
   update(dt: number): void {
     const startTime = performance.now();
     
     // 🚀 Behavior pre-update
     this.behaviors.update(dt);
+    
+    // 🍭 Update text animations automatically
+    this.updateTextAnimations(dt);
     
     // 🚀 Pure ECS update - no entity sync overhead!
     const physicsStart = performance.now();
@@ -141,7 +194,7 @@ export class Scene {
     const textStart = performance.now();
     
     // TextRenderer handles ALL text rendering (static, dynamic, effects)
-    const textEntities = (this as any).getTextEntities?.();
+    const textEntities = this.getTextEntities();
     if (textRenderer && textEntities && textEntities.size > 0) {
       this.renderTextBatch(textRenderer);
     }
@@ -171,9 +224,8 @@ export class Scene {
    * TextRenderer creates textures and passes them to WebGLBatchRenderer
    */
   private renderTextBatch(textRenderer: TextRenderer): void {
-    // Get text entities from DemoScene if available
-    const textEntities = (this as any).getTextEntities?.();
-    // console.log('🎨 renderTextBatch: textEntities =', textEntities, 'size =', textEntities?.size);
+    // Get text entities from base class
+    const textEntities = this.getTextEntities();
     if (!textEntities || textEntities.size === 0) return;
     
     const textIndices = this.world.getTextIndices();
@@ -341,61 +393,12 @@ export class Scene {
   getSpatialHash() {
     return this.world.getSpatialHash();
   }
-
   // ============================================================================
-  // 🍭 SYNTAX SUGAR: Convenient service accessors
+  // 🎯 PUBLIC ACCESSORS
   // ============================================================================
 
   /**
-   * Get TextPool (automatically injected by engine)
-   * Use for text entity creation
-   */
-  protected getTextPool() {
-    return this.services.textPool;
-  }
-
-  /**
-   * Get AnimationManager (automatically injected by engine)
-   * Use for creating and managing animations
-   */
-  protected getAnimationManager() {
-    return this.services.animationManager;
-  }
-
-  /**
-   * Get InputManager (automatically injected by engine)
-   * Use for mouse/keyboard/touch input
-   */
-  protected getInputManager() {
-    return this.services.inputManager;
-  }
-
-  /**
-   * Get TextureManager (automatically injected by engine)
-   * Use for loading and managing textures
-   */
-  protected getTextureManager() {
-    return this.services.textureManager;
-  }
-
-  /**
-   * Get AssetLoader (automatically injected by engine)
-   * Use for loading game assets
-   */
-  protected getAssetLoader() {
-    return this.services.assetLoader;
-  }
-
-  /**
-   * Get RuntimeConfig (automatically injected by engine)
-   * Use for accessing engine configuration
-   */
-  protected getRuntimeConfig() {
-    return this.services.runtimeConfig;
-  }
-  
-  /**
-   * Get world instance
+   * Get world instance (public accessor for external use)
    */
   getWorld(): World {
     return this.world;
@@ -530,6 +533,16 @@ export class Scene {
     let removed = 0;
     for (let i = maxCapacity - 1; i >= 0 && removed < toRemove; i--) {
       if (this.world.isEntityActive(i)) {
+        // 🍭 Remove text animation and textEntities entry automatically
+        this.textAnimations.delete(i);
+        this.textEntities.delete(i);
+        
+        // 🍭 Free text pool entry if applicable
+        const textIndex = this.world.getTextIndices()[i];
+        if (textIndex >= 0 && this.textPool) {
+          this.textPool.free(textIndex);
+        }
+        
         this.world.destroyEntity(i);
         removed++;
       }
@@ -537,6 +550,17 @@ export class Scene {
   }
 
   clear(): void {
+    // 🍭 Clear text animations automatically
+    this.textAnimations.clear();
+    
+    // 🍭 Clear text entities map
+    this.textEntities.clear();
+    
+    // 🍭 Clear text pool if available
+    if (this.textPool) {
+      this.textPool.clear();
+    }
+    
     // Destroy all active entities in the ECS world
     const maxCapacity = this.world.getTotalCount();
     for (let i = 0; i < maxCapacity; i++) {
@@ -548,5 +572,58 @@ export class Scene {
 
   destroy(): void {
     this.clear();
+  }
+  
+  // ============================================================================
+  // 🍭 TEXT ANIMATION MANAGEMENT (automatic, no manual calls needed)
+  // ============================================================================
+  
+  /**
+   * Update text animations (called automatically by Scene.update)
+   * @internal
+   */
+  private updateTextAnimations(dt: number): void {
+    if (this.textAnimations.size === 0) return;
+    
+    const rotations = this.world.getRotation();
+    const scales = this.world.getScale();
+    const time = performance.now() / 1000;
+    
+    this.textAnimations.forEach((animData, entityId) => {
+      // Rotation animation
+      rotations[entityId] = (rotations[entityId] + animData.rotationSpeed * dt) % 360;
+      if (rotations[entityId] < 0) rotations[entityId] += 360;
+      
+      // Pulse animation
+      const pulseValue = Math.sin(time * animData.pulseSpeed + animData.pulsePhase);
+      scales[entityId] = 1.0 + pulseValue * 0.3;
+    });
+  }
+  
+  /**
+   * Register a text animation for an entity
+   * @internal - Called by EntitySpawnService
+   */
+  registerTextAnimation(entityId: EntityId, animData: {
+    rotationSpeed: number;
+    pulseSpeed: number;
+    pulsePhase: number;
+  }): void {
+    this.textAnimations.set(entityId, animData);
+  }
+  
+  /**
+   * Remove text animation for an entity
+   * @internal - Called automatically during entity cleanup
+   */
+  removeTextAnimation(entityId: EntityId): void {
+    this.textAnimations.delete(entityId);
+  }
+  
+  /**
+   * Get text animation count (for debugging)
+   */
+  getTextAnimationCount(): number {
+    return this.textAnimations.size;
   }
 }

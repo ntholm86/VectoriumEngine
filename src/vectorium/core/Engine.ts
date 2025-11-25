@@ -19,8 +19,6 @@ import { CameraControls } from '../debug/CameraControls';
 import { UIStyleLoader } from '../ui/UIStyleLoader';
 import { UIPanelManager } from '../ui/UIPanelManager';
 import { DebugToolRegistry } from '../debug/DebugToolRegistry';
-
-// 🚀 Phase 1: New Systems
 import { TextureManager } from '../rendering/TextureManager';
 import { AnimationManager } from '../animation/AnimationManager';
 import { AnimationSystem } from '../animation/AnimationSystem';
@@ -33,6 +31,7 @@ export { Viewport, Scene };
 export type { Entity, EntityId, EntityFlags } from './Entity';
 export { VectoriumBuilder, VectoriumPresets } from './EngineBuilder';
 export { SceneBuilder, createScene } from './SceneBuilder';
+export { ServiceAwareBase } from './ServiceAwareBase';
 
 export class Vectorium {
   readonly canvas: HTMLCanvasElement;
@@ -44,18 +43,12 @@ export class Vectorium {
   readonly performanceMonitor: PerformanceMonitor;
   readonly bufferPool: BufferPool;
   readonly runtimeConfig: RuntimeConfig;
-  
-  // 🚀 Phase 1: New Systems
   readonly textureManager: TextureManager;
   readonly animationManager: AnimationManager;
   readonly loadingManager: LoadingManager;
   readonly assetLoader: AssetLoader;
   private inputManager: InputManager | null = null;  // Created when scene loads
-  
-  // 🚀 UI Panel Management
   readonly panelManager: UIPanelManager;
-  
-  // 🚀 Debug Tool Registry
   readonly debugRegistry: DebugToolRegistry;
   
   private scenes = new Map<string, Scene>();
@@ -237,8 +230,6 @@ export class Vectorium {
     this.currentScene.setCanvasDimensions(this.canvas.width, this.canvas.height);
     console.log(`Scene loaded: ${name} | Viewport: ${this.canvas.width}×${this.canvas.height} | World: ${this.currentScene.getWorldWidth()}×${this.currentScene.getWorldHeight()} (${this.currentScene['viewport'].worldScale}x)`);
     
-    await this.currentScene.load();
-    
     // 🚀 Phase 1: Initialize InputManager with scene's world and spatial hash
     this.inputManager = new InputManager(
       this.canvas,
@@ -252,8 +243,13 @@ export class Vectorium {
     // 🚀 Phase 1: Create and set AnimationSystem for this scene
     const animSystem = new AnimationSystem(this.currentScene.world, this.animationManager);
     
-    // 🚀 Inject all services into scene at once
+    // 🚀 Inject all services into scene BEFORE load() so they're available
     this.currentScene['services'].initialize({
+      world: this.currentScene.world,
+      camera: this.currentScene.getCamera(),
+      renderer: this.renderer,
+      textRenderer: this.textRenderer,
+      canvas: this.canvas,
       textPool: this.textPool,
       animationManager: this.animationManager,
       animationSystem: animSystem,
@@ -263,6 +259,9 @@ export class Vectorium {
       loadingManager: this.loadingManager,
       runtimeConfig: this.runtimeConfig
     });
+    
+    // 🚀 Now call scene.load() - services are ready!
+    await this.currentScene.load();
     
     // 🚀 Register debug panels with UIPanelManager
     if (this.config.enableDebugTools) {
@@ -276,6 +275,11 @@ export class Vectorium {
       // Register Entity Spawner (Press E)
       const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager);
       this.panelManager.register('spawner', entitySpawner);
+      
+      // 🍭 Auto-wire EntitySpawnService with EntitySpawner
+      if ((this.currentScene as any).spawnService) {
+        (this.currentScene as any).spawnService.registerWithSpawner(entitySpawner);
+      }
       
       // Register Camera Controls (Press V)
       const camera = this.getCamera();
@@ -579,6 +583,59 @@ export class Vectorium {
    */
   getEntitySpawner(): EntitySpawner | undefined {
     return this.panelManager.get('spawner') as EntitySpawner | undefined;
+  }
+
+  /**
+   * Setup automatic click-to-spawn behavior
+   * Wires up camera shake and spawner automatically
+   */
+  enableClickToSpawn(options?: {
+    shakeThresholds?: { min: number; intensity: number; duration: number }[];
+  }): void {
+    const defaultShake = [
+      { min: 100000, intensity: 20, duration: 500 },
+      { min: 10000, intensity: 10, duration: 300 }
+    ];
+    
+    this.onClick((x, y) => {
+      const spawner = this.getEntitySpawner();
+      if (!spawner) return;
+      
+      const config = spawner.getSpawnConfig();
+      
+      // Conditional shake based on spawn count
+      this.getCamera()?.shakeIf(config.count, options?.shakeThresholds ?? defaultShake);
+      
+      // Trigger spawn (EntitySpawnService is auto-registered)
+      spawner.triggerSpawn(x, y);
+    });
+  }
+
+  /**
+   * Expose engine, scene, and performance monitor globally for console access
+   * Also adds runPerfTest() helper function
+   */
+  exposeGlobals(): void {
+    (window as any).vectoriumEngine = this;
+    (window as any).vectoriumScene = this.currentScene;
+    (window as any).vectoriumPerfMonitor = this.performanceMonitor;
+    
+    // Add automated performance test function
+    (window as any).runPerfTest = async (durationMs: number = 2000) => {
+      console.log(`🚀 Starting automated performance test...`);
+      if (this.performanceMonitor) {
+        const result = await this.performanceMonitor.startMeasurement(durationMs);
+        console.log(`✅ Test complete! Metrics available in window.lastMeasurement`);
+        return result;
+      } else {
+        console.error('❌ Performance monitor not available');
+        return null;
+      }
+    };
+    
+    console.log('💡 TIP: Run await runPerfTest() in console to start automated measurement');
+    console.log('💡 TIP: Or click "📊 Measure (2s)" button in profiler panel');
+    console.log('💡 TIP: Agent can read window.lastMeasurementJSON for optimization iterations');
   }
 
   /**

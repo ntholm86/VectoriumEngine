@@ -31,6 +31,7 @@ export class EntitySpawner extends UIPanel {
   private textOutline: boolean = false;
   private textGlow: boolean = false;
   private spawnCallbacks: Map<string, () => void> = new Map();
+  private onSpawnCallback: ((x: number, y: number, config: any) => void) | null = null;
   
   constructor(scene: Scene, inputManager: InputManager) {
     const config: UIPanelConfig = {
@@ -145,6 +146,23 @@ export class EntitySpawner extends UIPanel {
   }): void {
     this.spawnCallbacks.set('remove1K', () => callbacks.remove1K?.());
     this.spawnCallbacks.set('clearAll', () => callbacks.clearAll?.());
+  }
+
+  /**
+   * Register spawn callback (called when user clicks to spawn)
+   * This allows EntitySpawnService to auto-register itself
+   */
+  registerSpawnCallback(callback: (x: number, y: number, config: any) => void): void {
+    this.onSpawnCallback = callback;
+  }
+
+  /**
+   * Trigger spawn callback (called by click handler)
+   */
+  triggerSpawn(x: number, y: number): void {
+    if (this.onSpawnCallback) {
+      this.onSpawnCallback(x, y, this.getSpawnConfig());
+    }
   }
 
   /**

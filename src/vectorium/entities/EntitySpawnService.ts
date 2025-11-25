@@ -13,8 +13,7 @@
 
 import { Scene } from '../core/Engine';
 import { World, EntityId } from '../core/World';
-import { TextPool } from '../core/TextPool';
-import { AnimationManager } from '../animation/AnimationManager';
+import { ServiceAwareBase } from '../core/ServiceAwareBase';
 import {
   createCircleEntity,
   createStar5Entity,
@@ -90,13 +89,8 @@ type ShapeFactory = (world: World, x: number, y: number, options: any) => Entity
  * Entity Spawn Service
  * Handles all entity creation with physics, animations, and visual types
  */
-export class EntitySpawnService {
+export class EntitySpawnService extends ServiceAwareBase {
   private shapeRegistry = new Map<VisualType, ShapeFactory | null>();
-  private textAnimations = new Map<EntityId, {
-    rotationSpeed: number;
-    pulseSpeed: number;
-    pulsePhase: number;
-  }>();
   
   // Rainbow colors for shape spawning
   private readonly colors = [
@@ -110,11 +104,24 @@ export class EntitySpawnService {
   ];
   
   constructor(
-    private scene: Scene,
-    private textPool?: TextPool,
-    private animationManager?: AnimationManager
+    private scene: Scene
   ) {
+    super();
+    // Copy services from scene
+    this.services = (scene as any).services;
     this.registerShapeFactories();
+  }
+  
+  /**
+   * Auto-register with EntitySpawner if it exists
+   * This allows automatic spawning without demo.ts wiring
+   */
+  registerWithSpawner(spawner: any): void {
+    if (spawner && typeof spawner.registerSpawnCallback === 'function') {
+      spawner.registerSpawnCallback((x: number, y: number, config: any) => {
+        this.spawnBatch({ x, y, ...config });
+      });
+    }
   }
   
   /**
@@ -215,8 +222,8 @@ export class EntitySpawnService {
    * Spawn text entities
    */
   private spawnText(config: SpawnConfig): EntityId[] {
-    if (!this.textPool || !config.textConfig) {
-      console.error('TextPool or TextConfig not available');
+    if (!config.textConfig) {
+      console.error('TextConfig not available');
       return [];
     }
     
@@ -237,7 +244,7 @@ export class EntitySpawnService {
     });
     
     // Get scene's text entities map (required for rendering)
-    const sceneTextEntities = (this.scene as any).getTextEntities?.();
+    const sceneTextEntities = this.scene.getTextEntities();
     if (!sceneTextEntities) {
       console.error('Scene does not have getTextEntities() method - text rendering will not work');
       return [];
@@ -294,12 +301,13 @@ export class EntitySpawnService {
         sceneTextEntities  // Pass scene's map directly
       );
       
-      // Add animations to dynamic text
+      // Add animations to dynamic text (registered with Scene)
       if (!isStaticMode) {
         const rotations = world.getRotation();
         rotations[id] = Math.floor(Math.random() * 360);
         
-        this.textAnimations.set(id, {
+        // Register animation with Scene (Scene handles updates automatically)
+        this.scene.registerTextAnimation(id, {
           rotationSpeed: (Math.random() - 0.5) * 180,
           pulseSpeed: 1 + Math.random() * 2,
           pulsePhase: Math.random() * Math.PI * 2
@@ -342,7 +350,7 @@ export class EntitySpawnService {
    * Apply animation to entity
    */
   private applyAnimation(entityId: EntityId, config: AnimationConfig): void {
-    if (config.type !== 'tween' || !this.animationManager) return;
+    if (config.type !== 'tween') return;
     
     const world = this.scene.world;
     
@@ -441,46 +449,4 @@ export class EntitySpawnService {
     tweenEndValues[baseIndex] = endValue;
   }
   
-  /**
-   * Update text animations (call from scene.update)
-   */
-  updateTextAnimations(dt: number): void {
-    if (this.textAnimations.size === 0) return;
-    
-    const world = this.scene.world;
-    const rotations = world.getRotation();
-    const scales = world.getScale();
-    const time = performance.now() / 1000;
-    
-    this.textAnimations.forEach((animData, entityId) => {
-      // Rotation animation
-      rotations[entityId] = (rotations[entityId] + animData.rotationSpeed * dt) % 360;
-      if (rotations[entityId] < 0) rotations[entityId] += 360;
-      
-      // Pulse animation
-      const pulseValue = Math.sin(time * animData.pulseSpeed + animData.pulsePhase);
-      scales[entityId] = 1.0 + pulseValue * 0.3;
-    });
-  }
-  
-  /**
-   * Clear all text animations
-   */
-  clearTextAnimations(): void {
-    this.textAnimations.clear();
-  }
-  
-  /**
-   * Remove text animation for specific entity
-   */
-  removeTextAnimation(entityId: EntityId): void {
-    this.textAnimations.delete(entityId);
-  }
-  
-  /**
-   * Get text animation count
-   */
-  getTextAnimationCount(): number {
-    return this.textAnimations.size;
-  }
 }

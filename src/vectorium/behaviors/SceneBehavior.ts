@@ -64,15 +64,20 @@ export interface SceneBehavior {
   readonly name?: string;
 }
 
+import { ServiceAwareBase } from '../core/ServiceAwareBase';
+
 /**
  * Behavior manager for Scene
  */
-export class SceneBehaviorManager {
+export class SceneBehaviorManager extends ServiceAwareBase {
   private behaviors: SceneBehavior[] = [];
   private scene: Scene;
   
   constructor(scene: Scene) {
+    super();
     this.scene = scene;
+    // Copy services reference for ServiceAwareBase access
+    this.services = (scene as any).services;
   }
   
   /**
