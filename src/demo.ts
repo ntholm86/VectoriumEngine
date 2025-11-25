@@ -129,157 +129,162 @@ class DemoScene extends Scene {
   async load(): Promise<void> {
     this.setWorldBoundsMultiplier(1.0);
     
-    // 🎨 DEBUG: Spawn test text entities with different effects
-    if (!this.textPool) {
-      console.error('TextPool not available');
-      return;
-    }
+    console.log('✅ Scene loaded - Text will be rendered directly via TextRenderer');
+  }
+  
+  // Custom render method to draw debug text
+  override render(renderer: any, textRenderer: any, textPool?: any): void {
+    // Call parent render first (entities, shapes, etc.)
+    super.render(renderer, textRenderer, textPool);
     
+    // Now draw our debug text labels directly
     const startX = 100;
     const startY = 100;
     const spacing = 60;
     
     // === DYNAMIC TEXT (Left Column) ===
-    console.log('🔄 Creating DYNAMIC text examples (regenerated each frame)');
-    
     // 1. Plain text (no effects)
-    this.spawnDebugText('Plain Text', startX, startY, {}, 'left', 32, false, '#00FFFF');
+    textRenderer.drawText('Plain Text', startX, startY, { color: '#00FFFF', align: 'left', fontSize: 32 });
     
     // 2. Bold text
-    this.spawnDebugText('Bold Text', startX, startY + spacing, { bold: true }, 'left', 32, false, '#FFFF00');
+    textRenderer.drawText('Bold Text', startX, startY + spacing, { 
+      font: 'bold 32px Arial', color: '#FFFF00', align: 'left', fontSize: 32 
+    });
     
     // 3. Italic text
-    this.spawnDebugText('Italic Text', startX, startY + spacing * 2, { italic: true }, 'left', 32, false, '#FF00FF');
+    textRenderer.drawText('Italic Text', startX, startY + spacing * 2, { 
+      font: 'italic 32px Arial', color: '#FF00FF', align: 'left', fontSize: 32 
+    });
     
     // 4. Shadow effect
-    this.spawnDebugText('Shadow Text', startX, startY + spacing * 3, { shadow: true }, 'left', 32, false);
+    textRenderer.drawText('Shadow Text', startX, startY + spacing * 3, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32,
+      shadow: { color: 'rgba(255, 0, 0, 1.0)', blur: 6, offsetX: 4, offsetY: 4 }
+    });
     
     // 5. Outline effect
-    this.spawnDebugText('Outline Text', startX, startY + spacing * 4, { outline: true }, 'left', 32, false);
+    textRenderer.drawText('Outline Text', startX, startY + spacing * 4, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32,
+      strokeColor: '#00FFFF', strokeWidth: 4
+    });
     
     // 6. Glow effect
-    this.spawnDebugText('Glow Text', startX, startY + spacing * 5, { glow: true }, 'left', 32, false);
+    textRenderer.drawText('Glow Text', startX, startY + spacing * 5, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32,
+      shadow: { color: 'rgba(255, 255, 0, 1.0)', blur: 20, offsetX: 0, offsetY: 0 }
+    });
     
-    // 7. HEAVY EFFECTS (dynamic)
-    this.spawnDebugText('HEAVY EFFECTS', startX, startY + spacing * 6, {
-      bold: true,
-      italic: true,
-      shadow: true,
-      outline: true,
-      glow: true
-    }, 'left', 32, false);
+    // 7. HEAVY EFFECTS
+    textRenderer.drawText('HEAVY EFFECTS', startX, startY + spacing * 6, { 
+      font: 'bold italic 32px Arial', color: '#FFFFFF', align: 'left', fontSize: 32,
+      strokeColor: '#00FFFF', strokeWidth: 4,
+      shadow: { color: 'rgba(255, 255, 0, 1.0)', blur: 20, offsetX: 0, offsetY: 0 }
+    });
     
     // 8. Letter spacing
-    this.spawnDebugText('L e t t e r   S p a c i n g', startX, startY + spacing * 7, {}, 'left', 32, false);
+    textRenderer.drawText('L e t t e r   S p a c i n g', startX, startY + spacing * 7, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32 
+    });
     
     // === STATIC TEXT (Right Column) ===
-    console.log('✨ Creating STATIC text examples (cached, optimized)');
-    
     const staticX = startX + 700;
     
     // 1. Plain text (static)
-    this.spawnDebugText('Plain Text [STATIC]', staticX, startY, {}, 'left', 32, true, '#FF8800');
+    textRenderer.drawText('Plain Text [STATIC]', staticX, startY, { 
+      color: '#FF8800', align: 'left', fontSize: 32 
+    });
     
     // 2. Bold text (static)
-    this.spawnDebugText('Bold Text [STATIC]', staticX, startY + spacing, { bold: true }, 'left', 32, true, '#00FF00');
+    textRenderer.drawText('Bold Text [STATIC]', staticX, startY + spacing, { 
+      font: 'bold 32px Arial', color: '#00FF00', align: 'left', fontSize: 32 
+    });
     
     // 3. Italic text (static)
-    this.spawnDebugText('Italic Text [STATIC]', staticX, startY + spacing * 2, { italic: true }, 'left', 32, true, '#FF69B4');
+    textRenderer.drawText('Italic Text [STATIC]', staticX, startY + spacing * 2, { 
+      font: 'italic 32px Arial', color: '#FF69B4', align: 'left', fontSize: 32 
+    });
     
     // 4. Shadow effect (static)
-    this.spawnDebugText('Shadow Text [STATIC]', staticX, startY + spacing * 3, { shadow: true }, 'left', 32, true);
+    textRenderer.drawText('Shadow Text [STATIC]', staticX, startY + spacing * 3, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32,
+      shadow: { color: 'rgba(255, 0, 0, 1.0)', blur: 6, offsetX: 4, offsetY: 4 }
+    });
     
     // 5. Outline effect (static)
-    this.spawnDebugText('Outline Text [STATIC]', staticX, startY + spacing * 4, { outline: true }, 'left', 32, true);
+    textRenderer.drawText('Outline Text [STATIC]', staticX, startY + spacing * 4, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32,
+      strokeColor: '#00FFFF', strokeWidth: 4
+    });
     
     // 6. Glow effect (static)
-    this.spawnDebugText('Glow Text [STATIC]', staticX, startY + spacing * 5, { glow: true }, 'left', 32, true);
+    textRenderer.drawText('Glow Text [STATIC]', staticX, startY + spacing * 5, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32,
+      shadow: { color: 'rgba(255, 255, 0, 1.0)', blur: 20, offsetX: 0, offsetY: 0 }
+    });
     
     // 7. HEAVY EFFECTS (static)
-    this.spawnDebugText('HEAVY EFFECTS [STATIC]', staticX, startY + spacing * 6, {
-      bold: true,
-      italic: true,
-      shadow: true,
-      outline: true,
-      glow: true
-    }, 'left', 32, true);
+    textRenderer.drawText('HEAVY EFFECTS [STATIC]', staticX, startY + spacing * 6, { 
+      font: 'bold italic 32px Arial', color: '#FFFFFF', align: 'left', fontSize: 32,
+      strokeColor: '#00FFFF', strokeWidth: 4,
+      shadow: { color: 'rgba(255, 255, 0, 1.0)', blur: 20, offsetX: 0, offsetY: 0 }
+    });
     
     // 8. Letter spacing (static)
-    this.spawnDebugText('L e t t e r   S p a c i n g   [ S T A T I C ]', staticX, startY + spacing * 7, {}, 'left', 28, true);
+    textRenderer.drawText('L e t t e r   S p a c i n g   [ S T A T I C ]', staticX, startY + spacing * 7, { 
+      color: '#FFFFFF', align: 'left', fontSize: 28 
+    });
     
     // 9. Bacon ipsum text (static)
-    this.spawnDebugText('Bacon ipsum short loin [STATIC]', staticX, startY + spacing * 8, {}, 'left', 24, true);
+    textRenderer.drawText('Bacon ipsum short loin [STATIC]', staticX, startY + spacing * 8, { 
+      color: '#FFFFFF', align: 'left', fontSize: 24 
+    });
     
-    // === ALIGNMENT TESTS (Middle Column - Dynamic) ===
+    // === ALIGNMENT TESTS (Middle Column) ===
     const alignX = startX + 400;
-    this.spawnDebugText('Left Aligned', alignX, startY, {}, 'left', 32, false);
-    this.spawnDebugText('Center Aligned', alignX, startY + spacing, {}, 'center', 32, false);
-    this.spawnDebugText('Right Aligned', alignX, startY + spacing * 2, {}, 'right', 32, false);
+    textRenderer.drawText('Left Aligned', alignX, startY, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32 
+    });
+    textRenderer.drawText('Center Aligned', alignX, startY + spacing, { 
+      color: '#FFFFFF', align: 'center', fontSize: 32 
+    });
+    textRenderer.drawText('Right Aligned', alignX, startY + spacing * 2, { 
+      color: '#FFFFFF', align: 'right', fontSize: 32 
+    });
     
     // === ALIGNMENT TESTS (Static variants) ===
-    this.spawnDebugText('Left Aligned [STATIC]', alignX, startY + spacing * 4.5, {}, 'left', 28, true);
-    this.spawnDebugText('Center Aligned [STATIC]', alignX, startY + spacing * 5.5, {}, 'center', 28, true);
-    this.spawnDebugText('Right Aligned [STATIC]', alignX, startY + spacing * 6.5, {}, 'right', 28, true);
+    textRenderer.drawText('Left Aligned [STATIC]', alignX, startY + spacing * 4.5, { 
+      color: '#FFFFFF', align: 'left', fontSize: 28 
+    });
+    textRenderer.drawText('Center Aligned [STATIC]', alignX, startY + spacing * 5.5, { 
+      color: '#FFFFFF', align: 'center', fontSize: 28 
+    });
+    textRenderer.drawText('Right Aligned [STATIC]', alignX, startY + spacing * 6.5, { 
+      color: '#FFFFFF', align: 'right', fontSize: 28 
+    });
     
     // === LINE HEIGHT TEST ===
-    this.spawnDebugText('Line 1 of text', alignX, startY + spacing * 3, {}, 'left', 32, true);
-    this.spawnDebugText('Line 2 of text', alignX, startY + spacing * 3 + 40, {}, 'left', 32, true);
-    this.spawnDebugText('Line 3 of text', alignX, startY + spacing * 3 + 80, {}, 'left', 32, true);
+    textRenderer.drawText('Line 1 of text', alignX, startY + spacing * 3, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32 
+    });
+    textRenderer.drawText('Line 2 of text', alignX, startY + spacing * 3 + 40, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32 
+    });
+    textRenderer.drawText('Line 3 of text', alignX, startY + spacing * 3 + 80, { 
+      color: '#FFFFFF', align: 'left', fontSize: 32 
+    });
     
     // === PARAGRAPH TESTS ===
-    const baconText = 'Bacon ipsum dolor amet short loin pork chop turkey';
-    this.spawnDebugText(baconText, 100, 580, {}, 'left', 28, false);
+    textRenderer.drawText('Bacon ipsum dolor amet short loin pork chop turkey', 100, 580, { 
+      color: '#FFFFFF', align: 'left', fontSize: 28 
+    });
     
-    const baconText2 = 'Ribeye bresaola ham hock hamburger porchetta';
-    this.spawnDebugText(baconText2, 100, 615, {}, 'left', 24, false);
+    textRenderer.drawText('Ribeye bresaola ham hock hamburger porchetta', 100, 615, { 
+      color: '#FFFFFF', align: 'left', fontSize: 24 
+    });
     
-    const baconText3 = 'Tri-tip chuck beef ribs meatloaf shoulder';
-    this.spawnDebugText(baconText3, 100, 645, { bold: true }, 'left', 20, false);
-    
-    console.log(`📊 Text entities: ${this.world.getTextEntityCount()} total`);
-  }
-  
-  private spawnDebugText(
-    text: string, 
-    x: number, 
-    y: number, 
-    effects: { bold?: boolean; italic?: boolean; shadow?: boolean; outline?: boolean; glow?: boolean },
-    align: 'left' | 'center' | 'right' = 'left',
-    fontSize: number = 32,
-    isStatic: boolean = false,
-    color: string = '#FFFFFF'
-  ): void {
-    if (!this.textPool) return;
-    
-    // Build text style using factory helper
-    const textStyle = buildTextStyle(
-      {
-        bold: effects.bold,
-        italic: effects.italic,
-        size: fontSize,
-        align: align,
-        shadow: effects.shadow,
-        outline: effects.outline,
-        glow: effects.glow
-      },
-      color
-    );
-    
-    // Create text entity using factory (no velocity for demo labels)
-    createTextEntity(
-      this.world,
-      this.textPool,
-      x,
-      y,
-      text,
-      {
-        vx: 0,
-        vy: 0,
-        textStyle,
-        isStatic
-      },
-      this.textEntities
-    );
+    textRenderer.drawText('Tri-tip chuck beef ribs meatloaf shoulder', 100, 645, { 
+      font: 'bold 20px Arial', color: '#FFFFFF', align: 'left', fontSize: 20 
+    });
   }
 }
 

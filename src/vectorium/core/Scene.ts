@@ -180,6 +180,8 @@ export class Scene {
     const textIndices = this.world.getTextIndices();
     const posX = this.world.getPositionX();
     const posY = this.world.getPositionY();
+    const rotation = this.world.getRotation();
+    const scales = this.world.getScale();
     const flags = this.world.getFlags();
     const count = this.world.getTotalCount();
     
@@ -193,13 +195,15 @@ export class Scene {
       // Get world position
       const worldX = posX[id];
       const worldY = posY[id];
+      const rot = rotation[id];
+      const scale = scales[id];
       
       // Transform to screen space
       const screenX = (worldX - this.camera.x) * this.camera.getZoom() + this.canvasWidth / 2;
       const screenY = (worldY - this.camera.y) * this.camera.getZoom() + this.canvasHeight / 2;
       
-      // Render text at screen position (TextRenderer → WebGLBatchRenderer)
-      textRenderer.drawText(textData.text, screenX, screenY, textData.style);
+      // Render text at screen position with rotation and scale (TextRenderer → WebGLBatchRenderer)
+      textRenderer.drawText(textData.text, screenX, screenY, textData.style, rot, scale);
     }
   }
   

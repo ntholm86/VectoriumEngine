@@ -14,7 +14,6 @@
 import { Scene } from '../core/Engine';
 import { World, EntityId } from '../core/World';
 import { TextPool } from '../core/TextPool';
-import { TextStyle } from '../rendering/TextRenderer';
 import { AnimationManager } from '../animation/AnimationManager';
 import {
   createCircleEntity,
@@ -237,8 +236,12 @@ export class EntitySpawnService {
       glow: textCfg.glow
     });
     
-    // Track text entities for management
-    const textEntities = new Map<EntityId, { text: string; style: TextStyle }>();
+    // Get scene's text entities map (required for rendering)
+    const sceneTextEntities = (this.scene as any).getTextEntities?.();
+    if (!sceneTextEntities) {
+      console.error('Scene does not have getTextEntities() method - text rendering will not work');
+      return [];
+    }
     
     for (let i = 0; i < config.count; i++) {
       let spawnX = config.x;
@@ -288,7 +291,7 @@ export class EntitySpawnService {
           textStyle,
           isStatic: isStaticMode
         },
-        textEntities
+        sceneTextEntities  // Pass scene's map directly
       );
       
       // Add animations to dynamic text
