@@ -1,132 +1,41 @@
-import { Vectorium, Scene } from './vectorium/core/Engine';
+// 🍭 Using new syntax sugar imports!
+import { VectoriumBuilder, createScene } from './vectorium/core/Engine';
 import { EntitySpawnService } from './vectorium/entities/EntitySpawnService';
-import { TextPool } from './vectorium/core/TextPool';
 import type { EntityId } from './vectorium/core/World';
 import { TextStyle } from './vectorium/rendering/TextRenderer';
 
-/**
- * 🎮 VECTORIUM DEMO - Phase 1 Complete
- * 
- * Features demonstrated:
- * - ✅ GPU-accelerated shapes (circle, star, triangle, hexagon, heart, square, diamond)
- * - ✅ Text rendering with effects (shadow, outline, glow, bold, italic)
- * - ✅ Physics modes (gravity, collision, boundary)
- * - ✅ Input system (mouse, keyboard, touch)
- * - ✅ Camera system (zoom, pan, shake)
- * - ✅ Performance monitoring
- * - 🆕 Texture system (load & render sprites)
- * - 🆕 Animation system (frame animations & tweens)
- * 
- * HOW TO USE TEXTURES:
- * 1. Select "Sprite" from Visual Type dropdown
- * 2. Enter texture URL in "Texture URL" field (e.g., "/assets/sprite.png")
- * 3. Click canvas to spawn textured entities
- * 
- * HOW TO USE ANIMATIONS:
- * Frame Animation:
- * 1. Select "Frame Animation" from Animation dropdown
- * 2. Set FPS (1-60) and toggle Loop
- * 3. Requires sprite atlas with frame data
- * 
- * Tween Animation:
- * 1. Select "Tween Animation" from Animation dropdown
- * 2. Choose property to animate (scale, position, alpha, etc.)
- * 3. Set duration (100-5000ms) and easing function
- * 4. Spawned entities will animate automatically
- * 
- * Note: Texture and animation systems are initialized but require
- * asset loading. See TextureManager.loadTexture() and 
- * AnimationManager.createFrameAnimation() for manual setup.
- */
-
-class DemoScene extends Scene {
-  // Reference to engine's text pool
-  private textPool: TextPool | null = null;
+// 🍭 Create scene using builder - no class inheritance needed!
+const demoScene = createScene('demo', {
+  capacity: 2000000,
   
-  // Text entity storage (entityId -> text content and style)
-  private textEntities: Map<EntityId, { text: string; style: TextStyle }> = new Map();
-  
-  // Entity spawn service
-  public spawnService: EntitySpawnService | null = null;
-  
-  setTextPool(textPool: TextPool): void {
-    this.textPool = textPool;
-  }
-  
-  setSpawnService(service: EntitySpawnService): void {
-    this.spawnService = service;
-  }
-  
-  getTextEntities(): Map<EntityId, { text: string; style: TextStyle }> {
-    return this.textEntities;
-  }
-  
-  // Override update to add text animations
-  override update(dt: number): void {
-    // Call parent update first (physics, animations, camera)
-    super.update(dt);
+  onLoad: async function() {
+    this.setWorldBoundsMultiplier(1.0);
     
+    // 🍭 Services are auto-injected! No manual wiring needed
+    const textPool = this.getTextPool();
+    const animMgr = this.getAnimationManager();
+    
+    // Setup spawn service with auto-injected services
+    this.spawnService = new EntitySpawnService(this, textPool, animMgr);
+    
+    // Text entities storage for spawn service
+    this.textEntities = new Map<EntityId, { text: string; style: TextStyle }>();
+    
+    console.log('✅ Scene loaded - Services auto-injected! 🍭');
+  },
+  
+  onUpdate: function(dt: number) {
     // Update text animations via spawn service
     if (this.spawnService) {
       this.spawnService.updateTextAnimations(dt);
     }
-  }
+  },
   
-  // Override clearAll to also clear text animations
-  clearAll(): void {
-    if (this.spawnService) {
-      this.spawnService.clearTextAnimations();
-    }
-    this.textEntities.clear();
-    if (this.textPool) {
-      this.textPool.clear();
-    }
-    super.clear();
-  }
-  
-  // Override clear to also clear text animations
-  clear(): void {
-    if (this.spawnService) {
-      this.spawnService.clearTextAnimations();
-    }
-    this.textEntities.clear();
-    if (this.textPool) {
-      this.textPool.clear();
-    }
-    super.clear();
-  }
-  
-  // Override removeLast to also remove from text animations
-  removeLast(count: number): void {
-    // Get entities that will be removed
-    const totalCount = this.world.getActiveCount();
-    const toRemove = Math.min(count, totalCount);
-    const maxCapacity = this.world.getTotalCount();
-    
-    let removed = 0;
-    for (let i = maxCapacity - 1; i >= 0 && removed < toRemove; i--) {
-      if (this.world.isEntityActive(i)) {
-        this.textEntities.delete(i);
-        if (this.spawnService) {
-          this.spawnService.removeTextAnimation(i);
-        }
-        const textIndex = this.world.getTextIndices()[i];
-        if (textIndex >= 0 && this.textPool) {
-          this.textPool.free(textIndex);
-        }
-        removed++;
-      }
-    }
-    
-    // Call parent to actually destroy entities
-    super.removeLast(count);
-  }
-  
-  async load(): Promise<void> {
-    this.setWorldBoundsMultiplier(1.0);
-    
-    console.log('✅ Scene loaded - Text will be rendered directly via TextRenderer');
-  }
+  onRender: function(renderer: any, textRenderer: any, textPool?: any) {
+    // Now draw our debug text labels directly
+    const startX = 100;
+    const startY = 100;
+    const spacing = 60;
   
   // Custom render method to draw debug text
   override render(renderer: any, textRenderer: any, textPool?: any): void {
@@ -282,31 +191,68 @@ class DemoScene extends Scene {
       font: 'bold 20px Arial', color: '#FFFFFF', align: 'left', fontSize: 20 
     });
   }
-}
+});
+
+// Add helper methods to scene instance
+(demoScene as any).getTextEntities = function() {
+  return this.textEntities;
+};
+
+(demoScene as any).clearAll = function() {
+  if (this.spawnService) {
+    this.spawnService.clearTextAnimations();
+  }
+  this.textEntities?.clear();
+  const textPool = this.getTextPool();
+  if (textPool) {
+    textPool.clear();
+  }
+  this.clear();
+};
+
+(demoScene as any).removeLast = function(count: number) {
+  const totalCount = this.world.getActiveCount();
+  const toRemove = Math.min(count, totalCount);
+  const maxCapacity = this.world.getTotalCount();
+  
+  let removed = 0;
+  for (let i = maxCapacity - 1; i >= 0 && removed < toRemove; i--) {
+    if (this.world.isEntityActive(i)) {
+      this.textEntities?.delete(i);
+      if (this.spawnService) {
+        this.spawnService.removeTextAnimation(i);
+      }
+      const textIndex = this.world.getTextIndices()[i];
+      const textPool = this.getTextPool();
+      if (textIndex >= 0 && textPool) {
+        textPool.free(textIndex);
+      }
+      removed++;
+    }
+  }
+  
+  // Destroy entities
+  for (let i = maxCapacity - 1, removed = 0; i >= 0 && removed < toRemove; i--) {
+    if (this.world.isEntityActive(i)) {
+      this.world.destroyEntity(i);
+      removed++;
+    }
+  }
+};
 
 function initDemo() {
-  // Create canvas with default styling (one line!)
-  const canvas = Vectorium.createFullscreenCanvas();
+  // 🍭 Use VectoriumBuilder for clean configuration!
+  const engine = new VectoriumBuilder()
+    .withFullscreenCanvas()
+    .withQuality('high')
+    .withTargetFPS(60)
+    .enableDebugTools()
+    .build();
   
-  // Create engine
-  const engine = new Vectorium({ canvas, enableDebugTools: true });
-  const scene = new DemoScene('demo', 2000000);
+  // 🍭 No more manual service wiring - all automatic!
+  engine.registerScene('demo', demoScene);
   
-  // Pass TextPool reference to scene for text entity management
-  scene.setTextPool((engine as any).textPool);
-  (scene as any).animationManager = engine.getAnimationManager();
-  
-  // Create spawn service (replaces 200+ lines of spawn logic!)
-  const spawnService = new EntitySpawnService(
-    scene,
-    (engine as any).textPool,
-    engine.getAnimationManager()
-  );
-  scene.setSpawnService(spawnService);
-  
-  engine.registerScene('demo', scene);
-  
-  // Click to spawn entities - now just one line!
+  // Click to spawn entities
   engine.onClick((x, y) => {
     const spawner = engine.getEntitySpawner();
     if (!spawner) return;
@@ -319,8 +265,11 @@ function initDemo() {
       { min: 10000, intensity: 10, duration: 300 }
     ]);
     
-    // Spawn entities with service (replaces massive spawn function!)
-    spawnService.spawnBatch({ x, y, ...config });
+    // 🍭 Access spawn service from scene
+    const spawnService = (demoScene as any).spawnService;
+    if (spawnService) {
+      spawnService.spawnBatch({ x, y, ...config });
+    }
   });
   
   // Start engine
@@ -329,7 +278,7 @@ function initDemo() {
     
     // Expose engine and scene globally for console access
     (window as any).vectoriumEngine = engine;
-    (window as any).vectoriumScene = scene;
+    (window as any).vectoriumScene = demoScene;
     (window as any).vectoriumPerfMonitor = engine.performanceMonitor;
     
     // Add automated performance test function with Promise support

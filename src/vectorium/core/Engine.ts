@@ -31,6 +31,8 @@ import { InputManager } from '../input/InputManager';
 // Re-export for convenience
 export { Viewport, Scene };
 export type { Entity, EntityId, EntityFlags } from './Entity';
+export { VectoriumBuilder, VectoriumPresets } from './EngineBuilder';
+export { SceneBuilder, createScene } from './SceneBuilder';
 
 export class Vectorium {
   readonly canvas: HTMLCanvasElement;

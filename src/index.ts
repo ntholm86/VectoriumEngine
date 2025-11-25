@@ -7,6 +7,10 @@
 export { Vectorium, Scene } from './vectorium/core/Engine';
 export type { Entity } from './vectorium/core/Engine';
 
+// 🍭 Syntax Sugar: Builders & Presets
+export { VectoriumBuilder, VectoriumPresets } from './vectorium/core/EngineBuilder';
+export { SceneBuilder, createScene } from './vectorium/core/SceneBuilder';
+
 export { Viewport } from './vectorium/core/Viewport';
 
 export { FeatureDetector } from './vectorium/core/FeatureDetector';

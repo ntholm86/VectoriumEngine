@@ -341,6 +341,58 @@ export class Scene {
   getSpatialHash() {
     return this.world.getSpatialHash();
   }
+
+  // ============================================================================
+  // 🍭 SYNTAX SUGAR: Convenient service accessors
+  // ============================================================================
+
+  /**
+   * Get TextPool (automatically injected by engine)
+   * Use for text entity creation
+   */
+  protected getTextPool() {
+    return this.services.textPool;
+  }
+
+  /**
+   * Get AnimationManager (automatically injected by engine)
+   * Use for creating and managing animations
+   */
+  protected getAnimationManager() {
+    return this.services.animationManager;
+  }
+
+  /**
+   * Get InputManager (automatically injected by engine)
+   * Use for mouse/keyboard/touch input
+   */
+  protected getInputManager() {
+    return this.services.inputManager;
+  }
+
+  /**
+   * Get TextureManager (automatically injected by engine)
+   * Use for loading and managing textures
+   */
+  protected getTextureManager() {
+    return this.services.textureManager;
+  }
+
+  /**
+   * Get AssetLoader (automatically injected by engine)
+   * Use for loading game assets
+   */
+  protected getAssetLoader() {
+    return this.services.assetLoader;
+  }
+
+  /**
+   * Get RuntimeConfig (automatically injected by engine)
+   * Use for accessing engine configuration
+   */
+  protected getRuntimeConfig() {
+    return this.services.runtimeConfig;
+  }
   
   /**
    * Get world instance
