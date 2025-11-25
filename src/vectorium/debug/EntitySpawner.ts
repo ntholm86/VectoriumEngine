@@ -7,6 +7,7 @@
 import { Scene } from '../core/Engine';
 import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
 import type { InputManager } from '../input/InputManager';
+import { isSpawnableScene } from '../core/ISpawnableScene';
 
 export class EntitySpawner extends UIPanel {
   private clickSpawnCount = 100; // Number of entities to spawn per click
@@ -31,7 +32,7 @@ export class EntitySpawner extends UIPanel {
   private textGlow: boolean = false;
   private spawnCallbacks: Map<string, () => void> = new Map();
   
-  constructor(_scene: Scene, inputManager: InputManager) {
+  constructor(scene: Scene, inputManager: InputManager) {
     const config: UIPanelConfig = {
       id: 'entity-spawner',
       title: '🎮 SPAWN ENTITIES',
@@ -41,6 +42,14 @@ export class EntitySpawner extends UIPanel {
       collapsible: true
     };
     super(config, inputManager);
+    
+    // 🚀 Auto-register callbacks if scene implements ISpawnableScene
+    if (isSpawnableScene(scene)) {
+      this.registerCallbacks({
+        remove1K: () => scene.removeLast(1000),
+        clearAll: () => scene.clear()
+      });
+    }
   }
   
   /**
@@ -101,6 +110,21 @@ export class EntitySpawner extends UIPanel {
       tweenProperty: this.tweenProperty,
       tweenDuration: this.tweenDuration,
       tweenEasing: this.tweenEasing
+    };
+  }
+  
+  /**
+   * Get complete spawn configuration (all settings in one call)
+   * Use this with EntitySpawnService for one-line spawning
+   */
+  getSpawnConfig() {
+    return {
+      count: this.clickSpawnCount,
+      physicsMode: this.physicsMode,
+      visualType: this.visualType,
+      textConfig: this.getTextConfig(),
+      textureConfig: this.getTextureConfig(),
+      animationConfig: this.getAnimationConfig()
     };
   }
   

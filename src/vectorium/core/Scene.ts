@@ -14,8 +14,11 @@ import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
 import type { EntityBurstFactory } from '../entities/factories';
 
-// 🚀 Phase 1: Animation System
-import type { AnimationSystem } from '../animation/AnimationSystem';
+// 🚀 Service Injection System
+import { SceneServicesContainer } from './SceneServices';
+
+// 🚀 Behavior System
+import { SceneBehaviorManager, type SceneBehavior } from '../behaviors/SceneBehavior';
 
 export class Scene {
   name: string;
@@ -24,8 +27,11 @@ export class Scene {
   // 🚀 Pure ECS World - all entity data lives here
   public world: World;
   
-  // 🚀 Phase 1: Animation System (set by Engine)
-  private animationSystem: AnimationSystem | null = null;
+  // 🚀 Type-safe service container
+  protected readonly services = new SceneServicesContainer();
+  
+  // 🚀 Behavior system for composition
+  protected readonly behaviors = new SceneBehaviorManager(this);
   
   // Viewport manages all resolution and world bounds
   // Initialize with HD resolution (will be updated by Engine.loadScene)
@@ -85,6 +91,9 @@ export class Scene {
   update(dt: number): void {
     const startTime = performance.now();
     
+    // 🚀 Behavior pre-update
+    this.behaviors.update(dt);
+    
     // 🚀 Pure ECS update - no entity sync overhead!
     const physicsStart = performance.now();
     // CRITICAL: Pass WORLD dimensions for physics boundaries (entities bounce at world edges)
@@ -96,12 +105,15 @@ export class Scene {
     const animStart = performance.now();
     this.world.updateAnimations(dt);
     
-    // 🚀 Phase 1: Update frame animations and tweens
-    if (this.animationSystem) {
-      this.animationSystem.update(dt);
+    // 🚀 Update frame animations and tweens via service
+    if (this.services.isInitialized()) {
+      this.services.animationSystem.update(dt);
     }
     
     this.perfMetrics.updateAnimation = performance.now() - animStart;
+    
+    // 🚀 Behavior late-update
+    this.behaviors.lateUpdate(dt);
     
     this.perfMetrics.updateEntitySync = 0; // No sync needed!
     this.perfMetrics.updateTotal = performance.now() - startTime;
@@ -335,10 +347,31 @@ export class Scene {
   }
   
   /**
-   * Set animation system (called by Engine)
+   * Add a behavior to this scene
    */
-  setAnimationSystem(animSystem: AnimationSystem): void {
-    this.animationSystem = animSystem;
+  addBehavior(behavior: SceneBehavior): void {
+    this.behaviors.add(behavior);
+  }
+  
+  /**
+   * Remove a behavior from this scene
+   */
+  removeBehavior(behavior: SceneBehavior): void {
+    this.behaviors.remove(behavior);
+  }
+  
+  /**
+   * Get behavior by type
+   */
+  getBehavior<T extends SceneBehavior>(type: new (...args: any[]) => T): T | undefined {
+    return this.behaviors.get(type);
+  }
+  
+  /**
+   * Check if behavior exists
+   */
+  hasBehavior<T extends SceneBehavior>(type: new (...args: any[]) => T): boolean {
+    return this.behaviors.has(type);
   }
   
   /**

@@ -4,6 +4,8 @@
  * Inspired by Unity Inspector, Three.js renderer options, and dat.GUI
  */
 
+import { ConfigEventEmitter, type ConfigEventType, type ConfigEventHandler, type UnsubscribeFunction } from './ConfigEventSystem';
+
 export interface RenderingSettings {
   resolution: { width: number; height: number }; // Canvas resolution
   batchSize: number;              // Sprites per batch (16K-65K)
@@ -130,13 +132,39 @@ export class RuntimeConfig {
 
   private changeCallbacks: Array<(config: RuntimeConfig) => void> = [];
   private storageKey = 'vectorium-runtime-config';
+  
+  // 🚀 Typed event system
+  private eventEmitter = new ConfigEventEmitter();
 
   constructor() {
     this.load();
   }
+  
+  /**
+   * Subscribe to specific configuration changes
+   * Returns unsubscribe function
+   */
+  on<T = any>(event: ConfigEventType, handler: ConfigEventHandler<T>): UnsubscribeFunction {
+    return this.eventEmitter.on(event, handler);
+  }
+  
+  /**
+   * Unsubscribe from configuration changes
+   */
+  off<T = any>(event: ConfigEventType, handler: ConfigEventHandler<T>): void {
+    this.eventEmitter.off(event, handler);
+  }
+  
+  /**
+   * Subscribe to an event that fires only once
+   */
+  once<T = any>(event: ConfigEventType, handler: ConfigEventHandler<T>): void {
+    this.eventEmitter.once(event, handler);
+  }
 
   /**
    * Register callback for config changes (hot-reload)
+   * @deprecated Use on() with specific event types instead
    */
   onChange(callback: (config: RuntimeConfig) => void): void {
     this.changeCallbacks.push(callback);
@@ -157,7 +185,16 @@ export class RuntimeConfig {
    * Update rendering settings
    */
   setRendering(settings: Partial<RenderingSettings>): void {
+    // Emit specific events for changed properties
+    if (settings.resolution && settings.resolution !== this.rendering.resolution) {
+      this.eventEmitter.emit('rendering.resolution', settings.resolution);
+    }
+    if (settings.clearColor && settings.clearColor !== this.rendering.clearColor) {
+      this.eventEmitter.emit('rendering.clearColor', settings.clearColor);
+    }
+    
     Object.assign(this.rendering, settings);
+    this.eventEmitter.emit('rendering', this.rendering);
     this.notifyChange();
     this.save();
   }
@@ -166,7 +203,16 @@ export class RuntimeConfig {
    * Update physics settings
    */
   setPhysics(settings: Partial<PhysicsSettings>): void {
+    // Emit specific events
+    if (settings.gravity && settings.gravity !== this.physics.gravity) {
+      this.eventEmitter.emit('physics.gravity', settings.gravity);
+    }
+    if (settings.velocityDamping !== undefined && settings.velocityDamping !== this.physics.velocityDamping) {
+      this.eventEmitter.emit('physics.damping', settings.velocityDamping);
+    }
+    
     Object.assign(this.physics, settings);
+    this.eventEmitter.emit('physics', this.physics);
     this.notifyChange();
     this.save();
   }
@@ -175,7 +221,16 @@ export class RuntimeConfig {
    * Update debug settings
    */
   setDebug(settings: Partial<DebugSettings>): void {
+    // Emit specific events
+    if (settings.showStats !== undefined && settings.showStats !== this.debug.showStats) {
+      this.eventEmitter.emit('debug.showStats', settings.showStats);
+    }
+    if (settings.showBounds !== undefined && settings.showBounds !== this.debug.showBounds) {
+      this.eventEmitter.emit('debug.showBounds', settings.showBounds);
+    }
+    
     Object.assign(this.debug, settings);
+    this.eventEmitter.emit('debug', this.debug);
     this.notifyChange();
     this.save();
   }
@@ -184,7 +239,16 @@ export class RuntimeConfig {
    * Update quality settings
    */
   setQuality(settings: Partial<QualitySettings>): void {
+    // Emit specific events
+    if (settings.targetFPS !== undefined && settings.targetFPS !== this.quality.targetFPS) {
+      this.eventEmitter.emit('quality.targetFPS', settings.targetFPS);
+    }
+    if (settings.enableAdaptiveQuality !== undefined && settings.enableAdaptiveQuality !== this.quality.enableAdaptiveQuality) {
+      this.eventEmitter.emit('quality.enableAdaptiveQuality', settings.enableAdaptiveQuality);
+    }
+    
     Object.assign(this.quality, settings);
+    this.eventEmitter.emit('quality', this.quality);
     this.notifyChange();
     this.save();
   }
@@ -202,7 +266,22 @@ export class RuntimeConfig {
    * Update camera settings
    */
   setCamera(settings: Partial<CameraSettings>): void {
+    // Emit specific events
+    if (settings.minZoom !== undefined && settings.minZoom !== this.camera.minZoom) {
+      this.eventEmitter.emit('camera.minZoom', settings.minZoom);
+    }
+    if (settings.maxZoom !== undefined && settings.maxZoom !== this.camera.maxZoom) {
+      this.eventEmitter.emit('camera.maxZoom', settings.maxZoom);
+    }
+    if (settings.smoothFactor !== undefined && settings.smoothFactor !== this.camera.smoothFactor) {
+      this.eventEmitter.emit('camera.smoothing', settings.smoothFactor);
+    }
+    if (settings.cullingMargin !== undefined && settings.cullingMargin !== this.camera.cullingMargin) {
+      this.eventEmitter.emit('camera.cullingMargin', settings.cullingMargin);
+    }
+    
     Object.assign(this.camera, settings);
+    this.eventEmitter.emit('camera', this.camera);
     this.notifyChange();
     this.save();
   }

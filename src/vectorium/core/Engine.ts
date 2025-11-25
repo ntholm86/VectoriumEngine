@@ -17,6 +17,8 @@ import { DebugPanel } from '../debug/DebugPanel';
 import { EntitySpawner } from '../debug/EntitySpawner';
 import { CameraControls } from '../debug/CameraControls';
 import { UIStyleLoader } from '../ui/UIStyleLoader';
+import { UIPanelManager } from '../ui/UIPanelManager';
+import { DebugToolRegistry } from '../debug/DebugToolRegistry';
 
 // 🚀 Phase 1: New Systems
 import { TextureManager } from '../rendering/TextureManager';
@@ -48,16 +50,17 @@ export class Vectorium {
   readonly assetLoader: AssetLoader;
   private inputManager: InputManager | null = null;  // Created when scene loads
   
+  // 🚀 UI Panel Management
+  readonly panelManager: UIPanelManager;
+  
+  // 🚀 Debug Tool Registry
+  readonly debugRegistry: DebugToolRegistry;
+  
   private scenes = new Map<string, Scene>();
   private currentScene: Scene | null = null;
   private running = false;
   private lastTime = 0;
   private rafId = 0;
-  
-  // Debug tools (optional)
-  private debugPanel?: DebugPanel;
-  private entitySpawner?: EntitySpawner;
-  private cameraControls?: CameraControls;
 
   constructor(config: Partial<EngineConfig> = {}) {
     this.featureDetector = new FeatureDetector();
@@ -121,6 +124,12 @@ export class Vectorium {
     this.animationManager = new AnimationManager();
     this.loadingManager = new LoadingManager();
     this.assetLoader = new AssetLoader(this.textureManager, this.loadingManager);
+    
+    // 🚀 Initialize UI panel manager
+    this.panelManager = new UIPanelManager({ enableConsoleAPI: true });
+    
+    // 🚀 Initialize debug tool registry
+    this.debugRegistry = new DebugToolRegistry(this, { enableConsoleAPI: true });
     
     // Setup runtime config change handler
     this.setupRuntimeConfig();
@@ -186,8 +195,7 @@ export class Vectorium {
     // Inject consolidated UI styles once
     UIStyleLoader.injectStyles();
     
-    // Note: DebugPanel, Entity spawner and camera controls need InputManager
-    // They will be initialized in loadScene() after InputManager is created
+    // Panels will be registered in loadScene() after InputManager exists
   }
 
   registerScene(name: string, scene: Scene): void {
@@ -207,6 +215,8 @@ export class Vectorium {
     
     if (this.currentScene) {
       this.currentScene.active = false;
+      // Notify behaviors of deactivation
+      (this.currentScene as any).behaviors?.deactivate();
       this.currentScene.clear();
     }
     
@@ -231,34 +241,47 @@ export class Vectorium {
     
     // 🚀 Phase 1: Create and set AnimationSystem for this scene
     const animSystem = new AnimationSystem(this.currentScene.world, this.animationManager);
-    this.currentScene.setAnimationSystem(animSystem);
     
-    // Initialize scene-specific debug tools
+    // 🚀 Inject all services into scene at once
+    this.currentScene['services'].initialize({
+      textPool: this.textPool,
+      animationManager: this.animationManager,
+      animationSystem: animSystem,
+      inputManager: this.inputManager,
+      textureManager: this.textureManager,
+      assetLoader: this.assetLoader,
+      loadingManager: this.loadingManager,
+      runtimeConfig: this.runtimeConfig
+    });
+    
+    // 🚀 Register debug panels with UIPanelManager
     if (this.config.enableDebugTools) {
-      // Initialize debug panel (Press C) - needs InputManager
-      if (!this.debugPanel) {
-        this.debugPanel = new DebugPanel(this.runtimeConfig, this.inputManager);
-      }
+      // Register PerformanceMonitor (Press P)
+      this.panelManager.register('performance', this.performanceMonitor);
       
-      // Entity spawner (Press E)
-      this.entitySpawner = new EntitySpawner(this.currentScene, this.inputManager);
-      this.entitySpawner.registerCallbacks({
-        remove1K: () => {
-          // Remove last 1K entities using pure ECS
-          this.currentScene?.removeLast(1000);
-        },
-        clearAll: () => this.currentScene?.clear()
-      });
+      // Register Debug Panel (Press C)
+      const debugPanel = new DebugPanel(this.runtimeConfig, this.inputManager);
+      this.panelManager.register('debug', debugPanel);
       
-      // Camera controls (Press V)
+      // Register Entity Spawner (Press E)
+      const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager);
+      this.panelManager.register('spawner', entitySpawner);
+      
+      // Register Camera Controls (Press V)
       const camera = this.getCamera();
       if (camera) {
-        this.cameraControls = new CameraControls(camera, this.runtimeConfig, this.inputManager);
+        const cameraControls = new CameraControls(camera, this.runtimeConfig, this.inputManager);
+        this.panelManager.register('camera', cameraControls);
       }
+      
+      console.log('Debug panels registered: ' + this.panelManager.list().join(', '));
     }
     
     // Apply initial runtime config
     this.runtimeConfig.onChange(this.runtimeConfig as any);
+    
+    // 🚀 Notify behaviors of activation
+    (this.currentScene as any).behaviors?.activate();
     
     console.log(`Loaded scene: ${name}`);
   }
@@ -539,7 +562,7 @@ export class Vectorium {
    * Get the entity spawner for click spawn count
    */
   getEntitySpawner(): EntitySpawner | undefined {
-    return this.entitySpawner;
+    return this.panelManager.get('spawner') as EntitySpawner | undefined;
   }
 
   /**
@@ -655,15 +678,11 @@ export class Vectorium {
     this.stop();
     
     // Clean up debug tools
-    if (this.debugPanel) {
-      this.debugPanel.destroy();
-    }
-    if (this.entitySpawner) {
-      this.entitySpawner.destroy();
-    }
-    if (this.cameraControls) {
-      this.cameraControls.destroy();
-    }
+    // Dispose all panels via manager
+    this.panelManager.dispose();
+    
+    // Dispose debug registry
+    this.debugRegistry.dispose();
     
     // Clean up scene and rendering
     if (this.currentScene) {
