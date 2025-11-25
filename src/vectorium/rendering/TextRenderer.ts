@@ -1,8 +1,10 @@
 /**
  * Vectorium Engine - Text Renderer
- * WebGL-based text rendering using the main canvas
+ * WebGL-based text rendering using glyph atlas
  * Text is rendered as textured quads through the batch renderer
  */
+
+import { GlyphAtlasGenerator, GlyphAtlas } from './GlyphAtlasGenerator';
 
 export interface TextStyle {
   font?: string;
@@ -22,30 +24,19 @@ export interface TextStyle {
 }
 
 export class TextRenderer {
-  private offscreenCanvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private glyphAtlas: GlyphAtlas | null = null;
+  private glyphAtlasTexture: WebGLTexture | null = null;
   private defaultStyle: Required<Omit<TextStyle, 'shadow' | 'strokeColor' | 'strokeWidth'>> & {
     shadow?: TextStyle['shadow'];
     strokeColor?: string;
     strokeWidth?: number;
   };
   private drawCallCount = 0;
-  private textCache: Map<string, { texture: WebGLTexture; width: number; height: number }> = new Map();
   private gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
   private batchRenderer: any = null; // WebGLBatchRenderer reference
+  private atlasReady = false;
 
   constructor(_width: number, _height: number) {
-    // Create small offscreen canvas for text rasterization (NOT added to DOM)
-    this.offscreenCanvas = document.createElement('canvas');
-    this.offscreenCanvas.width = 512;
-    this.offscreenCanvas.height = 128;
-    
-    const ctx = this.offscreenCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
-    if (!ctx) {
-      throw new Error('Failed to get 2D context for text rasterization');
-    }
-    this.ctx = ctx;
-
     // Default style
     this.defaultStyle = {
       font: '16px Arial',
@@ -60,8 +51,37 @@ export class TextRenderer {
   /**
    * Initialize with WebGL context (called by Engine)
    */
-  setGLContext(gl: WebGLRenderingContext | WebGL2RenderingContext): void {
+  async setGLContext(gl: WebGLRenderingContext | WebGL2RenderingContext): Promise<void> {
     this.gl = gl;
+    
+    // Generate glyph atlas (32px Arial - covers most common text sizes)
+    const generator = new GlyphAtlasGenerator(32, 'Arial');
+    this.glyphAtlas = await generator.generate();
+    
+    // Upload atlas to GPU
+    const texture = gl.createTexture();
+    if (!texture) throw new Error('Failed to create glyph atlas texture');
+    
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      this.glyphAtlas.texture
+    );
+    
+    // Texture parameters for crisp text
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    
+    this.glyphAtlasTexture = texture;
+    this.atlasReady = true;
+    
+    console.log(`✅ Glyph atlas loaded: ${this.glyphAtlas.glyphs.size} glyphs, ${this.glyphAtlas.atlasWidth}x${this.glyphAtlas.atlasHeight}`);
   }
 
   /**
@@ -93,161 +113,86 @@ export class TextRenderer {
   }
 
   /**
-   * Draw text as textured quad (rendered through WebGL batch)
-   * Fully integrated with the optimization pipeline
+   * Draw text using glyph atlas (rendered through WebGL batch)
+   * Each character becomes a quad with UV coords from the atlas
+   * ALL text shares ONE texture = minimal draw calls!
    */
   drawText(text: string, x: number, y: number, style?: TextStyle): void {
-    if (!this.gl || !this.batchRenderer) return;
+    if (!this.gl || !this.batchRenderer || !this.atlasReady || !this.glyphAtlas) return;
     
-    const fontSize = style?.fontSize || this.defaultStyle.fontSize;
-    const fontFamily = style?.fontFamily || this.defaultStyle.fontFamily;
     const color = style?.color || this.defaultStyle.color;
-    const font = style?.font || `${fontSize}px ${fontFamily}`;
-    
-    // Create cache key
-    // Build cache key with ALL style properties to ensure each unique combination gets its own texture
-    const shadowKey = style?.shadow ? 
-      `_s${style.shadow.color}_${style.shadow.blur}_${style.shadow.offsetX}_${style.shadow.offsetY}` : '';
-    const strokeKey = style?.strokeColor && style?.strokeWidth ?
-      `_st${style.strokeColor}_${style.strokeWidth}` : '';
-    const alignKey = style?.align ? `_a${style.align}` : '';
-    const baselineKey = style?.baseline ? `_b${style.baseline}` : '';
-    const cacheKey = `${text}_${font}_${color}${shadowKey}${strokeKey}${alignKey}${baselineKey}`;
-    
-    // Check cache
-    let textureInfo = this.textCache.get(cacheKey);
-    
-    if (!textureInfo) {
-      // Set up canvas for text rendering
-      this.ctx.font = font;
-      this.ctx.textAlign = 'left';
-      this.ctx.textBaseline = 'top';
-      
-      // Measure text
-      const metrics = this.ctx.measureText(text);
-      const textWidth = Math.ceil(metrics.width) + 4;
-      const textHeight = Math.ceil(fontSize * 1.5) + 4;
-      
-      // Resize canvas
-      this.offscreenCanvas.width = Math.max(textWidth, 16);
-      this.offscreenCanvas.height = Math.max(textHeight, 16);
-      
-      // Re-apply font after canvas resize
-      this.ctx.font = font;
-      this.ctx.textAlign = 'left';
-      this.ctx.textBaseline = 'top';
-      
-      // Clear background
-      this.ctx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
-      
-      // Apply text effects
-      const textX = 2;
-      const textY = 2;
-      
-      // Apply shadow if specified
-      if (style?.shadow) {
-        this.ctx.shadowColor = style.shadow.color;
-        this.ctx.shadowBlur = style.shadow.blur;
-        this.ctx.shadowOffsetX = style.shadow.offsetX;
-        this.ctx.shadowOffsetY = style.shadow.offsetY;
-      } else {
-        this.ctx.shadowColor = 'transparent';
-        this.ctx.shadowBlur = 0;
-        this.ctx.shadowOffsetX = 0;
-        this.ctx.shadowOffsetY = 0;
-      }
-      
-      // Apply stroke (outline) if specified
-      if (style?.strokeColor && style?.strokeWidth) {
-        this.ctx.strokeStyle = style.strokeColor;
-        this.ctx.lineWidth = style.strokeWidth;
-        this.ctx.lineJoin = 'round';
-        this.ctx.miterLimit = 2;
-        this.ctx.strokeText(text, textX, textY);
-      }
-      
-      // Draw text fill
-      this.ctx.fillStyle = color;
-      this.ctx.fillText(text, textX, textY);
-      
-      // Create WebGL texture
-      const texture = this.gl.createTexture();
-      if (!texture) return;
-      
-      this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-      this.gl.texImage2D(
-        this.gl.TEXTURE_2D,
-        0,
-        this.gl.RGBA,
-        this.gl.RGBA,
-        this.gl.UNSIGNED_BYTE,
-        this.offscreenCanvas
-      );
-      
-      // Set texture parameters for crisp text
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-      
-      // Cache texture info
-      textureInfo = {
-        texture,
-        width: this.offscreenCanvas.width,
-        height: this.offscreenCanvas.height
-      };
-      
-      this.textCache.set(cacheKey, textureInfo);
-      
-      // Limit cache size
-      if (this.textCache.size > 100) {
-        const firstKey = this.textCache.keys().next().value as string;
-        const oldTexture = this.textCache.get(firstKey);
-        if (oldTexture && this.gl) {
-          this.gl.deleteTexture(oldTexture.texture);
-        }
-        this.textCache.delete(firstKey);
-      }
-    }
-    
-    // Calculate X position based on alignment
-    // drawSprite treats (x,y) as CENTER of sprite
-    // For alignment, x represents where the alignment edge/center should be
-    let alignOffsetX = 0;
     const align = style?.align || 'left';
     
-    if (align === 'center') {
-      alignOffsetX = 0; // Center: sprite center at x
-    } else if (align === 'left') {
-      alignOffsetX = textureInfo.width / 2; // Left edge at x → sprite center at x + width/2
-    } else if (align === 'right') {
-      alignOffsetX = -textureInfo.width / 2; // Right edge at x → sprite center at x - width/2
+    // Parse color (support hex format)
+    let r = 1, g = 1, b = 1;
+    if (color.startsWith('#')) {
+      const hex = color.substring(1);
+      r = parseInt(hex.substring(0, 2), 16) / 255;
+      g = parseInt(hex.substring(2, 4), 16) / 255;
+      b = parseInt(hex.substring(4, 6), 16) / 255;
     }
     
-    // Render text quad through batch renderer (uses same optimization pipeline as sprites)
-    this.batchRenderer.drawSprite({
-      x: x + alignOffsetX,
-      y: y + textureInfo.height / 2,
-      width: textureInfo.width,
-      height: textureInfo.height,
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-      alpha: 1,
-      texture: textureInfo.texture,
-      color: { r: 1, g: 1, b: 1 }
-    });
+    // Calculate text width for alignment
+    let textWidth = 0;
+    for (const char of text) {
+      const glyph = this.glyphAtlas.glyphs.get(char);
+      if (glyph) textWidth += glyph.advance;
+    }
+    
+    // Adjust starting X based on alignment
+    let cursorX = x;
+    if (align === 'center') {
+      cursorX -= textWidth / 2;
+    } else if (align === 'right') {
+      cursorX -= textWidth;
+    }
+    
+    // Render each character as a quad using atlas UVs
+    for (const char of text) {
+      const glyph = this.glyphAtlas.glyphs.get(char);
+      if (!glyph) {
+        cursorX += this.glyphAtlas.fontSize * 0.3; // Space for missing glyphs
+        continue;
+      }
+      // Render this character as a quad with atlas UVs
+      this.batchRenderer.drawSprite({
+        x: cursorX + glyph.width / 2,
+        y: y + glyph.height / 2 + glyph.offsetY,
+        width: glyph.width,
+        height: glyph.height,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1,
+        alpha: 1,
+        texture: this.glyphAtlasTexture,
+        color: { r, g, b },
+        // Use glyph's UV coordinates in the atlas
+        uvX: glyph.uvX,
+        uvY: glyph.uvY,
+        uvWidth: glyph.uvWidth,
+        uvHeight: glyph.uvHeight
+      });
+      
+      // Advance cursor
+      cursorX += glyph.advance;
+    }
     
     this.drawCallCount++;
   }
 
   /**
-   * Measure text width
+   * Measure text width using glyph atlas
    */
-  measureText(text: string, style?: TextStyle): TextMetrics {
-    const font = style?.font || `${style?.fontSize || this.defaultStyle.fontSize}px ${style?.fontFamily || this.defaultStyle.fontFamily}`;
-    this.ctx.font = font;
-    return this.ctx.measureText(text);
+  measureText(text: string, _style?: TextStyle): { width: number } {
+    if (!this.glyphAtlas) return { width: 0 };
+    
+    let width = 0;
+    for (const char of text) {
+      const glyph = this.glyphAtlas.glyphs.get(char);
+      if (glyph) width += glyph.advance;
+    }
+    
+    return { width };
   }
 
   /**
@@ -282,11 +227,12 @@ export class TextRenderer {
   }
 
   /**
-   * Get memory usage (minimal - just offscreen rasterization canvas)
+   * Get memory usage (glyph atlas texture)
    */
   getMemoryUsage(): number {
-    const pixelCount = this.offscreenCanvas.width * this.offscreenCanvas.height;
-    const bytes = pixelCount * 4;
+    if (!this.glyphAtlas) return 0;
+    const pixels = this.glyphAtlas.atlasWidth * this.glyphAtlas.atlasHeight;
+    const bytes = pixels * 4; // RGBA
     return bytes / (1024 * 1024);
   }
 
@@ -301,12 +247,11 @@ export class TextRenderer {
    * Destroy the text renderer
    */
   destroy(): void {
-    // Clean up texture cache
-    if (this.gl) {
-      for (const cached of this.textCache.values()) {
-        this.gl.deleteTexture(cached.texture);
-      }
+    // Clean up glyph atlas texture
+    if (this.gl && this.glyphAtlasTexture) {
+      this.gl.deleteTexture(this.glyphAtlasTexture);
     }
-    this.textCache.clear();
+    this.glyphAtlasTexture = null;
+    this.glyphAtlas = null;
   }
 }

@@ -121,6 +121,7 @@ export class DebugPanel extends UIPanel {
           <label class="ui-label">Target FPS</label>
           <input type="number" id="cfg-target-fps" min="30" max="144" value="${q.targetFPS}">
         </div>
+        <button class="vectorium-btn full-width" id="cfg-reset-quality">Reset to Ultra Quality</button>
       </div>
     `;
   }

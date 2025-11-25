@@ -16,6 +16,11 @@ export interface Sprite {
   alpha: number;
   texture: WebGLTexture | null;
   color: { r: number; g: number; b: number };
+  // Optional UV coordinates for texture atlases (defaults to 0,0 -> 1,1)
+  uvX?: number;
+  uvY?: number;
+  uvWidth?: number;
+  uvHeight?: number;
 }
 
 export class WebGLBatchRenderer {
@@ -612,14 +617,6 @@ void main() {
         this.vertexCount >= this.maxBatchSize * 4 - 4) {
       this.flush();
       this.currentTexture = sprite.texture;
-      
-      // OPTIMIZATION WARNING: Check for texture switching
-      if (this.enableWarnings && sprite.texture && sprite.texture !== this.currentTexture) {
-        if (!this.warnedAbout.has('texture_switch')) {
-          console.warn('⚠️ VECTORIUM OPTIMIZATION: Texture switching detected. Batch sprites by texture to minimize draw calls.');
-          this.warnedAbout.add('texture_switch');
-        }
-      }
     }
     
     const { x, y, width, height, rotation, scaleX, scaleY, alpha, color } = sprite;
@@ -684,35 +681,41 @@ void main() {
     let offset = this.vertexCount * 5;
     const baseByteOffset = this.vertexCount * 20;
     
+    // Extract UV coordinates (default to full texture if not specified)
+    const u0 = sprite.uvX ?? 0.0;
+    const v0 = sprite.uvY ?? 0.0;
+    const u1 = sprite.uvX !== undefined ? sprite.uvX + (sprite.uvWidth ?? 1.0) : 1.0;
+    const v1 = sprite.uvY !== undefined ? sprite.uvY + (sprite.uvHeight ?? 1.0) : 1.0;
+    
     // Vertex 0 (top-left)
     this.batchVertices[offset++] = c0x;
     this.batchVertices[offset++] = c0y;
-    this.batchVertices[offset++] = 0.0; // u
-    this.batchVertices[offset++] = 0.0; // v
+    this.batchVertices[offset++] = u0; // u
+    this.batchVertices[offset++] = v0; // v
     offset++; // Skip color (written via Uint8Array below)
     this.vertexCount++;
     
     // Vertex 1 (top-right)
     this.batchVertices[offset++] = c1x;
     this.batchVertices[offset++] = c1y;
-    this.batchVertices[offset++] = 1.0; // u
-    this.batchVertices[offset++] = 0.0; // v
+    this.batchVertices[offset++] = u1; // u
+    this.batchVertices[offset++] = v0; // v
     offset++;
     this.vertexCount++;
     
     // Vertex 2 (bottom-right)
     this.batchVertices[offset++] = c2x;
     this.batchVertices[offset++] = c2y;
-    this.batchVertices[offset++] = 1.0; // u
-    this.batchVertices[offset++] = 1.0; // v
+    this.batchVertices[offset++] = u1; // u
+    this.batchVertices[offset++] = v1; // v
     offset++;
     this.vertexCount++;
     
     // Vertex 3 (bottom-left)
     this.batchVertices[offset++] = c3x;
     this.batchVertices[offset++] = c3y;
-    this.batchVertices[offset++] = 0.0; // u
-    this.batchVertices[offset++] = 1.0; // v
+    this.batchVertices[offset++] = u0; // u
+    this.batchVertices[offset++] = v1; // v
     offset++;
     this.vertexCount++;
     

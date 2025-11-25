@@ -36,11 +36,11 @@
   --ui-line-height: 1.35;
   
   /* Spacing */
-  --ui-padding-xs: 3px;
-  --ui-padding-sm: 4px;
-  --ui-padding-md: 6px;
-  --ui-padding-lg: 8px;
-  --ui-padding-xl: 10px;
+  --ui-padding-xs: 1px;
+  --ui-padding-sm: 2px;
+  --ui-padding-md: 3px;
+  --ui-padding-lg: 4px;
+  --ui-padding-xl: 5px;
   --ui-margin-xs: 4px;
   --ui-margin-sm: 6px;
   --ui-margin-md: 8px;
@@ -169,7 +169,7 @@
 
 .section-header {
   background: var(--ui-bg-light);
-  padding: var(--ui-padding-sm) var(--ui-padding-lg);
+  padding: var(--ui-padding-xs) var(--ui-padding-lg);
   margin: 0 calc(-1 * var(--ui-padding-lg)) var(--ui-margin-sm) calc(-1 * var(--ui-padding-lg));
   font-weight: bold;
   font-size: var(--ui-font-tiny);
@@ -185,7 +185,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0;
-  padding: var(--ui-padding-xs) var(--ui-padding-md);
+  padding: 0 var(--ui-padding-md);
   background: var(--ui-bg-light);
   border-radius: var(--ui-border-radius-md);
 }

@@ -27,6 +27,7 @@ export interface PerformanceMetrics {
   memory: number;
   textMemory: number;
   quality: QualityLevel;
+  timestamp?: number; // For tracking when measurement was taken
 
   // GPU metrics
   gpuFrameTime?: number; // GPU execution time (WebGL2 queries)
@@ -123,7 +124,7 @@ export class PerformanceMonitor extends UIPanel {
   private frameTimes: number[] = [];
   private readonly maxSamples = 60;
   private lastFrameTime = 0;
-  private currentQuality: QualityLevel = 'high';
+  private currentQuality: QualityLevel = 'ultra';
   private targetFPS: number = 60;
   private drawCalls = 0;
   private webglDrawCalls = 0;
@@ -152,7 +153,7 @@ export class PerformanceMonitor extends UIPanel {
   // Physics metrics cache
 
 
-  constructor(targetFPS: number = 60, initialQuality: QualityLevel = 'high') {
+  constructor(targetFPS: number = 60, initialQuality: QualityLevel = 'ultra') {
     const panelConfig: UIPanelConfig = {
       id: 'performance-monitor',
       title: '⚡ VECTORIUM PROFILER',
@@ -166,6 +167,7 @@ export class PerformanceMonitor extends UIPanel {
     
     this.targetFPS = targetFPS;
     this.currentQuality = initialQuality;
+    this.adaptiveEnabled = false; // Disable adaptive quality by default - it's too aggressive
   }
   
   /**
@@ -300,6 +302,15 @@ export class PerformanceMonitor extends UIPanel {
     const targetFrame = 1000 / this.targetFPS;
     const avgFrame = this.getAverageFrameTime();
 
+    // More aggressive quality increase: if performance is EXCELLENT, upgrade immediately
+    if (avgFPS > this.targetFPS * 3.0 && avgFrame < targetFrame * 0.3) {
+      // Performance is 3x better than target - upgrade multiple levels
+      this.increaseQuality();
+      this.increaseQuality(); // Double upgrade for excellent performance
+      this.qualityChangeDelay = 30; // Short delay for next change
+      return;
+    }
+    
     // Drop quality if performance is bad
     if (avgFPS < this.targetFPS * 0.8 && avgFrame > targetFrame * 1.2) {
       this.decreaseQuality();
@@ -308,7 +319,7 @@ export class PerformanceMonitor extends UIPanel {
     // Increase quality if performance is good
     else if (avgFPS > this.targetFPS * 0.95 && avgFrame < targetFrame * 0.8) {
       this.increaseQuality();
-      this.qualityChangeDelay = 120;
+      this.qualityChangeDelay = 60; // Reduced delay for upgrades (1 second)
     }
   }
 
@@ -686,13 +697,29 @@ export class PerformanceMonitor extends UIPanel {
             <span class="ui-label">Bottleneck</span>
             <span class="ui-value" data-metric="bottleneck">BALANCED</span>
           </div>
+          <button class="vectorium-btn full-width" data-action="measure">📊 Measure (2s)</button>
+          <button class="vectorium-btn full-width" data-action="export">💾 Export Metrics</button>
         </div>
       </div>
     `;
   }
 
   protected attachEventListeners(): void {
-    // PerformanceMonitor doesn't need event listeners - it's display only
+    // Add event listeners for measurement buttons
+    const measureBtn = this.container?.querySelector('[data-action="measure"]');
+    const exportBtn = this.container?.querySelector('[data-action="export"]');
+    
+    if (measureBtn) {
+      measureBtn.addEventListener('click', () => {
+        this.startMeasurement(2000);
+      });
+    }
+    
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        this.exportMetrics();
+      });
+    }
   }
 
   private initSparkline(): void {
@@ -804,5 +831,78 @@ export class PerformanceMonitor extends UIPanel {
       clearInterval(this.updateTimer);
     }
     super.destroy(); // Call parent cleanup
+  }
+
+  /**
+   * Export current metrics to JSON file
+   * @param additionalData Optional metadata to include
+   */
+  exportMetrics(additionalData?: any): string {
+    const metrics = this.getMetrics();
+    metrics.timestamp = Date.now();
+    
+    const exportData = {
+      metrics,
+      metadata: {
+        exportTime: new Date().toISOString(),
+        ...additionalData
+      },
+      // Include historical data
+      frameTimeHistory: {
+        samples: this.frameTimeHistory.length,
+        min: Math.min(...this.frameTimeHistory),
+        max: Math.max(...this.frameTimeHistory),
+        avg: this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length,
+        recent: this.frameTimeHistory.slice(-60) // Last 60 frames
+      }
+    };
+
+    const jsonData = JSON.stringify(exportData, null, 2);
+    
+    // Store in window for agent to access
+    (window as any).lastMeasurement = exportData;
+    (window as any).lastMeasurementJSON = jsonData;
+    
+    console.log(`📊 Metrics exported - data available in window.lastMeasurement`);
+    console.log(`📊 JSON data available in window.lastMeasurementJSON`);
+    console.log(jsonData);
+    
+    return jsonData;
+  }
+
+  /**
+   * Start automated performance measurement
+   * @param durationMs How long to collect samples (default 2000ms)
+   * @param callback Called when measurement is complete with results
+   */
+  startMeasurement(durationMs: number = 2000, callback?: (metrics: PerformanceMetrics, jsonData: string) => void): Promise<{metrics: PerformanceMetrics, jsonData: string}> {
+    console.log(`📊 Starting ${durationMs}ms performance measurement...`);
+    
+    // Clear history for clean measurement
+    this.frameTimeHistory = [];
+    
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const metrics = this.getMetrics();
+        metrics.timestamp = Date.now();
+        
+        console.log(`📊 Measurement complete:`);
+        console.log(`   FPS: ${metrics.fps.toFixed(1)} (avg: ${this.getAverageFPS().toFixed(1)})`);
+        console.log(`   Frame Time: ${metrics.frameTime.toFixed(2)}ms`);
+        console.log(`   Draw Calls: ${metrics.drawCalls} (WebGL: ${metrics.webglDrawCalls}, Text: ${metrics.textDrawCalls})`);
+        console.log(`   Entities: ${metrics.entitiesProcessed}`);
+        console.log(`   Memory: ${metrics.memory.toFixed(0)}MB`);
+        
+        // Auto-export
+        const jsonData = this.exportMetrics({
+          measurementDuration: durationMs,
+          sampleCount: this.frameTimeHistory.length
+        });
+        
+        const result = { metrics, jsonData };
+        if (callback) callback(metrics, jsonData);
+        resolve(result);
+      }, durationMs);
+    });
   }
 }

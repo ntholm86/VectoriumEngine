@@ -259,9 +259,9 @@ export class WasmPhysics {
           // Moving apart check (avoid double-resolution)
           if (velAlongNormal <= 0) continue;
           
-          // Restitution (bounciness) - realistic energy dissipation
+          // Restitution (bounciness) - use full restitution for perfect bouncing
           const restj = restitution ? restitution[j] : 0.3;
-          const e = Math.min(resti, restj) * 0.7; // Extra energy dissipation to prevent gain
+          const e = Math.min(resti, restj) * 1.0; // Perfect elasticity
           
           // CRITICAL FIX: Correct impulse formula
           // impulse = -(1 + e) * velAlongNormal / (invMass_i + invMass_j)

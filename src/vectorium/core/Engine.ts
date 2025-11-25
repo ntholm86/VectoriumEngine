@@ -97,7 +97,7 @@ export class Vectorium {
     
     // Initialize text renderer (renders text as textures → WebGLBatchRenderer)
     this.textRenderer = new TextRenderer(this.config.width, this.config.height);
-    this.textRenderer.setGLContext(this.renderer.getContext());
+    // Lazy atlas initialization - will be done on first loadScene()
     this.textRenderer.setBatchRenderer(this.renderer);
     
     // Initialize TextPool for ECS text entities
@@ -198,6 +198,11 @@ export class Vectorium {
     const scene = this.scenes.get(name);
     if (!scene) {
       throw new Error(`Scene "${name}" not found`);
+    }
+    
+    // Initialize text renderer atlas on first scene load
+    if (this.textRenderer && !this.textRenderer['atlasReady']) {
+      await this.textRenderer.setGLContext(this.renderer.getContext());
     }
     
     if (this.currentScene) {

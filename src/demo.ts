@@ -344,7 +344,32 @@ function initDemo() {
   });
   
   // Start engine
-  engine.loadScene('demo').then(() => engine.start());
+  engine.loadScene('demo').then(() => {
+    engine.start();
+    
+    // Expose engine and scene globally for console access
+    (window as any).vectoriumEngine = engine;
+    (window as any).vectoriumScene = scene;
+    (window as any).vectoriumPerfMonitor = engine.performanceMonitor;
+    
+    // Add automated performance test function with Promise support
+    (window as any).runPerfTest = async (durationMs: number = 2000) => {
+      console.log(`🚀 Starting automated performance test...`);
+      const perfMonitor = (window as any).vectoriumPerfMonitor;
+      if (perfMonitor) {
+        const result = await perfMonitor.startMeasurement(durationMs);
+        console.log(`✅ Test complete! Metrics available in window.lastMeasurement`);
+        return result;
+      } else {
+        console.error('❌ Performance monitor not available');
+        return null;
+      }
+    };
+    
+    console.log('💡 TIP: Run await runPerfTest() in console to start automated measurement');
+    console.log('💡 TIP: Or click "📊 Measure (2s)" button in profiler panel');
+    console.log('💡 TIP: Agent can read window.lastMeasurementJSON for optimization iterations');
+  });
 }
 
 /**

@@ -45,7 +45,7 @@ export class Scene {
   private visibleIndices: Uint32Array;
   
   // Performance monitoring
-  private enableWarnings = true;
+  private enableWarnings = false; // Disabled - text texture switching causes expected slowness
   private updateTimeWarningThreshold = 10; // ms
   private renderTimeWarningThreshold = 16; // ms
   

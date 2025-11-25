@@ -208,6 +208,13 @@ export class InputManager {
   private onKeyDown = (e: KeyboardEvent): void => {
     if (!this.keysDown.has(e.key)) {
       this.keysJustPressed.add(e.key);
+      
+      // Trigger registered keyboard callbacks
+      const normalizedKey = e.key.toLowerCase();
+      const callbacks = this.keyCallbacks.get(normalizedKey);
+      if (callbacks) {
+        callbacks.forEach(cb => cb());
+      }
     }
     this.keysDown.add(e.key);
   };
