@@ -7,7 +7,6 @@
  */
 
 import { World, EntityId } from './World';
-import type { Entity } from './Entity';
 import { Camera } from './Camera';
 import { Viewport } from './Viewport';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
@@ -465,34 +464,9 @@ export class Scene {
   }
 
   // ============================================================================
-  // ⚠️ DEPRECATED: OOP Entity Methods (Use spawnEntity/spawnBurst instead)
-  // ============================================================================
-  
-  /**
-   * @deprecated Use spawnEntity() with factory functions instead
-   * This method maintains backward compatibility but adds OOP overhead
-   */
-  addEntity(_entity: Entity): void {
-    throw new Error('addEntity() is deprecated. Use spawnEntity() with factory functions instead.');
-  }
-
-  /**
-   * @deprecated Use world.destroyEntity(entityId) directly
-   */
-  removeEntity(_entity: Entity): void {
-    throw new Error('removeEntity() is deprecated. Use world.destroyEntity(entityId) directly.');
-  }
-
-  /**
-   * @deprecated Use spawnBurst() with burst factory functions instead
-   */
-  addBatch(_entities: Entity[]): void {
-    throw new Error('addBatch() is deprecated. Use spawnBurst() with burst factory functions instead.');
-  }
-
   /**
    * Remove last N entities
-   * @deprecated Use world.destroyEntity() directly with entity IDs
+   * Used by UI for clearing entities
    */
   removeLast(count: number): void {
     // Get active entities and remove the last N
@@ -508,22 +482,6 @@ export class Scene {
         removed++;
       }
     }
-  }
-
-  /**
-   * Spawn random entities in viewport or world bounds
-   * @deprecated Use spawnBurst() with factory functions for better performance
-   */
-  spawnRandom<T extends Entity>(
-    _EntityClass: new (...args: any[]) => T,
-    _count: number,
-    _options: {
-      inViewportOnly?: boolean;
-      minSpeed?: number;
-      maxSpeed?: number;
-    } = {}
-  ): T[] {
-    throw new Error('spawnRandom() is deprecated. Use spawnBurst() with factory functions instead.');
   }
 
   clear(): void {

@@ -2,10 +2,6 @@ import { Vectorium, Scene } from './vectorium/core/Engine';
 import { EntitySpawnService } from './vectorium/entities/EntitySpawnService';
 import { TextPool } from './vectorium/core/TextPool';
 import type { EntityId } from './vectorium/core/World';
-import {
-  createTextEntity,
-  buildTextStyle
-} from './vectorium/entities/factories';
 import { TextStyle } from './vectorium/rendering/TextRenderer';
 
 /**

@@ -158,35 +158,43 @@ export class Vectorium {
   }
   
   private setupRuntimeConfig(): void {
-    this.runtimeConfig.onChange((cfg) => {
-      // Apply resolution change
-      if (cfg.rendering.resolution.width !== this.canvas.width || cfg.rendering.resolution.height !== this.canvas.height) {
-        this.resize(cfg.rendering.resolution.width, cfg.rendering.resolution.height);
+    // Subscribe to resolution changes
+    this.runtimeConfig.on('rendering.resolution', (resolution) => {
+      if (resolution.width !== this.canvas.width || resolution.height !== this.canvas.height) {
+        this.resize(resolution.width, resolution.height);
       }
-      
-      // Apply batch size
-      this.renderer.setBatchSize(cfg.rendering.batchSize);
-      
-      // Apply clear color
-      this.renderer.setClearColor(cfg.rendering.clearColor[0], cfg.rendering.clearColor[1], cfg.rendering.clearColor[2], cfg.rendering.clearColor[3]);
-      
-      // Apply scene settings
+    });
+    
+    // Subscribe to batch size changes
+    this.runtimeConfig.on('rendering', (rendering) => {
+      this.renderer.setBatchSize(rendering.batchSize);
+      this.renderer.setClearColor(rendering.clearColor[0], rendering.clearColor[1], rendering.clearColor[2], rendering.clearColor[3]);
       if (this.currentScene) {
-        this.currentScene.setCullingEnabled(cfg.rendering.enableFrustumCulling);
-        this.currentScene.setWorldBoundsMultiplier(cfg.physics.boundsMultiplier);
+        this.currentScene.setCullingEnabled(rendering.enableFrustumCulling);
       }
-      
-      // Apply quality settings
-      this.performanceMonitor.setAdaptiveQuality(cfg.quality.enableAdaptiveQuality);
-      
-      // Apply camera settings
-      const camera = this.getCamera();
-      if (camera) {
-        camera.setZoom(cfg.camera.zoom);
-        camera.setZoomRange(cfg.camera.minZoom, cfg.camera.maxZoom);
-        camera.setSmooth(cfg.camera.smooth, cfg.camera.smoothFactor);
-        camera.setFollowSettings(cfg.camera.followLerp, cfg.camera.followDeadzoneX, cfg.camera.followDeadzoneY);
-        camera.setCullingMargin(cfg.camera.cullingMargin);
+    });
+    
+    // Subscribe to physics changes
+    this.runtimeConfig.on('physics', (physics) => {
+      if (this.currentScene) {
+        this.currentScene.setWorldBoundsMultiplier(physics.boundsMultiplier);
+      }
+    });
+    
+    // Subscribe to quality changes
+    this.runtimeConfig.on('quality.enableAdaptiveQuality', (enabled) => {
+      this.performanceMonitor.setAdaptiveQuality(enabled);
+    });
+    
+    // Subscribe to camera changes
+    this.runtimeConfig.on('camera', (camera) => {
+      const cam = this.getCamera();
+      if (cam) {
+        cam.setZoom(camera.zoom);
+        cam.setZoomRange(camera.minZoom, camera.maxZoom);
+        cam.setSmooth(camera.smooth, camera.smoothFactor);
+        cam.setFollowSettings(camera.followLerp, camera.followDeadzoneX, camera.followDeadzoneY);
+        cam.setCullingMargin(camera.cullingMargin);
       }
     });
   }
@@ -277,8 +285,14 @@ export class Vectorium {
       console.log('Debug panels registered: ' + this.panelManager.list().join(', '));
     }
     
-    // Apply initial runtime config
-    this.runtimeConfig.onChange(this.runtimeConfig as any);
+    // Apply initial runtime config values
+    const cfg = this.runtimeConfig;
+    this.renderer.setBatchSize(cfg.rendering.batchSize);
+    this.renderer.setClearColor(cfg.rendering.clearColor[0], cfg.rendering.clearColor[1], cfg.rendering.clearColor[2], cfg.rendering.clearColor[3]);
+    if (this.currentScene) {
+      this.currentScene.setCullingEnabled(cfg.rendering.enableFrustumCulling);
+      this.currentScene.setWorldBoundsMultiplier(cfg.physics.boundsMultiplier);
+    }
     
     // 🚀 Notify behaviors of activation
     (this.currentScene as any).behaviors?.activate();

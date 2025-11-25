@@ -130,7 +130,6 @@ export class RuntimeConfig {
     cullingMargin: 50
   };
 
-  private changeCallbacks: Array<(config: RuntimeConfig) => void> = [];
   private storageKey = 'vectorium-runtime-config';
   
   // 🚀 Typed event system
@@ -162,24 +161,7 @@ export class RuntimeConfig {
     this.eventEmitter.once(event, handler);
   }
 
-  /**
-   * Register callback for config changes (hot-reload)
-   * @deprecated Use on() with specific event types instead
-   */
-  onChange(callback: (config: RuntimeConfig) => void): void {
-    this.changeCallbacks.push(callback);
-  }
 
-  /**
-   * Notify listeners of config change
-   */
-  private notifyChange(): void {
-    this.changeCallbacks.forEach(cb => {
-      if (typeof cb === 'function') {
-        cb(this);
-      }
-    });
-  }
 
   /**
    * Update rendering settings
@@ -195,7 +177,6 @@ export class RuntimeConfig {
     
     Object.assign(this.rendering, settings);
     this.eventEmitter.emit('rendering', this.rendering);
-    this.notifyChange();
     this.save();
   }
 
@@ -213,7 +194,6 @@ export class RuntimeConfig {
     
     Object.assign(this.physics, settings);
     this.eventEmitter.emit('physics', this.physics);
-    this.notifyChange();
     this.save();
   }
 
@@ -231,7 +211,6 @@ export class RuntimeConfig {
     
     Object.assign(this.debug, settings);
     this.eventEmitter.emit('debug', this.debug);
-    this.notifyChange();
     this.save();
   }
 
@@ -249,7 +228,6 @@ export class RuntimeConfig {
     
     Object.assign(this.quality, settings);
     this.eventEmitter.emit('quality', this.quality);
-    this.notifyChange();
     this.save();
   }
 
@@ -258,7 +236,6 @@ export class RuntimeConfig {
    */
   setAnimation(settings: Partial<AnimationSettings>): void {
     Object.assign(this.animation, settings);
-    this.notifyChange();
     this.save();
   }
 
@@ -282,7 +259,6 @@ export class RuntimeConfig {
     
     Object.assign(this.camera, settings);
     this.eventEmitter.emit('camera', this.camera);
-    this.notifyChange();
     this.save();
   }
 
@@ -383,7 +359,6 @@ export class RuntimeConfig {
       cullingMargin: 50
     };
 
-    this.notifyChange();
     this.save();
   }
 
