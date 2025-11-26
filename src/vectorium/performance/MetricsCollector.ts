@@ -162,39 +162,39 @@ export class AssetMetricsCollector extends MetricsCollector {
  * GPU utilization estimation (from frame time variance)
  */
 export class GPUMetricsCollector extends MetricsCollector {
-  private frameTimes: number[] = [];
+  private gpuDrawTimes: number[] = [];
   private maxSamples = 120;
   
-  recordFrame(frameTime: number): void {
+  recordFrame(frameTime: number, gpuDrawTime: number = 0): void {
     if (!this.enabled) return;
     
-    this.frameTimes.push(frameTime);
-    if (this.frameTimes.length > this.maxSamples) {
-      this.frameTimes.shift();
+    this.gpuDrawTimes.push(gpuDrawTime);
+    if (this.gpuDrawTimes.length > this.maxSamples) {
+      this.gpuDrawTimes.shift();
     }
   }
   
   reset(): void {
-    this.frameTimes = [];
+    this.gpuDrawTimes = [];
   }
   
   collect() {
-    if (this.frameTimes.length < 10) {
+    if (this.gpuDrawTimes.length < 10) {
       return { gpuUtilization: 0, gpuBottleneck: false };
     }
     
-    // High variance + consistent times = GPU bound
-    // Calculate coefficient of variation
-    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
-    const variance = this.frameTimes.reduce((sum, t) => sum + Math.pow(t - avg, 2), 0) / this.frameTimes.length;
+    // Calculate GPU utilization based on actual GPU draw time
+    const avg = this.gpuDrawTimes.reduce((a, b) => a + b, 0) / this.gpuDrawTimes.length;
+    const variance = this.gpuDrawTimes.reduce((sum, t) => sum + Math.pow(t - avg, 2), 0) / this.gpuDrawTimes.length;
     const stdDev = Math.sqrt(variance);
     const cv = stdDev / avg;
     
-    // Estimate GPU utilization (0-100%)
-    const utilization = Math.min(100, (avg / 16.67) * 100);
+    // Estimate GPU utilization based on GPU draw time (0-1 scale)
+    // If GPU draw time is near frame budget, GPU is bottleneck
+    const utilization = Math.min(1.0, avg / 16.67);
     
-    // GPU bottleneck if high utilization + low variance (consistent load)
-    const gpuBottleneck = utilization > 80 && cv < 0.3;
+    // GPU bottleneck if high utilization + low variance (consistent GPU load)
+    const gpuBottleneck = utilization > 0.70 && cv < 0.3 && avg > 11; // >11ms GPU time = 66% of frame
     
     return {
       gpuUtilization: utilization,

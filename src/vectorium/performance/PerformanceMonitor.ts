@@ -16,6 +16,15 @@ import {
   LongTaskCollector,
   ShaderMetricsCollector
 } from './MetricsCollector';
+import {
+  GPUTimingCollector,
+  BatchBreakCollector,
+  AllocationTracker,
+  RenderStatCollector,
+  FunctionProfiler,
+  PlatformMetricsCollector,
+  PhysicsDeepCollector
+} from './AdvancedCollectors';
 
 export type QualityLevel = 'ultra' | 'high' | 'medium' | 'low' | 'potato';
 
@@ -123,6 +132,48 @@ export interface PerformanceMetrics {
   longTaskCount?: number;
   longestTask?: number; // ms
   shaderCompileTime?: number; // ms
+  
+  // GPU timing (WebGL2)
+  gpuDrawTime?: number; // ms
+  gpuTextTime?: number; // ms
+  cpuGPUGap?: number; // CPU waiting for GPU
+  usingGPUTimingFallback?: boolean;
+  
+  // Batch breaks
+  totalBatches?: number;
+  textureSwaps?: number;
+  shaderSwaps?: number;
+  bufferFullBreaks?: number;
+  avgSpritesPerBatch?: number;
+  
+  // Memory allocation
+  totalAllocatedObjects?: number;
+  totalAllocatedBytes?: number;
+  potentialLeaks?: number;
+  
+  // Render stats
+  fillRate?: number; // 1.0 = filled once, 2.0 = double fill
+  overdrawPercentage?: number;
+  pixelsPerFrame?: number;
+  
+  // Function profiling
+  totalFunctionCalls?: number;
+  uniqueFunctions?: number;
+  hottestFunction?: string;
+  
+  // Platform
+  batteryPercentage?: number;
+  isCharging?: boolean;
+  vsyncMisses?: number;
+  displayRefreshRate?: number;
+  
+  // Physics deep dive
+  broadPhaseTime?: number;
+  narrowPhaseTime?: number;
+  contactCount?: number;
+  islandCount?: number;
+  sleepingBodies?: number;
+  awakeBodies?: number;
 }
 
 const QUALITY_PRESETS: Record<QualityLevel, QualitySettings> = {
@@ -217,6 +268,15 @@ export class PerformanceMonitor extends UIPanel {
   private listenerCollector: EventListenerCollector;
   private longTaskCollector: LongTaskCollector;
   private shaderCollector: ShaderMetricsCollector;
+  
+  // Advanced collectors
+  private gpuTimingCollector: GPUTimingCollector;
+  private batchBreakCollector: BatchBreakCollector;
+  private allocationTracker: AllocationTracker;
+  private renderStatCollector: RenderStatCollector;
+  private functionProfiler: FunctionProfiler;
+  private platformCollector: PlatformMetricsCollector;
+  private physicsDeepCollector: PhysicsDeepCollector;
 
   // Physics metrics cache
 
@@ -247,6 +307,18 @@ export class PerformanceMonitor extends UIPanel {
     this.listenerCollector = new EventListenerCollector();
     this.longTaskCollector = new LongTaskCollector();
     this.shaderCollector = new ShaderMetricsCollector();
+    
+    // Initialize advanced collectors
+    this.gpuTimingCollector = new GPUTimingCollector();
+    this.batchBreakCollector = new BatchBreakCollector();
+    this.allocationTracker = new AllocationTracker();
+    this.renderStatCollector = new RenderStatCollector();
+    this.functionProfiler = new FunctionProfiler();
+    this.platformCollector = new PlatformMetricsCollector();
+    this.physicsDeepCollector = new PhysicsDeepCollector();
+    
+    // Initialize platform metrics
+    this.platformCollector.initBatteryAPI();
   }
   
   /**
@@ -254,6 +326,19 @@ export class PerformanceMonitor extends UIPanel {
    */
   setRenderer(renderer: any): void {
     this.renderer = renderer;
+    
+    // Initialize GPU timing if WebGL2
+    const gl = renderer.getContext();
+    if (gl && 'WebGL2RenderingContext' in window && gl instanceof WebGL2RenderingContext) {
+      const success = this.gpuTimingCollector.initializeGL(gl);
+      if (success) {
+        console.log('✅ GPU timing enabled');
+      }
+    }
+    
+    // Set screen resolution for render stats
+    const canvas = gl.canvas as HTMLCanvasElement;
+    this.renderStatCollector.setScreenResolution(canvas.width, canvas.height);
   }
   
   /**
@@ -281,9 +366,17 @@ export class PerformanceMonitor extends UIPanel {
     this.entitiesRenderedThisFrame = 0;
     this.batchSpriteCounts = [];
     
+    // Reset batch break tracking each frame
+    this.batchBreakCollector.reset();
+    
+    // Start GPU timing for draw calls
+    this.gpuTimingCollector.startTiming('draw');
+    this.gpuTimingCollector.startTiming('text');
+    
     // Periodic scans (every 60 frames)
     if (this.frameTimes.length % 60 === 0) {
       this.listenerCollector.scan();
+      this.allocationTracker.scanForLeaks();
     }
   }
 
@@ -296,9 +389,19 @@ export class PerformanceMonitor extends UIPanel {
       this.frameTimes.shift();
     }
     
+    // End GPU timing
+    this.gpuTimingCollector.endTiming('draw');
+    this.gpuTimingCollector.endTiming('text');
+    this.gpuTimingCollector.pollResults();
+    
+    // Get GPU draw time for utilization calculation
+    const gpuTiming = this.gpuTimingCollector.collect();
+    const gpuDrawTime = gpuTiming.timings['draw']?.avg || 0;
+    
     // Track frame spikes and GPU metrics
     this.spikeCollector.recordFrame(frameTime);
-    this.gpuCollector.recordFrame(frameTime);
+    this.gpuCollector.recordFrame(frameTime, gpuDrawTime);
+    this.platformCollector.recordFrame(frameTime);
     
     // Track long tasks
     if (frameTime > 16.67) {
@@ -441,6 +544,68 @@ export class PerformanceMonitor extends UIPanel {
     // TextureCollector doesn't have a direct recordFragmentation method
     // It calculates fragmentation from atlas size/usage
     // This is a no-op for now
+  }
+
+  // Advanced collector recording methods
+  
+  recordBatchBreak(reason: 'texture' | 'shader' | 'buffer' | 'state' | 'manual'): void {
+    switch (reason) {
+      case 'texture':
+        this.batchBreakCollector.recordTextureSwap();
+        break;
+      case 'shader':
+        this.batchBreakCollector.recordShaderSwap();
+        break;
+      case 'buffer':
+        this.batchBreakCollector.recordBufferFull();
+        break;
+      case 'state':
+        this.batchBreakCollector.recordStateChange();
+        break;
+      case 'manual':
+        this.batchBreakCollector.recordManualFlush();
+        break;
+    }
+  }
+  
+  recordBatchComplete(spriteCount: number): void {
+    this.batchBreakCollector.recordBatch();
+    this.recordBatch(spriteCount); // Keep existing tracking
+  }
+  
+  trackAllocation(obj: object, type: string, size: number = 0): void {
+    this.allocationTracker.trackAllocation(obj, type, size);
+  }
+  
+  recordDrawPixels(triangles: number): void {
+    this.renderStatCollector.recordDrawCall(triangles);
+  }
+  
+  startFunctionProfile(name: string): void {
+    this.functionProfiler.startFunction(name);
+  }
+  
+  endFunctionProfile(name: string): void {
+    this.functionProfiler.endFunction(name);
+  }
+  
+  recordPhysicsDeep(metrics: {
+    broadPhase?: number;
+    narrowPhase?: number;
+    contacts?: number;
+    islands?: number;
+    sleeping?: number;
+    awake?: number;
+    iterations?: number;
+  }): void {
+    if (metrics.broadPhase !== undefined) this.physicsDeepCollector.recordBroadPhase(metrics.broadPhase);
+    if (metrics.narrowPhase !== undefined) this.physicsDeepCollector.recordNarrowPhase(metrics.narrowPhase);
+    if (metrics.contacts !== undefined) this.physicsDeepCollector.recordContacts(metrics.contacts);
+    if (metrics.islands !== undefined) this.physicsDeepCollector.recordIslands(metrics.islands);
+    if (metrics.sleeping !== undefined && metrics.awake !== undefined) {
+      this.physicsDeepCollector.recordBodyStates(metrics.sleeping, metrics.awake);
+    }
+    if (metrics.iterations !== undefined) this.physicsDeepCollector.recordConstraintIterations(metrics.iterations);
   }
 
   private adjustQuality(): void {
@@ -632,7 +797,43 @@ export class PerformanceMonitor extends UIPanel {
       ...this.textureCollector.collect(),
       ...this.listenerCollector.collect(),
       ...this.longTaskCollector.collect(),
-      ...this.shaderCollector.collect()
+      ...this.shaderCollector.collect(),
+      
+      // Collect from advanced collectors
+      ...this.collectGPUTimingMetrics(),
+      ...this.batchBreakCollector.collect(),
+      ...this.collectAllocationMetrics(),
+      ...this.renderStatCollector.collect(),
+      ...this.collectFunctionProfileMetrics(),
+      ...this.platformCollector.collect(),
+      ...this.physicsDeepCollector.collect()
+    };
+  }
+  
+  private collectGPUTimingMetrics(): any {
+    const gpuTiming = this.gpuTimingCollector.collect();
+    return {
+      gpuDrawTime: gpuTiming.timings['draw']?.avg || 0,
+      gpuTextTime: gpuTiming.timings['text']?.avg || 0,
+      usingGPUTimingFallback: gpuTiming.usingCPUFallback
+    };
+  }
+  
+  private collectAllocationMetrics(): any {
+    const alloc = this.allocationTracker.collect();
+    return {
+      totalAllocatedObjects: alloc.totalObjects,
+      totalAllocatedBytes: alloc.totalSize,
+      potentialLeaks: Object.keys(alloc.leakCandidates).length
+    };
+  }
+  
+  private collectFunctionProfileMetrics(): any {
+    const prof = this.functionProfiler.collect();
+    return {
+      totalFunctionCalls: prof.totalCalls,
+      uniqueFunctions: prof.totalFunctions,
+      hottestFunction: prof.hotPaths[0]?.name || 'none'
     };
   }
 
@@ -668,326 +869,481 @@ export class PerformanceMonitor extends UIPanel {
   protected createContent(): string {
     return `
       <div class="profiler-content">
-        <div class="section-header">📊 PERFORMANCE</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Quality</span>
-            <span class="ui-value" data-metric="quality">HIGH</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Score</span>
-            <span class="ui-value" data-metric="score">100</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Bottleneck</span>
-            <span class="ui-value" data-metric="bottleneck">BALANCED</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Frame Budget</span>
-            <span class="ui-value" data-metric="framebudget">0.0/16.67ms</span>
-          </div>
-          <div class="frame-budget-bar">
-            <div class="frame-budget-fill" data-metric="framebudgetbar" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <div class="section-header">🎯 FRAME METRICS</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">FPS</span>
-            <span class="ui-value" data-metric="fps">60.0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">└─ Average</span>
-            <span class="ui-value" data-metric="fpsavg">60.0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Frame Time</span>
-            <span class="ui-value" data-metric="frame">16.67ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Min/Max</span>
-            <span class="ui-value" data-metric="minmax">16/17ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Variance</span>
-            <span class="ui-value" data-metric="variance">±0.5ms</span>
+        <!-- Full-width performance header -->
+        <div class="profiler-full-width">
+          <div class="section-header">📊 PERFORMANCE</div>
+          <div class="ui-section">
+            <div class="ui-row">
+              <span class="ui-label">Quality</span>
+              <span class="ui-value" data-metric="quality">HIGH</span>
+            </div>
+            <div class="ui-row">
+              <span class="ui-label">Score</span>
+              <span class="ui-value" data-metric="score">100</span>
+            </div>
+            <div class="ui-row">
+              <span class="ui-label">Bottleneck</span>
+              <span class="ui-value" data-metric="bottleneck">BALANCED</span>
+            </div>
+            <div class="ui-row">
+              <span class="ui-label">Frame Budget</span>
+              <span class="ui-value" data-metric="framebudget">0.0/16.67ms</span>
+            </div>
+            <div class="frame-budget-bar">
+              <div class="frame-budget-fill" data-metric="framebudgetbar" style="width: 0%"></div>
+            </div>
           </div>
         </div>
 
-        <div class="section-header">🎨 RENDER PIPELINE</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Draw Calls</span>
-            <span class="ui-value" data-metric="drawcalls">0</span>
+        <!-- Two-column grid layout -->
+        <div class="profiler-grid">
+          <!-- LEFT COLUMN -->
+          <div class="profiler-column">
+            <div class="section-header">🎯 FRAME TIMING</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">FPS</span>
+                <span class="ui-value" data-metric="fps">60.0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">└─ Average</span>
+                <span class="ui-value" data-metric="fpsavg">60.0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Frame Time</span>
+                <span class="ui-value" data-metric="frame">16.67ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Min/Max</span>
+                <span class="ui-value" data-metric="minmax">16/17ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Variance</span>
+                <span class="ui-value" data-metric="variance">±0.5ms</span>
+              </div>
+            </div>
+
+            <div class="section-header">⚙️ UPDATE/RENDER</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Update Total</span>
+                <span class="ui-value" data-metric="updatetotal">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Physics</span>
+                <span class="ui-value" data-metric="updatephysics">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Animation</span>
+                <span class="ui-value" data-metric="updateanimation">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">└─ Sync</span>
+                <span class="ui-value" data-metric="updateentitysync">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Render Total</span>
+                <span class="ui-value" data-metric="rendertotal">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Batch</span>
+                <span class="ui-value" data-metric="renderbatch">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">└─ Custom</span>
+                <span class="ui-value" data-metric="rendercustom">0.00ms</span>
+              </div>
+            </div>
+
+            <div class="section-header">🎨 RENDER PIPELINE</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Draw Calls</span>
+                <span class="ui-value" data-metric="drawcalls">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ WebGL</span>
+                <span class="ui-value" data-metric="webgl">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">└─ Text</span>
+                <span class="ui-value" data-metric="text">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Vertices</span>
+                <span class="ui-value" data-metric="vertices">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Triangles</span>
+                <span class="ui-value" data-metric="triangles">0K</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Draw Calls</span>
+                <span class="ui-value" id="prof-drawcalls">0</span>
+              </div>
+              <div class="ui-stat">
+                <span class="ui-label">Batch Eff</span>
+                <span class="ui-value" data-metric="batch">0%</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Upload</span>
+                <span class="ui-value" data-metric="upload">0MB</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">States</span>
+                <span class="ui-value" data-metric="states">1</span>
+              </div>
+            </div>
+
+            <div class="section-header">⚡ GPU TIMING</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Draw Time</span>
+                <span class="ui-value" data-metric="gputimedraw">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Text Time</span>
+                <span class="ui-value" data-metric="gputimetext">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">CPU Fallback</span>
+                <span class="ui-value" data-metric="gputimefallback">No</span>
+              </div>
+            </div>
+
+            <div class="section-header">📦 BATCH ANALYSIS</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Total Batches</span>
+                <span class="ui-value" data-metric="batchcount">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Texture Swaps</span>
+                <span class="ui-value" data-metric="batchtexture">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Shader Swaps</span>
+                <span class="ui-value" data-metric="batchshader">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Buffer Full</span>
+                <span class="ui-value" data-metric="batchbuffer">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">State Changes</span>
+                <span class="ui-value" data-metric="batchstate">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Avg Sprites</span>
+                <span class="ui-value" data-metric="batchavgsprites">0</span>
+              </div>
+            </div>
+
+            <div class="section-header">🎨 RENDER STATS</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Fill Rate</span>
+                <span class="ui-value" data-metric="fillrate">0.0x</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Overdraw</span>
+                <span class="ui-value" data-metric="overdraw">0%</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Pixels/Frame</span>
+                <span class="ui-value" data-metric="pixelsframe">0M</span>
+              </div>
+            </div>
+
+            <div class="section-header">🎮 GPU UTILIZATION</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Utilization</span>
+                <span class="ui-value" data-metric="gpuutilization">0%</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Bottleneck</span>
+                <span class="ui-value" data-metric="gpubottleneck">No</span>
+              </div>
+            </div>
+
+            <div class="section-header">⚙️ ECS METRICS</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Active</span>
+                <span class="ui-value" data-metric="active">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Shapes</span>
+                <span class="ui-value" data-metric="shapes">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">└─ Text</span>
+                <span class="ui-value" data-metric="textentities">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Rendered</span>
+                <span class="ui-value" data-metric="rendered">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Culled</span>
+                <span class="ui-value" data-metric="culled">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Culling Eff</span>
+                <span class="ui-value" data-metric="cullingeff">0%</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Time/Entity</span>
+                <span class="ui-value" data-metric="timeperentity">0μs</span>
+              </div>
+            </div>
           </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ WebGL</span>
-            <span class="ui-value" data-metric="webgl">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">└─ Text</span>
-            <span class="ui-value" data-metric="text">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Vertices</span>
-            <span class="ui-value" data-metric="vertices">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Triangles</span>
-            <span class="ui-value" data-metric="triangles">0K</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Batch Eff</span>
-            <span class="ui-value" data-metric="batch">0%</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Upload</span>
-            <span class="ui-value" data-metric="upload">0MB</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">States</span>
-            <span class="ui-value" data-metric="states">1</span>
+
+          <!-- RIGHT COLUMN -->
+          <div class="profiler-column">
+            <div class="section-header">⚛️ PHYSICS</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Total Time</span>
+                <span class="ui-value" data-metric="physicstime">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Gravity</span>
+                <span class="ui-value" data-metric="gravitytime">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Hash Build</span>
+                <span class="ui-value" data-metric="hashbuild">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Collision</span>
+                <span class="ui-value" data-metric="collisiontime">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">└─ Boundary</span>
+                <span class="ui-value" data-metric="boundarytime">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Checks</span>
+                <span class="ui-value" data-metric="collisionchecks">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Cells/Bucket</span>
+                <span class="ui-value" data-metric="hashcells">0/0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Sleeping</span>
+                <span class="ui-value" data-metric="sleeping">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Active Pairs</span>
+                <span class="ui-value" data-metric="activepairs">0</span>
+              </div>
+            </div>
+
+            <div class="section-header">⚛️ PHYSICS DEEP</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Broad Phase</span>
+                <span class="ui-value" data-metric="broadphase">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Narrow Phase</span>
+                <span class="ui-value" data-metric="narrowphase">0.00ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Contacts</span>
+                <span class="ui-value" data-metric="contacts">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Islands</span>
+                <span class="ui-value" data-metric="islands">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Sleep Ratio</span>
+                <span class="ui-value" data-metric="sleepratio">0%</span>
+              </div>
+            </div>
+
+            <div class="section-header">💾 MEMORY</div>
+            <div class="ui-hint">JS HEAP (RAM)</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Used</span>
+                <span class="ui-value" data-metric="memory">0MB</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Limit</span>
+                <span class="ui-value" data-metric="heaplimit">0MB</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">GC Pressure</span>
+                <span class="ui-value" data-metric="gcpressure">0%</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">GC Events</span>
+                <span class="ui-value" data-metric="gcevents">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Heap Trend</span>
+                <span class="ui-value" data-metric="heaptrend">—</span>
+              </div>
+              <div class="ui-hint">Includes: V8 engine, page code, Vectorium lib, DevTools, DOM, all JS objects</div>
+            </div>
+            <div class="ui-hint">GPU MEMORY (VRAM)</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Vertex Buf</span>
+                <span class="ui-value" data-metric="vbuffer">0MB</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Index Buf</span>
+                <span class="ui-value" data-metric="ibuffer">0MB</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Text Atlas</span>
+                <span class="ui-value" data-metric="textatlas">0MB</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Total VRAM</span>
+                <span class="ui-value" data-metric="totalvram">0MB</span>
+              </div>
+            </div>
+
+            <div class="section-header">🧠 MEMORY TRACKING</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Allocated Objs</span>
+                <span class="ui-value" data-metric="allocatedobjects">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Allocated Bytes</span>
+                <span class="ui-value" data-metric="allocatedbytes">0KB</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Potential Leaks</span>
+                <span class="ui-value" data-metric="potentialleaks">0</span>
+              </div>
+            </div>
+
+            <div class="section-header">🎮 INPUT & RESPONSIVENESS</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Input Lag</span>
+                <span class="ui-value" data-metric="inputlag">0.0ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">P95 Lag</span>
+                <span class="ui-value" data-metric="inputlagp95">0.0ms</span>
+              </div>
+            </div>
+
+            <div class="section-header">📊 FRAME SPIKES</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Minor (16-20ms)</span>
+                <span class="ui-value" data-metric="minorspikes">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Major (20-33ms)</span>
+                <span class="ui-value" data-metric="majorspikes">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Severe (>33ms)</span>
+                <span class="ui-value" data-metric="severespikes">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Total Spikes</span>
+                <span class="ui-value" data-metric="totalspikes">0</span>
+              </div>
+            </div>
+
+            <div class="section-header">📦 ASSETS</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Loaded</span>
+                <span class="ui-value" data-metric="assetsloaded">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Failed</span>
+                <span class="ui-value" data-metric="assetsfailed">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Cache Hit Rate</span>
+                <span class="ui-value" data-metric="cachehitrate">0%</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Avg Load Time</span>
+                <span class="ui-value" data-metric="avgloadtime">0.0ms</span>
+              </div>
+            </div>
+
+            <div class="section-header">⚙️ FUNCTION PROFILE</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Total Calls</span>
+                <span class="ui-value" data-metric="functioncalls">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Unique Funcs</span>
+                <span class="ui-value" data-metric="uniquefuncs">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Hottest Func</span>
+                <span class="ui-value" data-metric="hottestfunc">—</span>
+              </div>
+            </div>
+
+            <div class="section-header">📱 PLATFORM</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Battery</span>
+                <span class="ui-value" data-metric="battery">—</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Charging</span>
+                <span class="ui-value" data-metric="charging">—</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Vsync Misses</span>
+                <span class="ui-value" data-metric="vsyncmisses">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Refresh Rate</span>
+                <span class="ui-value" data-metric="refreshrate">60Hz</span>
+              </div>
+            </div>
+
+            <div class="section-header">⚠️ DIAGNOSTICS</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Long Tasks</span>
+                <span class="ui-value" data-metric="longtasks">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Longest Task</span>
+                <span class="ui-value" data-metric="longesttask">0.0ms</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">DOM Elements</span>
+                <span class="ui-value" data-metric="domelements">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">DOM Growth</span>
+                <span class="ui-value" data-metric="domgrowth">0/s</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="section-header">⚛️ PHYSICS</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Total Time</span>
-            <span class="ui-value" data-metric="physicstime">0.00ms</span>
+        <!-- Full-width actions -->
+        <div class="profiler-full-width">
+          <div class="section-header">⚙️ ACTIONS</div>
+          <div class="ui-section">
+            <button class="vectorium-btn full-width" data-action="measure">📊 Measure (2s)</button>
+            <button class="vectorium-btn full-width" data-action="export">💾 Export Metrics</button>
           </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ Gravity</span>
-            <span class="ui-value" data-metric="gravitytime">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ Hash Build</span>
-            <span class="ui-value" data-metric="hashbuild">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ Collision</span>
-            <span class="ui-value" data-metric="collisiontime">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">└─ Boundary</span>
-            <span class="ui-value" data-metric="boundarytime">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Checks</span>
-            <span class="ui-value" data-metric="collisionchecks">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Cells/Bucket</span>
-            <span class="ui-value" data-metric="hashcells">0/0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Sleeping</span>
-            <span class="ui-value" data-metric="sleeping">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Active Pairs</span>
-            <span class="ui-value" data-metric="activepairs">0</span>
-          </div>
-        </div>
-
-        <div class="section-header">⚙️ ECS METRICS</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Active</span>
-            <span class="ui-value" data-metric="active">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ Shapes</span>
-            <span class="ui-value" data-metric="shapes">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">└─ Text</span>
-            <span class="ui-value" data-metric="textentities">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Rendered</span>
-            <span class="ui-value" data-metric="rendered">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Culled</span>
-            <span class="ui-value" data-metric="culled">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Culling Eff</span>
-            <span class="ui-value" data-metric="cullingeff">0%</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Time/Entity</span>
-            <span class="ui-value" data-metric="timeperentity">0μs</span>
-          </div>
-        </div>
-
-        <div class="section-header">⚙️ UPDATE/RENDER</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Update Total</span>
-            <span class="ui-value" data-metric="updatetotal">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ Physics</span>
-            <span class="ui-value" data-metric="updatephysics">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ Animation</span>
-            <span class="ui-value" data-metric="updateanimation">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">└─ Sync</span>
-            <span class="ui-value" data-metric="updateentitysync">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Render Total</span>
-            <span class="ui-value" data-metric="rendertotal">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">├─ Batch</span>
-            <span class="ui-value" data-metric="renderbatch">0.00ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">└─ Custom</span>
-            <span class="ui-value" data-metric="rendercustom">0.00ms</span>
-          </div>
-        </div>
-
-        <div class="section-header">💾 MEMORY</div>
-        <div class="ui-hint">JS HEAP (RAM)</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Used</span>
-            <span class="ui-value" data-metric="memory">0MB</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Limit</span>
-            <span class="ui-value" data-metric="heaplimit">0MB</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">GC Pressure</span>
-            <span class="ui-value" data-metric="gcpressure">0%</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">GC Events</span>
-            <span class="ui-value" data-metric="gcevents">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Heap Trend</span>
-            <span class="ui-value" data-metric="heaptrend">—</span>
-          </div>
-          <div class="ui-hint">Includes: V8 engine, page code, Vectorium lib, DevTools, DOM, all JS objects</div>
-        </div>
-        <div class="ui-hint">GPU MEMORY (VRAM)</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Vertex Buf</span>
-            <span class="ui-value" data-metric="vbuffer">0MB</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Index Buf</span>
-            <span class="ui-value" data-metric="ibuffer">0MB</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Text Atlas</span>
-            <span class="ui-value" data-metric="textatlas">0MB</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Total VRAM</span>
-            <span class="ui-value" data-metric="totalvram">0MB</span>
-          </div>
-        </div>
-
-        <div class="section-header">🎮 INPUT RESPONSIVENESS</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Input Lag</span>
-            <span class="ui-value" data-metric="inputlag">0.0ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">P95 Lag</span>
-            <span class="ui-value" data-metric="inputlagp95">0.0ms</span>
-          </div>
-        </div>
-
-        <div class="section-header">📊 FRAME SPIKES</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Minor (16-20ms)</span>
-            <span class="ui-value" data-metric="minorspikes">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Major (20-33ms)</span>
-            <span class="ui-value" data-metric="majorspikes">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Severe (>33ms)</span>
-            <span class="ui-value" data-metric="severespikes">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Total Spikes</span>
-            <span class="ui-value" data-metric="totalspikes">0</span>
-          </div>
-        </div>
-
-        <div class="section-header">📦 ASSETS</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Loaded</span>
-            <span class="ui-value" data-metric="assetsloaded">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Failed</span>
-            <span class="ui-value" data-metric="assetsfailed">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Cache Hit Rate</span>
-            <span class="ui-value" data-metric="cachehitrate">0%</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Avg Load Time</span>
-            <span class="ui-value" data-metric="avgloadtime">0.0ms</span>
-          </div>
-        </div>
-
-        <div class="section-header">🎮 GPU UTILIZATION</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Utilization</span>
-            <span class="ui-value" data-metric="gpuutilization">0%</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Bottleneck</span>
-            <span class="ui-value" data-metric="gpubottleneck">No</span>
-          </div>
-        </div>
-
-        <div class="section-header">⚠️ DIAGNOSTICS</div>
-        <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Long Tasks</span>
-            <span class="ui-value" data-metric="longtasks">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Longest Task</span>
-            <span class="ui-value" data-metric="longesttask">0.0ms</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">DOM Elements</span>
-            <span class="ui-value" data-metric="domelements">0</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">DOM Growth</span>
-            <span class="ui-value" data-metric="domgrowth">0/s</span>
-          </div>
-        </div>
-
-        <div class="section-header">⚙️ ACTIONS</div>
-        <div class="ui-section">
-          <button class="vectorium-btn full-width" data-action="measure">📊 Measure (2s)</button>
-          <button class="vectorium-btn full-width" data-action="export">💾 Export Metrics</button>
         </div>
       </div>
     `;
@@ -1088,6 +1444,9 @@ export class PerformanceMonitor extends UIPanel {
     const frameTimeClass = getColorClass(metrics.frameTime, {excellent: 8, good: 13, ok: 16.67, warning: 20, critical: 33, severe: 50}, false);
     set('frame', `${metrics.frameTime.toFixed(2)}ms`, frameTimeClass);
     set('minmax', `${metrics.frameTimeMin.toFixed(1)}/${metrics.frameTimeMax.toFixed(1)}ms`);
+    
+    const varianceClass = getColorClass(metrics.frameTimeVariance, {excellent: 0.5, good: 1.0, ok: 2.0, warning: 3.0, critical: 5.0, severe: 8.0}, false);
+    set('variance', `±${metrics.frameTimeVariance.toFixed(1)}ms`, varianceClass);
 
     // Render Pipeline
     const drawCallClass = getColorClass(metrics.drawCalls, {excellent: 50, good: 100, ok: 200, warning: 500, critical: 1000, severe: 2000}, false);
@@ -1108,13 +1467,13 @@ export class PerformanceMonitor extends UIPanel {
     set('triangles', `${triangleCount.toFixed(1)}K`, triangleClass);
     
     const batchEffPct = metrics.batchEfficiency * 100;
-    const batchClass = getColorClass(batchEffPct, {excellent: 80, good: 60, ok: 40, warning: 25, critical: 15, severe: 5}, true);
+    const batchClass = getColorClass(batchEffPct, {excellent: 80, good: 60, ok: 40, warning: 25, critical: 10}, true);
     set('batch', `${batchEffPct.toFixed(0)}%`, batchClass);
     
-    const uploadClass = getColorClass(metrics.bufferUploadSize, {excellent: 0.5, good: 1, ok: 2, warning: 5, critical: 10, severe: 20}, false);
+    const uploadClass = getColorClass(metrics.bufferUploadSize, {excellent: 1, good: 5, ok: 10, warning: 20, critical: 50, severe: 100}, false);
     set('upload', `${metrics.bufferUploadSize.toFixed(2)}MB`, uploadClass);
     
-    const stateClass = getColorClass(metrics.stateChanges, {excellent: 20, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    const stateClass = getColorClass(metrics.stateChanges, {excellent: 10, good: 30, ok: 60, warning: 120, critical: 250, severe: 500}, false);
     set('states', metrics.stateChanges.toString(), stateClass);
 
     // Physics Metrics
@@ -1133,9 +1492,9 @@ export class PerformanceMonitor extends UIPanel {
     const boundaryTimeClass = getColorClass(metrics.boundaryTime, {excellent: 0.3, good: 0.5, ok: 1, warning: 2, critical: 3, severe: 5}, false);
     set('boundarytime', `${metrics.boundaryTime.toFixed(2)}ms`, boundaryTimeClass);
     
+    const collisionChecksClass = getColorClass(metrics.collisionChecks, {excellent: 1000, good: 5000, ok: 10000, warning: 25000, critical: 50000, severe: 100000}, false);
     const collisionChecksK = metrics.collisionChecks / 1000;
-    const collisionChecksClass = getColorClass(collisionChecksK, {excellent: 1, good: 5, ok: 10, warning: 25, critical: 50, severe: 100}, false);
-    set('collisionchecks', `${collisionChecksK.toFixed(1)}K`, collisionChecksClass);
+    set('collisionchecks', metrics.collisionChecks > 1000 ? `${collisionChecksK.toFixed(1)}K` : metrics.collisionChecks.toString(), collisionChecksClass);
     
     set('hashcells', `${metrics.spatialHashCells}/${metrics.spatialHashMaxBucket}`);
     
@@ -1181,6 +1540,15 @@ export class PerformanceMonitor extends UIPanel {
     const culledCount = (metrics.entitiesCulled || 0) / 1000;
     set('culled', `${culledCount.toFixed(1)}K`);
     
+    // Culling efficiency display
+    if (metrics.cullingEfficiency !== undefined) {
+      const cullingEffPct = metrics.cullingEfficiency * 100;
+      const cullingEffClass = getColorClass(cullingEffPct, {excellent: 70, good: 50, ok: 30, warning: 15, critical: 5}, true);
+      set('cullingeff', `${cullingEffPct.toFixed(0)}%`, cullingEffClass);
+    } else {
+      set('cullingeff', '0%');
+    }
+    
     const timePerEntityClass = getColorClass(metrics.timePerEntity, {excellent: 1, good: 2, ok: 5, warning: 10, critical: 20, severe: 50}, false);
     set('timeperentity', `${metrics.timePerEntity.toFixed(1)}μs`, timePerEntityClass);
 
@@ -1201,6 +1569,20 @@ export class PerformanceMonitor extends UIPanel {
       
       const renderTotalClass = getColorClass(scenePerfMetrics.renderTotal, {excellent: 2, good: 5, ok: 8, warning: 12, critical: 15, severe: 20}, false);
       set('rendertotal', `${scenePerfMetrics.renderTotal.toFixed(2)}ms`, renderTotalClass);
+      
+      const renderBatchClass = getColorClass(scenePerfMetrics.renderBatch, {excellent: 1, good: 3, ok: 5, warning: 8, critical: 12, severe: 16}, false);
+      set('renderbatch', `${scenePerfMetrics.renderBatch.toFixed(2)}ms`, renderBatchClass);
+      
+      const renderCustomClass = getColorClass(scenePerfMetrics.renderCustom, {excellent: 0.5, good: 1, ok: 2, warning: 3, critical: 5, severe: 8}, false);
+      set('rendercustom', `${scenePerfMetrics.renderCustom.toFixed(2)}ms`, renderCustomClass);
+    } else {
+      set('updatetotal', '0.00ms');
+      set('updatephysics', '0.00ms');
+      set('updateanimation', '0.00ms');
+      set('updateentitysync', '0.00ms');
+      set('rendertotal', '0.00ms');
+      set('renderbatch', '0.00ms');
+      set('rendercustom', '0.00ms');
     }
 
     // Memory
@@ -1228,7 +1610,7 @@ export class PerformanceMonitor extends UIPanel {
       set('heaplimit', `${heapLimit.toFixed(0)}MB`);
       
       const gcPressure = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
-      const gcClass = getColorClass(gcPressure, {excellent: 40, good: 60, ok: 75, warning: 85, critical: 92, severe: 97}, false);
+      const gcClass = getColorClass(gcPressure, {excellent: 40, good: 60, ok: 75, warning: 85, critical: 90, severe: 95}, false);
       set('gcpressure', `${gcPressure.toFixed(0)}%`, gcClass);
       
       // GC activity tracking
@@ -1300,7 +1682,7 @@ export class PerformanceMonitor extends UIPanel {
 
     // GPU Utilization
     const gpuUtilPct = metrics.gpuUtilization * 100;
-    const gpuUtilClass = getColorClass(gpuUtilPct, {excellent: 50, good: 70, ok: 85, warning: 92, critical: 97, severe: 99}, false);
+    const gpuUtilClass = getColorClass(gpuUtilPct, {excellent: 50, good: 70, ok: 85, warning: 90, critical: 95, severe: 98}, false);
     set('gpuutilization', `${gpuUtilPct.toFixed(0)}%`, gpuUtilClass);
     
     set('gpubottleneck', metrics.gpuBottleneck ? 'Yes' : 'No', metrics.gpuBottleneck ? 'warning' : 'good');
@@ -1317,6 +1699,98 @@ export class PerformanceMonitor extends UIPanel {
     
     const domGrowthClass = getColorClass(metrics.domGrowthRate || 0, {excellent: 0, good: 1, ok: 5, warning: 10, critical: 25, severe: 50}, false);
     set('domgrowth', `${(metrics.domGrowthRate || 0).toFixed(1)}/s`, domGrowthClass);
+
+    // GPU Timing section
+    const gpuDrawTimeClass = getColorClass(metrics.gpuDrawTime || 0, {excellent: 2, good: 5, ok: 10, warning: 15, critical: 20, severe: 30}, false);
+    set('gputimedraw', `${(metrics.gpuDrawTime || 0).toFixed(2)}ms`, gpuDrawTimeClass);
+    
+    const gpuTextTimeClass = getColorClass(metrics.gpuTextTime || 0, {excellent: 1, good: 3, ok: 5, warning: 8, critical: 12, severe: 20}, false);
+    set('gputimetext', `${(metrics.gpuTextTime || 0).toFixed(2)}ms`, gpuTextTimeClass);
+    
+    set('gputimefallback', metrics.usingGPUTimingFallback ? 'Yes' : 'No', metrics.usingGPUTimingFallback ? 'critical' : 'excellent');
+
+    // Batch Analysis section
+    const batchCountClass = getColorClass(metrics.totalBatches || 0, {excellent: 5, good: 20, ok: 50, warning: 100, critical: 200, severe: 500}, false);
+    set('batchcount', (metrics.totalBatches || 0).toString(), batchCountClass);
+    
+    const textureSwapsClass = getColorClass(metrics.textureSwaps || 0, {excellent: 5, good: 20, ok: 50, warning: 100, critical: 200, severe: 500}, false);
+    set('batchtexture', (metrics.textureSwaps || 0).toString(), textureSwapsClass);
+    
+    const shaderSwapsClass = getColorClass(metrics.shaderSwaps || 0, {excellent: 2, good: 10, ok: 20, warning: 50, critical: 100, severe: 200}, false);
+    set('batchshader', (metrics.shaderSwaps || 0).toString(), shaderSwapsClass);
+    
+    const bufferFullClass = getColorClass(metrics.bufferFullBreaks || 0, {excellent: 0, good: 5, ok: 20, warning: 50, critical: 100, severe: 200}, false);
+    set('batchbuffer', (metrics.bufferFullBreaks || 0).toString(), bufferFullClass);
+    
+    // State changes already displayed in render pipeline section, show manual breaks here if available
+    set('batchstate', (metrics.stateChanges || 0).toString());
+    
+    const avgSpritesClass = getColorClass(metrics.avgSpritesPerBatch || 0, {excellent: 100, good: 50, ok: 30, warning: 15, critical: 5}, true);
+    set('batchavgsprites', (metrics.avgSpritesPerBatch || 0).toFixed(0), avgSpritesClass);
+
+    // Memory Tracking section
+    const allocatedObjsClass = getColorClass(metrics.totalAllocatedObjects || 0, {excellent: 1000, good: 5000, ok: 10000, warning: 25000, critical: 50000, severe: 100000}, false);
+    set('allocatedobjects', (metrics.totalAllocatedObjects || 0).toString(), allocatedObjsClass);
+    
+    const allocatedBytes = (metrics.totalAllocatedBytes || 0) / 1024;
+    const allocatedBytesClass = getColorClass(allocatedBytes, {excellent: 100, good: 500, ok: 1024, warning: 5120, critical: 10240, severe: 51200}, false);
+    set('allocatedbytes', `${allocatedBytes.toFixed(0)}KB`, allocatedBytesClass);
+    
+    const leaksClass = getColorClass(metrics.potentialLeaks || 0, {excellent: 0, good: 0, ok: 1, warning: 5, critical: 10, severe: 25}, false);
+    set('potentialleaks', (metrics.potentialLeaks || 0).toString(), leaksClass);
+
+    // Render Stats section
+    const fillRateClass = getColorClass(metrics.fillRate || 0, {excellent: 1.5, good: 2.5, ok: 3.5, warning: 5.0, critical: 7.0, severe: 10.0}, false);
+    set('fillrate', `${(metrics.fillRate || 0).toFixed(1)}x`, fillRateClass);
+    
+    const overdrawClass = getColorClass(metrics.overdrawPercentage || 0, {excellent: 50, good: 150, ok: 250, warning: 400, critical: 600, severe: 1000}, false);
+    set('overdraw', `${(metrics.overdrawPercentage || 0).toFixed(0)}%`, overdrawClass);
+    
+    const pixelsMillion = (metrics.pixelsPerFrame || 0) / 1_000_000;
+    const pixelsClass = getColorClass(pixelsMillion, {excellent: 5, good: 10, ok: 20, warning: 40, critical: 80, severe: 150}, false);
+    set('pixelsframe', `${pixelsMillion.toFixed(1)}M`, pixelsClass);
+
+    // Function Profile section
+    const functionCallsClass = getColorClass(metrics.totalFunctionCalls || 0, {excellent: 100, good: 500, ok: 1000, warning: 2500, critical: 5000, severe: 10000}, false);
+    set('functioncalls', (metrics.totalFunctionCalls || 0).toString(), functionCallsClass);
+    
+    const uniqueFuncsClass = getColorClass(metrics.uniqueFunctions || 0, {excellent: 10, good: 50, ok: 100, warning: 200, critical: 400, severe: 800}, false);
+    set('uniquefuncs', (metrics.uniqueFunctions || 0).toString(), uniqueFuncsClass);
+    
+    set('hottestfunc', metrics.hottestFunction || '—');
+
+    // Platform section
+    if (metrics.batteryPercentage !== undefined) {
+      const batteryClass = getColorClass(metrics.batteryPercentage * 100, {excellent: 80, good: 50, ok: 30, warning: 20, critical: 10, severe: 5}, true);
+      set('battery', `${(metrics.batteryPercentage * 100).toFixed(0)}%`, batteryClass);
+    } else {
+      set('battery', '—');
+    }
+    
+    set('charging', metrics.isCharging === undefined ? '—' : (metrics.isCharging ? 'Yes' : 'No'));
+    
+    const vsyncMissesClass = getColorClass(metrics.vsyncMisses || 0, {excellent: 0, good: 0, ok: 5, warning: 20, critical: 50, severe: 100}, false);
+    set('vsyncmisses', (metrics.vsyncMisses || 0).toString(), vsyncMissesClass);
+    
+    set('refreshrate', `${metrics.displayRefreshRate || 60}Hz`);
+
+    // Physics Deep section
+    const broadPhaseClass = getColorClass(metrics.broadPhaseTime || 0, {excellent: 0.5, good: 1.0, ok: 2.0, warning: 4.0, critical: 8.0, severe: 15.0}, false);
+    set('broadphase', `${(metrics.broadPhaseTime || 0).toFixed(2)}ms`, broadPhaseClass);
+    
+    const narrowPhaseClass = getColorClass(metrics.narrowPhaseTime || 0, {excellent: 1.0, good: 2.0, ok: 4.0, warning: 8.0, critical: 15.0, severe: 30.0}, false);
+    set('narrowphase', `${(metrics.narrowPhaseTime || 0).toFixed(2)}ms`, narrowPhaseClass);
+    
+    const contactsClass = getColorClass(metrics.contactCount || 0, {excellent: 50, good: 200, ok: 500, warning: 1000, critical: 2500, severe: 5000}, false);
+    set('contacts', (metrics.contactCount || 0).toString(), contactsClass);
+    
+    const islandsClass = getColorClass(metrics.islandCount || 0, {excellent: 5, good: 20, ok: 50, warning: 100, critical: 200, severe: 500}, false);
+    set('islands', (metrics.islandCount || 0).toString(), islandsClass);
+    
+    const totalBodies = (metrics.sleepingBodies || 0) + (metrics.awakeBodies || 0);
+    const sleepRatio = totalBodies > 0 ? (metrics.sleepingBodies || 0) / totalBodies * 100 : 0;
+    const sleepRatioClass = getColorClass(sleepRatio, {excellent: 80, good: 60, ok: 40, warning: 20, critical: 10}, true);
+    set('sleepratio', `${sleepRatio.toFixed(0)}%`, sleepRatioClass);
 
   }
 
@@ -1449,6 +1923,60 @@ export class PerformanceMonitor extends UIPanel {
         eventListeners: this.listenerCollector.collect(),
         longTasks: this.longTaskCollector.collect(),
         shaderCompiles: this.shaderCollector.collect()
+      },
+      
+      // Advanced profiling metrics
+      gpuTiming: {
+        drawTime: metrics.gpuDrawTime,
+        textTime: metrics.gpuTextTime,
+        fallback: metrics.usingGPUTimingFallback,
+        timings: this.gpuTimingCollector.collect()
+      },
+      batchAnalysis: {
+        totalBatches: metrics.totalBatches,
+        breaks: {
+          texture: metrics.textureSwaps,
+          shader: metrics.shaderSwaps,
+          buffer: metrics.bufferFullBreaks,
+          state: metrics.stateChanges
+        },
+        efficiency: {
+          avgSpritesPerBatch: metrics.avgSpritesPerBatch
+        },
+        details: this.batchBreakCollector.collect()
+      },
+      memoryTracking: {
+        allocatedObjects: metrics.totalAllocatedObjects,
+        allocatedBytes: metrics.totalAllocatedBytes,
+        potentialLeaks: metrics.potentialLeaks,
+        allocationsByType: this.allocationTracker.collect()
+      },
+      renderStats: {
+        fillRate: metrics.fillRate,
+        overdrawPercent: metrics.overdrawPercentage,
+        pixelsPerFrame: metrics.pixelsPerFrame,
+        details: this.renderStatCollector.collect()
+      },
+      functionProfile: {
+        totalCalls: metrics.totalFunctionCalls,
+        uniqueFunctions: metrics.uniqueFunctions,
+        hottestFunction: metrics.hottestFunction,
+        hotPaths: this.functionProfiler.collect()
+      },
+      platform: {
+        battery: metrics.batteryPercentage !== undefined ? (metrics.batteryPercentage * 100) : null,
+        charging: metrics.isCharging,
+        vsyncMisses: metrics.vsyncMisses,
+        refreshRate: metrics.displayRefreshRate,
+        details: this.platformCollector.collect()
+      },
+      physicsDeep: {
+        broadPhaseTime: metrics.broadPhaseTime,
+        narrowPhaseTime: metrics.narrowPhaseTime,
+        contacts: metrics.contactCount,
+        islands: metrics.islandCount,
+        sleepRatio: (metrics.sleepingBodies && metrics.awakeBodies) ? (metrics.sleepingBodies / (metrics.sleepingBodies + metrics.awakeBodies) * 100) : 0,
+        details: this.physicsDeepCollector.collect()
       }
     };
     
@@ -1512,6 +2040,15 @@ export class PerformanceMonitor extends UIPanel {
     this.listenerCollector.reset();
     this.longTaskCollector.reset();
     this.shaderCollector.reset();
+    
+    // Reset advanced collectors
+    this.gpuTimingCollector.reset();
+    this.batchBreakCollector.reset();
+    this.allocationTracker.reset();
+    this.renderStatCollector.reset();
+    this.functionProfiler.reset();
+    this.platformCollector.reset();
+    this.physicsDeepCollector.reset();
     
     // Reset GC tracking for this measurement
     const startGCEvents = this.gcEventCount;

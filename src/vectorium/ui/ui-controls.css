@@ -27,8 +27,8 @@
   /* Typography */
   --ui-font-family: 'Roboto', monospace;
   --ui-font-tiny: 8px;
-  --ui-font-base: 10px;
-  --ui-font-title: 12px;
+  --ui-font-base: 13px;
+  --ui-font-title: 13px;
   --ui-letter-spacing-sm: 0.3px;
   --ui-letter-spacing-md: 0.5px;
   --ui-line-height: 1.35;
@@ -88,7 +88,7 @@
 }
 
 .performance-monitor {
-  max-width: 200px;
+  max-width: 420px;
 }
 
 .vectorium-panel.hidden {
@@ -231,6 +231,26 @@
   text-transform: uppercase;
   letter-spacing: var(--ui-letter-spacing-sm);
   color: var(--ui-highlight);
+}
+
+/* Two-column grid layout for performance monitor */
+.profiler-content {
+  display: block;
+}
+
+.profiler-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ui-gap-lg);
+}
+
+.profiler-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.profiler-full-width {
+  grid-column: 1 / -1;
 }
 
 /* ============================================

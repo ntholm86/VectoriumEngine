@@ -58,6 +58,7 @@ export class WebGLBatchRenderer {
   
   // Performance monitoring
   private perfMonitor: PerformanceMonitor | null = null;
+  private currentShaderProgram: WebGLProgram | null = null; // Track active shader to detect changes
   
   // Clear color (RGBA 0-1)
   private clearColor: [number, number, number, number] = [0, 0, 0, 1];
@@ -617,6 +618,16 @@ void main() {
     // Flush if texture changes or batch is full
     if ((sprite.texture && sprite.texture !== this.currentTexture) || 
         this.vertexCount >= this.maxBatchSize * 4 - 4) {
+      
+      // Record batch break reason for profiling
+      if (this.vertexCount > 0) {
+        if (sprite.texture && sprite.texture !== this.currentTexture) {
+          this.perfMonitor?.recordBatchBreak('texture');
+        } else if (this.vertexCount >= this.maxBatchSize * 4 - 4) {
+          this.perfMonitor?.recordBatchBreak('buffer');
+        }
+      }
+      
       this.flush();
       this.currentTexture = sprite.texture;
     }
@@ -790,12 +801,17 @@ void main() {
     
     // Calculate index count (bit shift is faster than division: x/4 = x>>2, then *6)
     const indexCount = (this.vertexCount >> 2) * 6;
+    const spriteCount = this.vertexCount >> 2;
+    const triangleCount = spriteCount * 2;
+    
     gl.drawElements(gl.TRIANGLES, indexCount, this.indexType, 0);
     
     // Record rendering metrics
     if (this.perfMonitor) {
       this.perfMonitor.recordIndices(indexCount);
-      this.perfMonitor.recordBatch(this.vertexCount >> 2);
+      this.perfMonitor.recordBatch(spriteCount);
+      this.perfMonitor.recordBatchComplete(spriteCount);
+      this.perfMonitor.recordDrawPixels(triangleCount);
     }
     
     this.drawCallCount++;
@@ -1112,7 +1128,11 @@ void main() {
     const gl = this.gl;
     const HALF = 0.5;
     
-    // Switch to shape shader
+    // Switch to shape shader (only record if changing)
+    if (this.currentShaderProgram !== this.shapeProgram) {
+      this.perfMonitor?.recordBatchBreak('shader');
+      this.currentShaderProgram = this.shapeProgram;
+    }
     gl.useProgram(this.shapeProgram);
     
     // Set projection uniform
@@ -1229,7 +1249,11 @@ void main() {
       }
     }
     
-    // Restore sprite shader and attributes
+    // Restore sprite shader and attributes (only record if changing)
+    if (this.currentShaderProgram !== this.program) {
+      this.perfMonitor?.recordBatchBreak('shader');
+      this.currentShaderProgram = this.program;
+    }
     gl.useProgram(this.program);
     
     const positionLoc = gl.getAttribLocation(this.program!, 'a_position');

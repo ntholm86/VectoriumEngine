@@ -108,9 +108,19 @@ export class WasmPhysics {
     
     // 🚀 P0 OPTIMIZATION: Skip gravity phase if no entities have gravity enabled
     if (gravityEnabled && gravityEntityCount > 0) {
-      // SIMD-friendly loop (process 4 at once in future WASM)
+      // CRITICAL: Don't apply gravity to sleeping entities (prevents perpetual bouncing)
+      const SLEEP_VELOCITY_THRESHOLD_SQ = 2.0 * 2.0;
+      
       for (let i = 0; i < entityCount; i++) {
-        velocityY[i] += gravityAccel * gravityEnabled[i]; // Branchless multiply by 0 or 1
+        if (!gravityEnabled[i]) continue;
+        
+        // Skip gravity for sleeping entities (velocity near zero)
+        const vx = velocityX[i];
+        const vy = velocityY[i];
+        const speedSq = vx * vx + vy * vy;
+        if (speedSq < SLEEP_VELOCITY_THRESHOLD_SQ) continue;
+        
+        velocityY[i] += gravityAccel;
       }
     }
     
@@ -126,28 +136,13 @@ export class WasmPhysics {
     if (collisionsEnabled && collisionEntityCount > 0) {
       this.spatialHash.clear();
       
-      // 🚀 SLEEPING OPTIMIZATION: Only insert moving entities (velocity > threshold)
-      // This dramatically reduces hash build cost when entities settle
-      const SLEEP_VELOCITY_THRESHOLD = 5.0; // pixels/sec
-      let activeCollisionCount = 0;
-      
+      // Insert ALL collision-enabled entities into spatial hash
+      // We need stationary entities in the hash so moving entities can collide with them
       for (let i = 0; i < entityCount; i++) {
-        if (!collisionsEnabled[i]) continue;
-        
-        // Check if entity is moving (awake)
-        const vx = velocityX[i];
-        const vy = velocityY[i];
-        const speedSq = vx * vx + vy * vy;
-        
-        // Only insert awake entities into spatial hash
-        if (speedSq > SLEEP_VELOCITY_THRESHOLD * SLEEP_VELOCITY_THRESHOLD) {
+        if (collisionsEnabled[i]) {
           this.spatialHash.insert(i, positionX[i], positionY[i]);
-          activeCollisionCount++;
         }
       }
-      
-      // Update collision count to reflect only awake entities
-      collisionEntityCount = activeCollisionCount;
     } else {
       // No collisions needed - skip spatial hash entirely
       this.spatialHash.clear();
@@ -180,179 +175,207 @@ export class WasmPhysics {
       // Track collisions per entity to prevent stacking
       const collisionsPerEntity = new Uint8Array(entityCount);
       
-      // Adaptive collision limit based on entity count
-      const MAX_COLLISIONS_PER_ENTITY = collisionEntityCount > 5000 ? 1 : 
-                                         collisionEntityCount > 1000 ? 2 : 3;
+      // Collision limit: Must be high enough for realistic stacking
+      // In a dense pile, entities can touch 6-10+ neighbors
+      const MAX_COLLISIONS_PER_ENTITY = collisionEntityCount > 5000 ? 4 : 
+                                         collisionEntityCount > 2000 ? 6 : 8;
       
       // Early exit: Skip collision if too many entities (performance limiter)
       if (collisionEntityCount > 10000) {
         console.warn(`⚠️ Collision detection disabled: ${collisionEntityCount} entities (max: 10000)`);
         this.metrics.collisionDetectTime = 0;
-        // Skip to next phase
       } else {
+        // VERLET-BASED COLLISION RESOLUTION
+      // Based on Verlet integration article from GameDev.net
+      // Key insight: Direct position correction is stable with Verlet
+      // because velocity is implicit (current_pos - old_pos)
+      // 
+      // Strategy:
+      // 1. Detect all collisions
+      // 2. Accumulate position corrections (don't apply immediately)
+      // 3. Apply all corrections at once
+      // 4. Repeat for stability
       
-      // Process each entity against its spatial neighbors only
-      for (let i = 0; i < entityCount; i++) {
-        if (!collisionsEnabled[i]) continue;
+      // Fixed 4 iterations - good balance for 1000+ entities
+      // Box2D uses 8-10 velocity + 3 position iterations
+      // We combine both in Verlet integration
+      const SOLVER_ITERATIONS = 4;
+      
+      for (let iteration = 0; iteration < SOLVER_ITERATIONS; iteration++) {
+        // Clear deltas for this iteration
+        this.positionDeltaX.fill(0);
+        this.positionDeltaY.fill(0);
         
-        const xi = positionX[i];
-        const yi = positionY[i];
-        const ri = size[i] * halfConst;
-        const mi = mass ? mass[i] : 1;
-        const resti = restitution ? restitution[i] : 0.3;
+        let anyCollisions = false;
         
-        // Query 3x3 cell neighborhood with bounds check
-        const neighborCount = this.spatialHash.queryNeighbors(xi, yi, this.neighborBuffer, this.MAX_NEIGHBORS);
-        
-        // Limit neighbors checked based on entity count (performance)
-        const maxNeighborsToCheck = collisionEntityCount > 5000 ? 5 : 
-                                     collisionEntityCount > 1000 ? 10 : neighborCount;
-        const neighborsToCheck = Math.min(neighborCount, maxNeighborsToCheck);
-        
-        // Check collisions only with nearby entities
-        for (let k = 0; k < neighborsToCheck; k++) {
-          const j = this.neighborBuffer[k];
+        for (let i = 0; i < entityCount; i++) {
+          if (!collisionsEnabled[i]) continue;
           
-          // Limit collisions per entity to prevent energy stacking
-          if (collisionsPerEntity[i] >= MAX_COLLISIONS_PER_ENTITY) break;
-          if (collisionsPerEntity[j] >= MAX_COLLISIONS_PER_ENTITY) continue;
+          const xi = positionX[i];
+          const yi = positionY[i];
+          const ri = size[i] * halfConst;
+          const mi = mass ? mass[i] : 1;
+          const resti = restitution ? restitution[i] : 0.3;
           
-          // CRITICAL FIX: Validate entity index (prevent stale buffer reads)
-          if (j < 0 || j >= entityCount) {
-            console.error(`Invalid neighbor index: ${j} (entityCount: ${entityCount})`);
-            continue;
-          }
+          // Query 3x3 cell neighborhood with bounds check
+          const neighborCount = this.spatialHash.queryNeighbors(xi, yi, this.neighborBuffer, this.MAX_NEIGHBORS);
           
-          // Index guard: avoid duplicate pairs and self-collision
-          if (j <= i) continue;
-          if (!collisionsEnabled[j]) continue;
+          // Use all neighbors from spatial hash (already optimized to nearby entities)
+          // The spatial hash does the heavy lifting - don't double-limit here
+          const neighborsToCheck = Math.min(neighborCount, this.MAX_NEIGHBORS);
           
-          const xj = positionX[j];
-          const yj = positionY[j];
-          const rj = size[j] * halfConst;
-          
-          // AABB broad-phase (cheap early-out before expensive sqrt)
-          const dx = xj - xi;
-          const dy = yj - yi;
-          const rsum = ri + rj;
-          
-          // Branchless AABB check (faster than if statements)
-          const inRangeX = (dx * dx) < (rsum * rsum);
-          const inRangeY = (dy * dy) < (rsum * rsum);
-          
-          if (!inRangeX || !inRangeY) continue;
-          
-          // Circle-circle narrow-phase
-          const distSq = dx * dx + dy * dy;
-          const rsumSq = rsum * rsum;
-          
-          if (distSq >= rsumSq || distSq < 0.01) continue; // No overlap or singularity
-          
-          this.metrics.totalCollisionChecks++;
-          
-          // Fast inverse square root (avoid division)
-          const dist = Math.sqrt(distSq);
-          const invDist = 1 / dist;
-          const nx = dx * invDist;
-          const ny = dy * invDist;
-          
-          // Positional correction (separate penetrating bodies)
-          // Uses inverse mass ratios for proper force distribution
-          const penetration = rsum - dist;
-          const mj = mass ? mass[j] : 1;
-          const invMi = mi > 0 ? (1 / mi) : 0;
-          const invMj = mj > 0 ? (1 / mj) : 0;
-          const invMassSum = invMi + invMj;
-          
-          if (invMassSum > 0) {
-            // CRITICAL FIX: Correct positional correction formula
-            // correction = penetration * (invMass / totalInvMass)
-            // Previous code was dividing by mass twice, causing incorrect forces!
-            const correctionPercent = 0.4; // 40% separation per frame for stability
+          // Check collisions only with nearby entities
+          for (let k = 0; k < neighborsToCheck; k++) {
+            const j = this.neighborBuffer[k];
             
-            // CRITICAL FIX: Accumulate position deltas instead of modifying positions directly
-            // This prevents spatial hash corruption (positions change mid-detection!)
-            if (mi > 0) {
-              const corri = (penetration * correctionPercent) * (invMi / invMassSum);
-              this.positionDeltaX[i] -= nx * corri;
-              this.positionDeltaY[i] -= ny * corri;
+            // Limit collisions per entity to prevent energy stacking (only on first iteration)
+            if (iteration === 0) {
+              if (collisionsPerEntity[i] >= MAX_COLLISIONS_PER_ENTITY) break;
+              if (collisionsPerEntity[j] >= MAX_COLLISIONS_PER_ENTITY) continue;
             }
             
-            if (mj > 0) {
-              const corrj = (penetration * correctionPercent) * (invMj / invMassSum);
-              this.positionDeltaX[j] += nx * corrj;
-              this.positionDeltaY[j] += ny * corrj;
+            // CRITICAL FIX: Validate entity index (prevent stale buffer reads)
+            if (j < 0 || j >= entityCount) {
+              console.error(`Invalid neighbor index: ${j} (entityCount: ${entityCount})`);
+              continue;
+            }
+            
+            // Index guard: avoid duplicate pairs and self-collision
+            if (j <= i) continue;
+            if (!collisionsEnabled[j]) continue;
+            
+            const xj = positionX[j];
+            const yj = positionY[j];
+            const rj = size[j] * halfConst;
+            
+            // AABB broad-phase (cheap early-out before expensive sqrt)
+            const dx = xj - xi;
+            const dy = yj - yi;
+            const rsum = ri + rj;
+            
+            // Branchless AABB check (faster than if statements)
+            const inRangeX = (dx * dx) < (rsum * rsum);
+            const inRangeY = (dy * dy) < (rsum * rsum);
+            
+            if (!inRangeX || !inRangeY) continue;
+            
+            // Circle-circle narrow-phase
+            const distSq = dx * dx + dy * dy;
+            const rsumSq = rsum * rsum;
+            
+            if (distSq >= rsumSq || distSq < 0.01) continue; // No overlap or singularity
+            
+            anyCollisions = true;
+            if (iteration === 0) this.metrics.totalCollisionChecks++;
+            
+            // Fast inverse square root (avoid division)
+            const dist = Math.sqrt(distSq);
+            const invDist = 1 / dist;
+            const nx = dx * invDist;
+            const ny = dy * invDist;
+            
+            // VERLET COLLISION RESOLUTION
+            // Article approach: Simply push objects apart by penetration depth
+            // Position changes automatically affect velocity in Verlet integration
+            const penetration = rsum - dist;
+            const mj = mass ? mass[j] : 1;
+            
+            // Separation slop: Allow small overlaps to prevent jitter (Box2D approach)
+            // This is critical for stable stacking - prevents constant micro-corrections
+            const SLOP = 0.01; // 0.01px tolerance
+            const correctedPenetration = Math.max(penetration - SLOP, 0);
+            
+            if (correctedPenetration > 0) {
+              // Mass-weighted position correction
+              // Heavier objects move less, lighter objects move more
+              const massSum = mi + mj;
+              const massRatioI = mj / massSum; // i moves proportional to j's mass
+              const massRatioJ = mi / massSum; // j moves proportional to i's mass
+              
+              // Push apart by corrected penetration depth (with slop tolerance), weighted by mass
+              // Each iteration improves the solution
+              const correctionI = correctedPenetration * massRatioI;
+              const correctionJ = correctedPenetration * massRatioJ;
+              
+              // ACCUMULATE deltas (don't apply directly - prevents instability)
+              if (mi > 0) {
+                this.positionDeltaX[i] -= nx * correctionI;
+                this.positionDeltaY[i] -= ny * correctionI;
+              }
+              
+              if (mj > 0) {
+                this.positionDeltaX[j] += nx * correctionJ;
+                this.positionDeltaY[j] += ny * correctionJ;
+              }
+              
+              // Velocity damping (only on first iteration)
+              // Reduce relative velocity to prevent jitter
+              if (iteration === 0) {
+                const vxi = velocityX[i];
+                const vyi = velocityY[i];
+                const vxj = velocityX[j];
+                const vyj = velocityY[j];
+                
+                const dvx = vxj - vxi;
+                const dvy = vyj - vyi;
+                const relVelAlongNormal = dvx * nx + dvy * ny;
+                
+                // Only resolve if moving towards each other
+                if (relVelAlongNormal > 0) {
+                  // Calculate restitution (bounciness)
+                  // For stacking: use very low restitution (boxes shouldn't bounce)
+                  const restj = restitution ? restitution[j] : 0.3;
+                  const e = Math.min(resti, restj) * 0.1; // Very low restitution = stable stacks
+                  
+                  // Mass-weighted velocity correction
+                  const massSum = mi + mj;
+                  const correctionVel = relVelAlongNormal * (1 + e);
+                  
+                  if (mi > 0) {
+                    const velCorrI = correctionVel * (mj / massSum);
+                    this.velocityDeltaX[i] += nx * velCorrI;
+                    this.velocityDeltaY[i] += ny * velCorrI;
+                  }
+                  
+                  if (mj > 0) {
+                    const velCorrJ = correctionVel * (mi / massSum);
+                    this.velocityDeltaX[j] -= nx * velCorrJ;
+                    this.velocityDeltaY[j] -= ny * velCorrJ;
+                  }
+                }
+                
+                // Track collision count
+                collisionsPerEntity[i]++;
+                collisionsPerEntity[j]++;
+              }
             }
           }
-          
-          // Impulse resolution (elastic collision)
-          // CRITICAL FIX: Read velocities from arrays, not modified values
-          const vxi = velocityX[i];
-          const vyi = velocityY[i];
-          const vxj = velocityX[j];
-          const vyj = velocityY[j];
-          
-          const dvx = vxi - vxj;
-          const dvy = vyi - vyj;
-          const velAlongNormal = dvx * nx + dvy * ny;
-          
-          // Moving apart check (avoid double-resolution)
-          if (velAlongNormal <= 0) continue;
-          
-          // Restitution (bounciness) - use full restitution for perfect bouncing
-          const restj = restitution ? restitution[j] : 0.3;
-          const e = Math.min(resti, restj) * 1.0; // Perfect elasticity
-          
-          // CRITICAL FIX: Correct impulse formula
-          // impulse = -(1 + e) * velAlongNormal / (invMass_i + invMass_j)
-          // Then distribute by inverse mass ratio, NOT divide by mass again!
-          const jImpulse = -(1 + e) * velAlongNormal / invMassSum;
-          
-          // CRITICAL FIX: Accumulate velocity deltas instead of modifying directly
-          // This prevents energy gain from reading modified velocities mid-loop
-          if (mi > 0) {
-            const impulsei = jImpulse * invMi; // Multiply by invMass, not divide by mass!
-            this.velocityDeltaX[i] -= nx * impulsei;
-            this.velocityDeltaY[i] -= ny * impulsei;
-          }
-          
-          if (mj > 0) {
-            const impulsej = jImpulse * invMj; // Multiply by invMass, not divide by mass!
-            this.velocityDeltaX[j] += nx * impulsej;
-            this.velocityDeltaY[j] += ny * impulsej;
-          }
-          
-          // Track collision count for both entities
-          collisionsPerEntity[i]++;
-          collisionsPerEntity[j]++;
         }
+        
+        // APPLY accumulated position deltas for this iteration
+        for (let i = 0; i < entityCount; i++) {
+          positionX[i] += this.positionDeltaX[i];
+          positionY[i] += this.positionDeltaY[i];
+        }
+        
+        // Early exit if no collisions detected (convergence)
+        if (!anyCollisions && iteration > 0) break;
       }
       
-      // CRITICAL FIX: Apply accumulated deltas AFTER all collision detection
-      // This prevents spatial hash corruption AND energy gain from mid-loop modifications
-      const airDamping = 0.98; // Air friction: 2% velocity loss per frame
-      const groundDamping = 0.70; // Ground friction: 30% velocity loss when near ground (aggressive)
-      const sleepThreshold = 30.0; // Stop objects moving slower than 30 px/s
-      const maxVelocityChange = 100.0; // Cap velocity change per frame to prevent jumps
-      const groundHeight = heightF * 0.90; // Bottom 10% of world
+      // APPLY accumulated velocity deltas ONCE after all iterations
+      for (let i = 0; i < entityCount; i++) {
+        velocityX[i] += this.velocityDeltaX[i];
+        velocityY[i] += this.velocityDeltaY[i];
+      }
+      
+      // Apply damping and check for sleep after all constraint iterations
+      const airDamping = 0.98; // Air friction: 2% velocity loss per frame (was 1%)
+      const groundDamping = 0.75; // Ground friction: 25% velocity loss when near ground (was 20%)
+      const sleepThreshold = 1.5; // Stop objects moving slower than 1.5 px/s (was 2.0)
+      const groundHeight = heightF * 0.95; // Bottom 5% of world
       
       for (let i = 0; i < entityCount; i++) {
         if (collisionsEnabled[i]) {
-          positionX[i] += this.positionDeltaX[i];
-          positionY[i] += this.positionDeltaY[i];
-          
-          // Cap velocity change to prevent extreme jumps
-          const dvMagSq = this.velocityDeltaX[i] * this.velocityDeltaX[i] + 
-                          this.velocityDeltaY[i] * this.velocityDeltaY[i];
-          if (dvMagSq > maxVelocityChange * maxVelocityChange) {
-            const scale = maxVelocityChange / Math.sqrt(dvMagSq);
-            this.velocityDeltaX[i] *= scale;
-            this.velocityDeltaY[i] *= scale;
-          }
-          
-          velocityX[i] += this.velocityDeltaX[i];
-          velocityY[i] += this.velocityDeltaY[i];
-          
           // Apply damping (air or ground friction)
           const isNearGround = positionY[i] > groundHeight;
           const damping = isNearGround ? groundDamping : airDamping;
@@ -361,17 +384,17 @@ export class WasmPhysics {
           
           // Sleep threshold: stop nearly-stationary objects
           const speedSq = velocityX[i] * velocityX[i] + velocityY[i] * velocityY[i];
-          if (speedSq < sleepThreshold * sleepThreshold) {
+          if (speedSq < sleepThreshold * sleepThreshold && isNearGround) {
             velocityX[i] = 0;
             velocityY[i] = 0;
           }
         }
       }
-      } // Close early exit condition
-    }
-    
-    this.metrics.collisionDetectTime = performance.now() - t0;
-    this.metrics.spatialHashStats = this.spatialHash.getStats();
+      } // Close else block for if collisionEntityCount <= 10000
+      
+      this.metrics.collisionDetectTime = performance.now() - t0;
+      this.metrics.spatialHashStats = this.spatialHash.getStats();
+    } // Close if (collisionsEnabled && collisionEntityCount > 0)
     
     // ============================================================================
     // PHASE 4: VELOCITY INTEGRATION (O(n) - Apply velocity to position)
@@ -513,7 +536,7 @@ export class WasmPhysics {
         velocityY[i] = vy;
       }
     }
-  }
+  } // End of updatePhysicsOptimized method
   
   /**
    * Get detailed performance metrics

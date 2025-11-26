@@ -345,8 +345,12 @@ export class World {
   /**
    * System: Animation Update
    * Handles rotation, pulse, wobble, spin, fade animations
+   * NOW WITH REALISTIC PHYSICS: Angular damping + sleep detection
    */
   updateAnimations(dt: number): void {
+    const ANGULAR_DAMPING = 0.98; // 2% angular velocity loss per frame (air friction)
+    const ANGULAR_SLEEP_THRESHOLD = 5.0; // Stop rotating if slower than 5 deg/s
+    
     for (let i = 0; i < this.entityCount; i++) {
       const entityFlags = this.flags[i];
       
@@ -360,10 +364,26 @@ export class World {
         continue;
       }
       
-      let newRot = this.rotation[i] + this.rotationSpeed[i] * dt;
-      newRot = newRot >= 360 ? newRot - 360 : newRot;
-      newRot = newRot < 0 ? newRot + 360 : newRot;
-      this.rotation[i] = newRot;
+      // Apply angular damping (realistic friction)
+      let rotSpeed = this.rotationSpeed[i] * ANGULAR_DAMPING;
+      
+      // Angular sleep threshold: stop tiny rotations
+      if (Math.abs(rotSpeed) < ANGULAR_SLEEP_THRESHOLD) {
+        rotSpeed = 0;
+        // Snap to nearest 90-degree angle for realistic settling
+        const currentRot = this.rotation[i];
+        const nearest90 = Math.round(currentRot / 90) * 90;
+        this.rotation[i] = nearest90 % 360;
+      } else {
+        // Update rotation
+        let newRot = this.rotation[i] + rotSpeed * dt;
+        newRot = newRot >= 360 ? newRot - 360 : newRot;
+        newRot = newRot < 0 ? newRot + 360 : newRot;
+        this.rotation[i] = newRot;
+      }
+      
+      // Store damped rotation speed
+      this.rotationSpeed[i] = rotSpeed;
     }
   }
   
@@ -442,6 +462,7 @@ export class World {
   getPositionX(): Float32Array { return this.positionX; }
   getPositionY(): Float32Array { return this.positionY; }
   getRotation(): Uint16Array { return this.rotation; }
+  getRotationSpeed(): Int16Array { return this.rotationSpeed; }
   getScale(): Float32Array { return this.scale; }
   getSizes(): Float32Array { return this.size; }
   getColorR(): Uint8Array { return this.colorR; }
