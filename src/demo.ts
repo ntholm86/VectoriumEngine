@@ -10,7 +10,7 @@ import { DebugTextRenderer } from './vectorium/utils/DebugTextRenderer';
 class DemoScene extends Scene {
   override render(renderer: any, textRenderer: any, textPool?: any): void {
     super.render(renderer, textRenderer, textPool);
-    DebugTextRenderer.renderSamples(textRenderer);
+    // DebugTextRenderer.renderSamples(textRenderer);
   }
 }
 
@@ -21,7 +21,6 @@ function initDemo() {
     .withTargetFPS(60)
     .enableDebugTools()
     .withScene('demo', new DemoScene('demo'))
-    .withEntitySpawner()
     .build();
   
   // Start engine

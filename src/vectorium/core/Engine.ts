@@ -263,6 +263,18 @@ export class Vectorium {
     // 🚀 Now call scene.load() - services are ready!
     await this.currentScene.load();
     
+    // 🚀 Always instantiate EntitySpawnService (core service)
+    import('../entities/EntitySpawnService').then(({ EntitySpawnService }) => {
+      (this.currentScene as any).spawnService = new EntitySpawnService(this.currentScene!);
+      console.log('✅ EntitySpawnService auto-configured');
+      
+      // Auto-wire with EntitySpawner UI if it's registered
+      const uiPanel = this.panelManager.get('spawner');
+      if (uiPanel) {
+        (this.currentScene as any).spawnService.registerWithSpawner(uiPanel);
+      }
+    });
+    
     // 🚀 Register debug panels with UIPanelManager
     if (this.config.enableDebugTools) {
       // Register PerformanceMonitor (Press P)
@@ -272,11 +284,11 @@ export class Vectorium {
       const debugPanel = new DebugPanel(this.runtimeConfig, this.inputManager);
       this.panelManager.register('debug', debugPanel);
       
-      // Register Entity Spawner (Press E)
+      // Register Entity Spawner UI Panel (Press E)
       const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager);
       this.panelManager.register('spawner', entitySpawner);
       
-      // 🍭 Auto-wire EntitySpawnService with EntitySpawner
+      // Wire with service when service is ready
       if ((this.currentScene as any).spawnService) {
         (this.currentScene as any).spawnService.registerWithSpawner(entitySpawner);
       }
@@ -613,23 +625,6 @@ export class Vectorium {
 
   /**
    * Setup EntitySpawnService on the current scene automatically
-   * Called by VectoriumBuilder when .withEntitySpawner() is used
-   */
-  setupEntitySpawner(): void {
-    if (!this.currentScene) {
-      console.warn('⚠️ Cannot setup EntitySpawner: No scene loaded');
-      return;
-    }
-    
-    const scene = this.currentScene;
-    
-    // Lazy import to avoid circular dependencies
-    import('../entities/EntitySpawnService').then(({ EntitySpawnService }) => {
-      (scene as any).spawnService = new EntitySpawnService(scene);
-      console.log('✅ EntitySpawnService auto-configured');
-    });
-  }
-
   /**
    * Expose engine, scene, and performance monitor globally for console access
    * Also adds runPerfTest() helper function

@@ -81,7 +81,12 @@ export class GlyphAtlasGenerator {
     const padding = this.padding;
     
     // Configure canvas
-    this.ctx.font = `${fontSize}px ${this.fontFamily}`;
+    // Handle full CSS font strings (e.g., "bold 32px Arial" or just "Arial")
+    if (this.fontFamily.includes('px')) {
+      this.ctx.font = this.fontFamily; // Already a full font string
+    } else {
+      this.ctx.font = `${fontSize}px ${this.fontFamily}`; // Construct font string
+    }
     this.ctx.textBaseline = 'top';
     this.ctx.textAlign = 'left';
     this.ctx.fillStyle = 'white';
@@ -131,7 +136,11 @@ export class GlyphAtlasGenerator {
     this.canvas.height = atlasHeight;
     
     // Re-configure context after resize
-    this.ctx.font = `${fontSize}px ${this.fontFamily}`;
+    if (this.fontFamily.includes('px')) {
+      this.ctx.font = this.fontFamily; // Already a full font string
+    } else {
+      this.ctx.font = `${fontSize}px ${this.fontFamily}`; // Construct font string
+    }
     this.ctx.textBaseline = 'top';
     this.ctx.textAlign = 'left';
     this.ctx.fillStyle = 'white';

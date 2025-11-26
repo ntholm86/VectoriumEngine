@@ -19,6 +19,9 @@ import { SceneServicesContainer } from './SceneServices';
 // 🚀 Behavior System
 import { SceneBehaviorManager, type SceneBehavior } from '../behaviors/SceneBehavior';
 
+// 🚀 State Machine System
+import { StateMachine } from './StateMachine';
+
 /**
  * Scene class - Unity MonoBehaviour pattern
  * 
@@ -40,6 +43,9 @@ export class Scene {
   
   // 🚀 Behavior system for composition
   protected readonly behaviors = new SceneBehaviorManager(this);
+  
+  // 🚀 State machine (optional, created when needed)
+  protected stateMachine?: StateMachine<string>;
   
   // 🍭 Text animation tracking (managed automatically by base class)
   private textAnimations = new Map<EntityId, {
@@ -132,6 +138,30 @@ export class Scene {
     return this.textEntities;
   }
   
+  /**
+   * Create a state machine for this scene
+   * @param initialState - Optional initial state
+   * @returns The created state machine (typed with scene's state names)
+   * 
+   * Usage:
+   * ```typescript
+   * const gameState = this.createStateMachine<'menu' | 'playing' | 'paused'>('menu');
+   * gameState.onEnter('playing', () => this.startGame());
+   * gameState.onUpdate('playing', (dt) => this.updateGame(dt));
+   * ```
+   */
+  protected createStateMachine<TState extends string>(initialState?: TState): StateMachine<TState> {
+    this.stateMachine = new StateMachine(initialState) as StateMachine<string>;
+    return this.stateMachine as StateMachine<TState>;
+  }
+  
+  /**
+   * Get the scene's state machine (if created)
+   */
+  protected getStateMachine<TState extends string>(): StateMachine<TState> | undefined {
+    return this.stateMachine as StateMachine<TState> | undefined;
+  }
+  
   async load(): Promise<void> {
     // Override in subclasses
   }
@@ -146,6 +176,11 @@ export class Scene {
     
     // 🚀 Behavior pre-update
     this.behaviors.update(dt);
+    
+    // 🚀 State machine update
+    if (this.stateMachine) {
+      this.stateMachine.update(dt);
+    }
     
     // 🍭 Update text animations automatically
     this.updateTextAnimations(dt);

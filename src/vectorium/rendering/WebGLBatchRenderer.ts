@@ -33,6 +33,8 @@ export class WebGLBatchRenderer {
   private batchVertices: Float32Array;
   private batchVerticesU8: Uint8Array;  // Uint8 view for byte-level color writes
   private batchIndices: Uint16Array | Uint32Array;
+  private shapeVertices: Float32Array | null = null; // 🎨 Reusable buffer for shape rendering
+  private shapeMetadata: Uint32Array | null = null; // 🎨 Uint32 view for metadata
   private indexType: number;  // GL_UNSIGNED_SHORT or GL_UNSIGNED_INT
   private vertexCount = 0;
   private maxBatchSize = 65000; // 65k quads maximum (Uint16 limit)
@@ -1117,14 +1119,18 @@ void main() {
     const projectionMatrix = this.createProjectionMatrix(gl.canvas.width, gl.canvas.height);
     gl.uniformMatrix3fv(this.u_shapeProjection, false, projectionMatrix);
     
+    // Allocate reusable buffer once (persist across frames)
+    if (!this.shapeVertices) {
+      this.shapeVertices = new Float32Array(this.maxBatchSize * 4 * 5); // 5 floats per vertex
+      this.shapeMetadata = new Uint32Array(this.shapeVertices.buffer);
+    }
+    
+    const shapeVertices = this.shapeVertices;
+    const shapeMetadata = this.shapeMetadata!;
+    
     for (let start = 0; start < count; start += this.maxBatchSize) {
       const end = Math.min(start + this.maxBatchSize, count);
       let visibleCount = 0;
-      
-      // Build vertex data with 20-byte format:
-      // Position (8B) + UV (8B) + Metadata (4B)
-      const shapeVertices = new Float32Array(this.maxBatchSize * 4 * 5); // 5 floats per vertex
-      const shapeMetadata = new Uint32Array(shapeVertices.buffer);
       
       for (let i = start; i < end; i++) {
         if ((flags[i] & FLAG_VISIBLE) === 0) continue;
@@ -1189,7 +1195,9 @@ void main() {
       // Upload and draw
       if (visibleCount > 0) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, shapeVertices, gl.STREAM_DRAW);
+        // Use bufferSubData to update existing buffer (avoids reallocation)
+        const dataSize = visibleCount * 4 * 5; // 4 vertices × 5 floats
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, shapeVertices.subarray(0, dataSize));
         
         // Setup vertex attributes (20-byte stride)
         gl.enableVertexAttribArray(0); // position
@@ -1200,6 +1208,19 @@ void main() {
         
         gl.enableVertexAttribArray(2); // metadata
         (gl as WebGL2RenderingContext).vertexAttribIPointer(2, 1, gl.UNSIGNED_INT, 20, 16);
+        
+        // Record performance metrics
+        if (this.perfMonitor) {
+          const vertexCount = visibleCount * 4;
+          const indexCount = visibleCount * 6;
+          const bufferSize = vertexCount * 5 * 4; // 5 floats × 4 bytes
+          
+          this.perfMonitor.recordVertices(vertexCount);
+          this.perfMonitor.recordIndices(indexCount);
+          this.perfMonitor.recordBufferUpload(bufferSize);
+          this.perfMonitor.recordBatch(visibleCount);
+          this.perfMonitor.recordStateChange();
+        }
         
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.drawElements(gl.TRIANGLES, visibleCount * 6, this.indexType, 0);

@@ -19,8 +19,6 @@ export type QualityPreset = 'ultra' | 'high' | 'medium' | 'low' | 'potato';
 export class VectoriumBuilder {
   private config: Partial<EngineConfig> = {};
   private scenes: Map<string, Scene> = new Map();
-  private enableEntitySpawner: boolean = false;
-  private clickToSpawnOptions?: { shakeThresholds?: { min: number; intensity: number; duration: number }[] };
   private initialSceneName?: string;
   private shouldExposeGlobals: boolean = false;
 
@@ -147,18 +145,6 @@ export class VectoriumBuilder {
   }
 
   /**
-   * Enable entity spawner with click-to-spawn functionality
-   * Automatically sets up EntitySpawnService and wires click events
-   */
-  withEntitySpawner(options?: {
-    shakeThresholds?: { min: number; intensity: number; duration: number }[];
-  }): this {
-    this.enableEntitySpawner = true;
-    this.clickToSpawnOptions = options;
-    return this;
-  }
-
-  /**
    * Expose engine globals to window for console debugging
    * Automatically enabled when enableDebugTools() is used
    */
@@ -175,6 +161,7 @@ export class VectoriumBuilder {
       // Auto-create fullscreen canvas if none provided
       this.withFullscreenCanvas();
     }
+    
     const engine = new Vectorium(this.config);
     
     // Register all scenes
@@ -182,10 +169,9 @@ export class VectoriumBuilder {
       engine.registerScene(name, scene);
     }
     
-    // Setup entity spawner after initial scene loads
-    if (this.enableEntitySpawner && this.initialSceneName) {
+    // Setup click-to-spawn and expose globals after initial scene loads
+    if (this.config.enableDebugTools && this.initialSceneName) {
       const sceneName = this.initialSceneName;
-      const clickOptions = this.clickToSpawnOptions;
       const exposeGlobals = this.shouldExposeGlobals;
       const origLoadScene = engine.loadScene.bind(engine);
       let isFirstLoad = true;
@@ -194,25 +180,10 @@ export class VectoriumBuilder {
         await origLoadScene(name);
         if (isFirstLoad && name === sceneName) {
           isFirstLoad = false;
-          engine.setupEntitySpawner();
-          engine.enableClickToSpawn(clickOptions);
+          engine.enableClickToSpawn();
           if (exposeGlobals) {
             engine.exposeGlobals();
           }
-        }
-        return;
-      };
-    } else if (this.shouldExposeGlobals && this.initialSceneName) {
-      // Just expose globals, no entity spawner
-      const sceneName = this.initialSceneName;
-      const origLoadScene = engine.loadScene.bind(engine);
-      let isFirstLoad = true;
-      
-      engine.loadScene = async function(name: string) {
-        await origLoadScene(name);
-        if (isFirstLoad && name === sceneName) {
-          isFirstLoad = false;
-          engine.exposeGlobals();
         }
         return;
       };

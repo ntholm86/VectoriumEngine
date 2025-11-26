@@ -205,6 +205,24 @@
   justify-content: flex-end;
 }
 
+/* Frame budget bar for performance profiler */
+.frame-budget-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--ui-bg-dark);
+  border-radius: var(--ui-border-radius-sm);
+  margin: var(--ui-padding-sm) 0 var(--ui-margin-sm) 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-color);
+}
+
+.frame-budget-fill {
+  height: 100%;
+  background: var(--ui-success);
+  transition: width 0.1s ease, background-color 0.2s ease;
+  border-radius: var(--ui-border-radius-sm);
+}
+
 .ui-hint {
   font-size: var(--ui-font-tiny);
   font-weight: bold;

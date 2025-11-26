@@ -408,7 +408,7 @@ export class EntitySpawnService extends ServiceAwareBase {
         break;
       case 2: // scale
         startValue = scales[entityId];
-        endValue = 0.1 + Math.random() * 2.5;
+        endValue = 0.5 + Math.random() * 1.0; // Reduced from 2.5x to 1.5x max scale
         break;
       case 3: // size
         startValue = sizes[entityId];

@@ -147,8 +147,6 @@ export class PerformanceMonitor extends UIPanel {
 
   // Profiler UI
   private updateTimer: number | null = null;
-  private frameTimeRingBuffer: number[] = []; // Last 60 frames for sparkline
-  private readonly SPARKLINE_SIZE = 60;
 
   // Physics metrics cache
 
@@ -175,7 +173,6 @@ export class PerformanceMonitor extends UIPanel {
    */
   initializeUI(inputManager: InputManager): void {
     this.setInputManager(inputManager);
-    this.initSparkline();
     this.startProfilerUpdates();
   }
 
@@ -210,12 +207,6 @@ export class PerformanceMonitor extends UIPanel {
     this.frameTimeHistory.push(frameTime);
     if (this.frameTimeHistory.length > 300) { // 5 seconds at 60fps
       this.frameTimeHistory.shift();
-    }
-
-    // Update sparkline ring buffer
-    this.frameTimeRingBuffer.push(frameTime);
-    if (this.frameTimeRingBuffer.length > this.SPARKLINE_SIZE) {
-      this.frameTimeRingBuffer.shift();
     }
 
     // Adaptive quality adjustment
@@ -502,6 +493,29 @@ export class PerformanceMonitor extends UIPanel {
   protected createContent(): string {
     return `
       <div class="profiler-content">
+        <div class="section-header">📊 PERFORMANCE</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Quality</span>
+            <span class="ui-value" data-metric="quality">HIGH</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Score</span>
+            <span class="ui-value" data-metric="score">100</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Bottleneck</span>
+            <span class="ui-value" data-metric="bottleneck">BALANCED</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Frame Budget</span>
+            <span class="ui-value" data-metric="framebudget">0.0/16.67ms</span>
+          </div>
+          <div class="frame-budget-bar">
+            <div class="frame-budget-fill" data-metric="framebudgetbar" style="width: 0%"></div>
+          </div>
+        </div>
+
         <div class="section-header">🎯 FRAME METRICS</div>
         <div class="ui-section">
           <div class="ui-row">
@@ -524,11 +538,6 @@ export class PerformanceMonitor extends UIPanel {
             <span class="ui-label">Variance</span>
             <span class="ui-value" data-metric="variance">±0.5ms</span>
           </div>
-        </div>
-
-        <div class="sparkline-container">
-          <canvas class="sparkline-canvas" width="288" height="38"></canvas>
-          <div class="sparkline-label">Frame Time History</div>
         </div>
 
         <div class="section-header">🎨 RENDER PIPELINE</div>
@@ -563,7 +572,7 @@ export class PerformanceMonitor extends UIPanel {
           </div>
           <div class="ui-row">
             <span class="ui-label">States</span>
-            <span class="ui-value" data-metric="states">0</span>
+            <span class="ui-value" data-metric="states">1</span>
           </div>
         </div>
 
@@ -596,6 +605,14 @@ export class PerformanceMonitor extends UIPanel {
           <div class="ui-row">
             <span class="ui-label">Cells/Bucket</span>
             <span class="ui-value" data-metric="hashcells">0/0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Sleeping</span>
+            <span class="ui-value" data-metric="sleeping">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Active Pairs</span>
+            <span class="ui-value" data-metric="activepairs">0</span>
           </div>
         </div>
 
@@ -681,22 +698,18 @@ export class PerformanceMonitor extends UIPanel {
             <span class="ui-label">Text Atlas</span>
             <span class="ui-value" data-metric="textatlas">0MB</span>
           </div>
+          <div class="ui-row">
+            <span class="ui-label">Heap Limit</span>
+            <span class="ui-value" data-metric="heaplimit">0MB</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">GC Pressure</span>
+            <span class="ui-value" data-metric="gcpressure">0%</span>
+          </div>
         </div>
 
-        <div class="section-header">📊 PERFORMANCE</div>
+        <div class="section-header">⚙️ ACTIONS</div>
         <div class="ui-section">
-          <div class="ui-row">
-            <span class="ui-label">Quality</span>
-            <span class="ui-value" data-metric="quality">HIGH</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Score</span>
-            <span class="ui-value" data-metric="score">100</span>
-          </div>
-          <div class="ui-row">
-            <span class="ui-label">Bottleneck</span>
-            <span class="ui-value" data-metric="bottleneck">BALANCED</span>
-          </div>
           <button class="vectorium-btn full-width" data-action="measure">📊 Measure (2s)</button>
           <button class="vectorium-btn full-width" data-action="export">💾 Export Metrics</button>
         </div>
@@ -722,14 +735,6 @@ export class PerformanceMonitor extends UIPanel {
     }
   }
 
-  private initSparkline(): void {
-    // Sparkline canvas and context initialization kept for future use
-    // this.sparklineCanvas = this.container?.querySelector('.sparkline-canvas') as HTMLCanvasElement;
-    // if (this.sparklineCanvas) {
-    //   this._sparklineCtx = this.sparklineCanvas.getContext('2d');
-    // }
-  }
-
   private startProfilerUpdates(): void {
     this.updateTimer = window.setInterval(() => {
       if (this.visible) {
@@ -753,6 +758,24 @@ export class PerformanceMonitor extends UIPanel {
         }
       }
     };
+
+    // Performance section (top of UI)
+    set('quality', metrics.quality.toUpperCase());
+    const scoreClass = metrics.performanceScore < 50 ? 'critical' : metrics.performanceScore < 75 ? 'warning' : 'good';
+    set('score', metrics.performanceScore.toFixed(0), scoreClass);
+    set('bottleneck', metrics.bottleneck.toUpperCase());
+    
+    // Frame budget (16.67ms for 60 FPS)
+    const budgetUsage = (metrics.frameTime / 16.67) * 100;
+    const budgetClass = budgetUsage > 95 ? 'critical' : budgetUsage > 80 ? 'warning' : 'good';
+    set('framebudget', `${metrics.frameTime.toFixed(2)}/16.67ms`, budgetClass);
+    
+    // Update frame budget bar
+    const budgetBar = this.container!.querySelector('[data-metric="framebudgetbar"]') as HTMLElement;
+    if (budgetBar) {
+      budgetBar.style.width = `${Math.min(budgetUsage, 100)}%`;
+      budgetBar.style.backgroundColor = budgetUsage > 95 ? '#ff4444' : budgetUsage > 80 ? '#ffaa00' : '#44ff44';
+    }
 
     // Frame Metrics
     const fpsClass = metrics.fps < 30 ? 'critical' : metrics.fps < 50 ? 'warning' : 'good';
@@ -782,6 +805,18 @@ export class PerformanceMonitor extends UIPanel {
     set('boundarytime', `${metrics.boundaryTime.toFixed(2)}ms`);
     set('collisionchecks', `${(metrics.collisionChecks / 1000).toFixed(1)}K`);
     set('hashcells', `${metrics.spatialHashCells}/${metrics.spatialHashMaxBucket}`);
+    
+    // New physics metrics - sleeping entities and active collision pairs
+    const physicsMetrics = (this as any).lastPhysicsMetrics;
+    if (physicsMetrics) {
+      const sleepingCount = physicsMetrics.sleepingEntities || 0;
+      const activePairs = physicsMetrics.activeCollisionPairs || 0;
+      set('sleeping', sleepingCount.toString());
+      set('activepairs', activePairs.toString());
+    } else {
+      set('sleeping', '0');
+      set('activepairs', '0');
+    }
 
     // ECS Metrics
     set('active', `${(metrics.entitiesProcessed / 1000).toFixed(1)}K`);
@@ -818,12 +853,20 @@ export class PerformanceMonitor extends UIPanel {
     set('vbuffer', `${metrics.vertexBufferSize.toFixed(2)}MB`);
     set('ibuffer', `${metrics.indexBufferSize.toFixed(2)}MB`);
     set('textatlas', `${metrics.textMemory.toFixed(2)}MB`);
+    
+    // New memory metrics - heap limit and GC pressure
+    const memory = (performance as any).memory;
+    if (memory) {
+      const heapLimit = memory.jsHeapSizeLimit / (1024 * 1024);
+      const gcPressure = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
+      const gcClass = gcPressure > 90 ? 'critical' : gcPressure > 75 ? 'warning' : '';
+      set('heaplimit', `${heapLimit.toFixed(0)}MB`);
+      set('gcpressure', `${gcPressure.toFixed(0)}%`, gcClass);
+    } else {
+      set('heaplimit', 'N/A');
+      set('gcpressure', 'N/A');
+    }
 
-    // Performance
-    set('quality', metrics.quality.toUpperCase());
-    const scoreClass = metrics.performanceScore < 50 ? 'critical' : metrics.performanceScore < 75 ? 'warning' : 'good';
-    set('score', metrics.performanceScore.toFixed(0), scoreClass);
-    set('bottleneck', metrics.bottleneck.toUpperCase());
   }
 
   destroy(): void {
@@ -831,6 +874,20 @@ export class PerformanceMonitor extends UIPanel {
       clearInterval(this.updateTimer);
     }
     super.destroy(); // Call parent cleanup
+  }
+  
+  private getMedian(arr: number[]): number {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  }
+  
+  private getPercentile(arr: number[], percentile: number): number {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const index = Math.ceil(sorted.length * percentile) - 1;
+    return sorted[Math.max(0, index)];
   }
 
   /**
@@ -841,10 +898,72 @@ export class PerformanceMonitor extends UIPanel {
     const metrics = this.getMetrics();
     metrics.timestamp = Date.now();
     
+    // Gather extended metrics from engine/world
+    const world = (window as any).vectoriumCurrentWorld;
+    const scene = (window as any).vectoriumCurrentScene;
+    const physicsMetrics = (this as any).lastPhysicsMetrics;
+    const memory = (performance as any).memory;
+    
+    const extendedMetrics = {
+      // Frame budget analysis
+      frameBudget: {
+        target: 16.67, // 60 FPS
+        current: metrics.frameTime,
+        usage: (metrics.frameTime / 16.67) * 100,
+        overhead: Math.max(0, metrics.frameTime - 16.67)
+      },
+      
+      // Memory details
+      memoryDetailed: memory ? {
+        jsHeapSize: memory.usedJSHeapSize,
+        jsHeapSizeLimit: memory.jsHeapSizeLimit,
+        totalJSHeapSize: memory.totalJSHeapSize,
+        gcPressure: (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100,
+        heapUsageMB: memory.usedJSHeapSize / (1024 * 1024),
+        heapLimitMB: memory.jsHeapSizeLimit / (1024 * 1024)
+      } : null,
+      
+      // Physics extended
+      physicsDetailed: physicsMetrics ? {
+        sleepingEntities: physicsMetrics.sleepingEntities || 0,
+        awakeEntities: (world?.getActiveEntityCount() || 0) - (physicsMetrics.sleepingEntities || 0),
+        activeCollisionPairs: physicsMetrics.activeCollisionPairs || 0,
+        spatialHashEfficiency: metrics.spatialHashCells > 0 ? 
+          metrics.spatialHashMaxBucket / metrics.spatialHashCells : 0
+      } : null,
+      
+      // World/Scene stats
+      worldStats: world ? {
+        totalEntities: world.getActiveEntityCount(),
+        shapeEntities: world.getShapeEntityCount(),
+        textEntities: world.getTextEntityCount(),
+        collisionEnabled: world.getCollisionEntityCount?.() || 0,
+        gravityEnabled: world.getGravityEntityCount?.() || 0
+      } : null,
+      
+      // Scene performance
+      sceneStats: scene?.perfMetrics ? {
+        updateTotal: scene.perfMetrics.updateTotal,
+        updatePhysics: scene.perfMetrics.updatePhysics,
+        updateAnimation: scene.perfMetrics.updateAnimation,
+        updateEntitySync: scene.perfMetrics.updateEntitySync,
+        renderTotal: scene.perfMetrics.renderTotal,
+        renderBatch: scene.perfMetrics.renderBatch,
+        renderCustom: scene.perfMetrics.renderCustom
+      } : null
+    };
+    
     const exportData = {
       metrics,
+      extendedMetrics,
       metadata: {
         exportTime: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio
+        },
         ...additionalData
       },
       // Include historical data
@@ -853,6 +972,9 @@ export class PerformanceMonitor extends UIPanel {
         min: Math.min(...this.frameTimeHistory),
         max: Math.max(...this.frameTimeHistory),
         avg: this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length,
+        median: this.getMedian(this.frameTimeHistory),
+        p95: this.getPercentile(this.frameTimeHistory, 0.95),
+        p99: this.getPercentile(this.frameTimeHistory, 0.99),
         recent: this.frameTimeHistory.slice(-60) // Last 60 frames
       }
     };
@@ -888,10 +1010,20 @@ export class PerformanceMonitor extends UIPanel {
         
         console.log(`📊 Measurement complete:`);
         console.log(`   FPS: ${metrics.fps.toFixed(1)} (avg: ${this.getAverageFPS().toFixed(1)})`);
-        console.log(`   Frame Time: ${metrics.frameTime.toFixed(2)}ms`);
+        console.log(`   Frame Time: ${metrics.frameTime.toFixed(2)}ms (budget: ${((metrics.frameTime/16.67)*100).toFixed(0)}%)`);
         console.log(`   Draw Calls: ${metrics.drawCalls} (WebGL: ${metrics.webglDrawCalls}, Text: ${metrics.textDrawCalls})`);
-        console.log(`   Entities: ${metrics.entitiesProcessed}`);
+        console.log(`   Entities: ${metrics.entitiesProcessed} (Rendered: ${metrics.entitiesRendered})`);
+        console.log(`   Physics: ${metrics.physicsTime.toFixed(2)}ms (Checks: ${(metrics.collisionChecks/1000).toFixed(1)}K)`);
         console.log(`   Memory: ${metrics.memory.toFixed(0)}MB`);
+        console.log(`   Bottleneck: ${metrics.bottleneck.toUpperCase()}`);
+        console.log(`   Quality Score: ${metrics.performanceScore.toFixed(0)}/100`);
+        
+        // Additional detailed metrics
+        const memory = (performance as any).memory;
+        if (memory) {
+          const gcPressure = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
+          console.log(`   GC Pressure: ${gcPressure.toFixed(0)}% (${(memory.usedJSHeapSize/(1024*1024)).toFixed(0)}MB / ${(memory.jsHeapSizeLimit/(1024*1024)).toFixed(0)}MB)`);
+        }
         
         // Auto-export
         const jsonData = this.exportMetrics({
