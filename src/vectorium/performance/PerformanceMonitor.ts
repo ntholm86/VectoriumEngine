@@ -1081,40 +1081,40 @@ export class PerformanceMonitor extends UIPanel {
     }
 
     // Frame Metrics
-    const fpsClass = getColorClass(metrics.fps, {excellent: 60, good: 55, ok: 45, warning: 35, critical: 25, severe: 15}, true);
+    const fpsClass = getColorClass(metrics.fps, {excellent: 60, good: 50, ok: 40, warning: 30, critical: 20, severe: 15}, true);
     set('fps', metrics.fps.toFixed(1), fpsClass);
     set('fpsavg', this.getAverageFPS().toFixed(1));
     
-    const frameTimeClass = getColorClass(metrics.frameTime, {excellent: 8, good: 12, ok: 14, warning: 16, critical: 20, severe: 30}, false);
+    const frameTimeClass = getColorClass(metrics.frameTime, {excellent: 8, good: 13, ok: 16.67, warning: 20, critical: 33, severe: 50}, false);
     set('frame', `${metrics.frameTime.toFixed(2)}ms`, frameTimeClass);
     set('minmax', `${metrics.frameTimeMin.toFixed(1)}/${metrics.frameTimeMax.toFixed(1)}ms`);
 
     // Render Pipeline
-    const drawCallClass = getColorClass(metrics.drawCalls, {excellent: 10, good: 25, ok: 50, warning: 100, critical: 200, severe: 500}, false);
+    const drawCallClass = getColorClass(metrics.drawCalls, {excellent: 50, good: 100, ok: 200, warning: 500, critical: 1000, severe: 2000}, false);
     set('drawcalls', metrics.drawCalls.toString(), drawCallClass);
     
-    const webglCallClass = getColorClass(metrics.webglDrawCalls, {excellent: 5, good: 15, ok: 30, warning: 60, critical: 100, severe: 200}, false);
+    const webglCallClass = getColorClass(metrics.webglDrawCalls, {excellent: 10, good: 25, ok: 50, warning: 100, critical: 200, severe: 500}, false);
     set('webgl', `${metrics.webglDrawCalls}`, webglCallClass);
     
-    const textCallClass = getColorClass(metrics.textDrawCalls, {excellent: 5, good: 10, ok: 25, warning: 50, critical: 100, severe: 200}, false);
+    const textCallClass = getColorClass(metrics.textDrawCalls, {excellent: 10, good: 25, ok: 50, warning: 100, critical: 250, severe: 500}, false);
     set('text', `${metrics.textDrawCalls}`, textCallClass);
     
     const vertexCount = metrics.verticesRendered / 1000;
-    const vertexClass = getColorClass(vertexCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    const vertexClass = getColorClass(vertexCount, {excellent: 50, good: 200, ok: 500, warning: 1000, critical: 2000, severe: 5000}, false);
     set('vertices', `${vertexCount.toFixed(1)}K`, vertexClass);
     
     const triangleCount = metrics.trianglesRendered / 1000;
-    const triangleClass = getColorClass(triangleCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    const triangleClass = getColorClass(triangleCount, {excellent: 50, good: 200, ok: 500, warning: 1000, critical: 2000, severe: 5000}, false);
     set('triangles', `${triangleCount.toFixed(1)}K`, triangleClass);
     
     const batchEffPct = metrics.batchEfficiency * 100;
-    const batchClass = getColorClass(batchEffPct, {excellent: 90, good: 75, ok: 50, warning: 30, critical: 15, severe: 5}, true);
+    const batchClass = getColorClass(batchEffPct, {excellent: 80, good: 60, ok: 40, warning: 25, critical: 15, severe: 5}, true);
     set('batch', `${batchEffPct.toFixed(0)}%`, batchClass);
     
     const uploadClass = getColorClass(metrics.bufferUploadSize, {excellent: 0.5, good: 1, ok: 2, warning: 5, critical: 10, severe: 20}, false);
     set('upload', `${metrics.bufferUploadSize.toFixed(2)}MB`, uploadClass);
     
-    const stateClass = getColorClass(metrics.stateChanges, {excellent: 10, good: 20, ok: 50, warning: 100, critical: 200, severe: 500}, false);
+    const stateClass = getColorClass(metrics.stateChanges, {excellent: 20, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
     set('states', metrics.stateChanges.toString(), stateClass);
 
     // Physics Metrics
@@ -1153,7 +1153,7 @@ export class PerformanceMonitor extends UIPanel {
 
     // ECS Metrics
     const activeCount = metrics.entitiesProcessed / 1000;
-    const activeClass = getColorClass(activeCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    const activeClass = getColorClass(activeCount, {excellent: 5, good: 10, ok: 25, warning: 50, critical: 100, severe: 200}, false);
     set('active', `${activeCount.toFixed(1)}K`, activeClass);
     
     // Shape and text entity counts (from World)
@@ -1163,11 +1163,11 @@ export class PerformanceMonitor extends UIPanel {
       const textCount = world.getTextEntityCount();
       
       const shapeCountK = shapeCount / 1000;
-      const shapeClass = getColorClass(shapeCountK, {excellent: 5, good: 25, ok: 50, warning: 100, critical: 250, severe: 500}, false);
+      const shapeClass = getColorClass(shapeCountK, {excellent: 2, good: 5, ok: 10, warning: 25, critical: 50, severe: 100}, false);
       set('shapes', shapeCountK > 1 ? `${shapeCountK.toFixed(1)}K` : shapeCount.toString(), shapeClass);
       
       const textCountK = textCount / 1000;
-      const textClass = getColorClass(textCountK, {excellent: 1, good: 5, ok: 10, warning: 25, critical: 50, severe: 100}, false);
+      const textClass = getColorClass(textCountK, {excellent: 0.5, good: 1, ok: 2.5, warning: 5, critical: 10, severe: 25}, false);
       set('textentities', textCountK > 1 ? `${textCountK.toFixed(1)}K` : textCount.toString(), textClass);
     } else {
       set('shapes', '0');
@@ -1175,13 +1175,13 @@ export class PerformanceMonitor extends UIPanel {
     }
     
     const renderedCount = metrics.entitiesRendered / 1000;
-    const renderedClass = getColorClass(renderedCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    const renderedClass = getColorClass(renderedCount, {excellent: 5, good: 10, ok: 25, warning: 50, critical: 100, severe: 200}, false);
     set('rendered', `${renderedCount.toFixed(1)}K`, renderedClass);
     
     const culledCount = (metrics.entitiesCulled || 0) / 1000;
     set('culled', `${culledCount.toFixed(1)}K`);
     
-    const timePerEntityClass = getColorClass(metrics.timePerEntity, {excellent: 5, good: 10, ok: 20, warning: 50, critical: 100, severe: 200}, false);
+    const timePerEntityClass = getColorClass(metrics.timePerEntity, {excellent: 1, good: 2, ok: 5, warning: 10, critical: 20, severe: 50}, false);
     set('timeperentity', `${metrics.timePerEntity.toFixed(1)}μs`, timePerEntityClass);
 
     // Update/Render Breakdown (from Scene)
@@ -1266,10 +1266,10 @@ export class PerformanceMonitor extends UIPanel {
     }
 
     // Input Responsiveness
-    const inputLagClass = getColorClass(metrics.inputLag, {excellent: 5, good: 10, ok: 16, warning: 25, critical: 40, severe: 60}, false);
+    const inputLagClass = getColorClass(metrics.inputLag, {excellent: 8, good: 16, ok: 25, warning: 33, critical: 50, severe: 80}, false);
     set('inputlag', `${metrics.inputLag.toFixed(1)}ms`, inputLagClass);
     
-    const inputLagP95Class = getColorClass(metrics.inputLagP95, {excellent: 8, good: 15, ok: 20, warning: 30, critical: 50, severe: 80}, false);
+    const inputLagP95Class = getColorClass(metrics.inputLagP95, {excellent: 16, good: 25, ok: 33, warning: 50, critical: 80, severe: 120}, false);
     set('inputlagp95', `${metrics.inputLagP95.toFixed(1)}ms`, inputLagP95Class);
 
     // Frame Spikes
@@ -1292,7 +1292,7 @@ export class PerformanceMonitor extends UIPanel {
     set('assetsfailed', metrics.assetsFailed.toString(), assetsFailedClass);
     
     const cacheHitPct = metrics.cacheHitRate * 100;
-    const cacheHitClass = getColorClass(cacheHitPct, {excellent: 90, good: 75, ok: 50, warning: 30, critical: 15, severe: 5}, true);
+    const cacheHitClass = getColorClass(cacheHitPct, {excellent: 95, good: 85, ok: 70, warning: 50, critical: 30, severe: 10}, true);
     set('cachehitrate', `${cacheHitPct.toFixed(0)}%`, cacheHitClass);
     
     const avgLoadTimeClass = getColorClass(metrics.avgLoadTime, {excellent: 10, good: 30, ok: 50, warning: 100, critical: 250, severe: 500}, false);

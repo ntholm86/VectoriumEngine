@@ -96,10 +96,10 @@
   pointer-events: none;
 }
 
-.vectorium-panel[data-position="top-left"] { top: var(--ui-gap-xl); var(--ui-gap-xl); }
-.vectorium-panel[data-position="top-right"] { top: var(--ui-gap-xl); right: var(--ui-gap-xl); }
-.vectorium-panel[data-position="bottom-left"] { bottom: var(--ui-gap-xl); left: var(--ui-gap-xl); }
-.vectorium-panel[data-position="bottom-right"] { bottom: var(--ui-gap-xl); right: var(--ui-gap-xl); }
+.vectorium-panel[data-position="top-left"] { top: 0; left: 0; }
+.vectorium-panel[data-position="top-right"] { top: 0; right: 0; }
+.vectorium-panel[data-position="bottom-left"] { bottom: 0; left: 0; }
+.vectorium-panel[data-position="bottom-right"] { bottom: 0; right: 0; }
 
 .vectorium-panel-header {
   background: var(--ui-bg-light);
