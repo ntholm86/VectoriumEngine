@@ -1288,6 +1288,19 @@ void main() {
     return this.gl;
   }
 
+  /**
+   * Get GPU buffer memory usage (MB)
+   */
+  getBufferMemoryUsage(): { vertex: number; index: number; total: number } {
+    const vertexBytes = this.batchVertices.byteLength;
+    const indexBytes = this.batchIndices.byteLength;
+    return {
+      vertex: vertexBytes / (1024 * 1024),
+      index: indexBytes / (1024 * 1024),
+      total: (vertexBytes + indexBytes) / (1024 * 1024)
+    };
+  }
+
   destroy(): void {
     const gl = this.gl;
     if (this.program) gl.deleteProgram(this.program);

@@ -5,6 +5,17 @@
 
 import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
 import type { InputManager } from '../input/InputManager';
+import {
+  InputMetricsCollector,
+  FrameSpikeCollector,
+  AssetMetricsCollector,
+  GPUMetricsCollector,
+  NetworkMetricsCollector,
+  TextureMetricsCollector,
+  EventListenerCollector,
+  LongTaskCollector,
+  ShaderMetricsCollector
+} from './MetricsCollector';
 
 export type QualityLevel = 'ultra' | 'high' | 'medium' | 'low' | 'potato';
 
@@ -75,6 +86,43 @@ export interface PerformanceMetrics {
   // Performance score
   performanceScore: number; // 0-100 overall health
   bottleneck: 'cpu' | 'gpu' | 'memory' | 'balanced'; // What's limiting performance
+  
+  // Input metrics
+  inputLag: number; // ms from input event to frame render
+  inputLagP95: number; // 95th percentile input lag
+  
+  // Frame spike metrics
+  minorSpikes: number; // 16-20ms frames
+  majorSpikes: number; // 20-33ms frames
+  severeSpikes: number; // >33ms frames
+  totalSpikes: number; // all spikes
+  
+  // Asset metrics
+  assetsLoaded: number;
+  assetsFailed: number;
+  cacheHitRate: number; // 0-1
+  avgLoadTime: number; // ms
+  
+  // GPU metrics
+  gpuUtilization: number; // 0-1 estimated
+  gpuBottleneck: boolean;
+  
+  // Network metrics (optional)
+  bytesSent?: number;
+  bytesReceived?: number;
+  avgRTT?: number; // ms
+  packetLoss?: number; // 0-1
+  
+  // Texture metrics
+  textureAtlasFragmentation?: number; // 0-1
+  textureUploads?: number; // count
+  
+  // Diagnostic metrics
+  domElementCount?: number;
+  domGrowthRate?: number; // elements/second
+  longTaskCount?: number;
+  longestTask?: number; // ms
+  shaderCompileTime?: number; // ms
 }
 
 const QUALITY_PRESETS: Record<QualityLevel, QualitySettings> = {
@@ -147,6 +195,28 @@ export class PerformanceMonitor extends UIPanel {
 
   // Profiler UI
   private updateTimer: number | null = null;
+  
+  // Renderer reference for buffer sizes
+  private renderer: any = null;
+  
+  // GC activity tracking
+  private lastHeapSize = 0;
+  private heapGrowth = 0;
+  private gcEventCount = 0;
+  private lastGCTime = 0;
+  private heapHistory: number[] = [];
+  private maxHeapHistorySize = 120; // 2 seconds at 60fps
+  
+  // Modular metric collectors
+  private inputCollector: InputMetricsCollector;
+  private spikeCollector: FrameSpikeCollector;
+  private assetCollector: AssetMetricsCollector;
+  private gpuCollector: GPUMetricsCollector;
+  private networkCollector: NetworkMetricsCollector;
+  private textureCollector: TextureMetricsCollector;
+  private listenerCollector: EventListenerCollector;
+  private longTaskCollector: LongTaskCollector;
+  private shaderCollector: ShaderMetricsCollector;
 
   // Physics metrics cache
 
@@ -166,6 +236,24 @@ export class PerformanceMonitor extends UIPanel {
     this.targetFPS = targetFPS;
     this.currentQuality = initialQuality;
     this.adaptiveEnabled = false; // Disable adaptive quality by default - it's too aggressive
+    
+    // Initialize metric collectors
+    this.inputCollector = new InputMetricsCollector();
+    this.spikeCollector = new FrameSpikeCollector();
+    this.assetCollector = new AssetMetricsCollector();
+    this.gpuCollector = new GPUMetricsCollector();
+    this.networkCollector = new NetworkMetricsCollector();
+    this.textureCollector = new TextureMetricsCollector();
+    this.listenerCollector = new EventListenerCollector();
+    this.longTaskCollector = new LongTaskCollector();
+    this.shaderCollector = new ShaderMetricsCollector();
+  }
+  
+  /**
+   * Set renderer reference for buffer size tracking
+   */
+  setRenderer(renderer: any): void {
+    this.renderer = renderer;
   }
   
   /**
@@ -192,6 +280,11 @@ export class PerformanceMonitor extends UIPanel {
     this.entitiesProcessedThisFrame = 0;
     this.entitiesRenderedThisFrame = 0;
     this.batchSpriteCounts = [];
+    
+    // Periodic scans (every 60 frames)
+    if (this.frameTimes.length % 60 === 0) {
+      this.listenerCollector.scan();
+    }
   }
 
   endFrame(): void {
@@ -201,6 +294,37 @@ export class PerformanceMonitor extends UIPanel {
     this.frameTimes.push(frameTime);
     if (this.frameTimes.length > this.maxSamples) {
       this.frameTimes.shift();
+    }
+    
+    // Track frame spikes and GPU metrics
+    this.spikeCollector.recordFrame(frameTime);
+    this.gpuCollector.recordFrame(frameTime);
+    
+    // Track long tasks
+    if (frameTime > 16.67) {
+      this.longTaskCollector.recordTask(frameTime);
+    }
+    
+    // Track input lag
+    this.inputCollector.recordFrameRender();
+    
+    // Track GC activity
+    const memory = (performance as any).memory;
+    if (memory) {
+      const currentHeap = memory.usedJSHeapSize;
+      this.heapHistory.push(currentHeap);
+      if (this.heapHistory.length > this.maxHeapHistorySize) {
+        this.heapHistory.shift();
+      }
+      
+      // Detect GC event (heap size suddenly drops)
+      if (currentHeap < this.lastHeapSize - 1048576) { // 1MB drop
+        this.gcEventCount++;
+        this.lastGCTime = now;
+      }
+      
+      this.heapGrowth = currentHeap - this.lastHeapSize;
+      this.lastHeapSize = currentHeap;
     }
 
     // Track frame time history for variance
@@ -286,6 +410,37 @@ export class PerformanceMonitor extends UIPanel {
     (this as any).collisionChecks = metrics.totalCollisionChecks || 0;
     (this as any).spatialHashCells = metrics.spatialHashStats?.cellsUsed || 0;
     (this as any).spatialHashMaxBucket = metrics.spatialHashStats?.maxBucketSize || 0;
+  }
+
+  // New collector-based recording methods
+  recordAssetLoad(assetId: string, loadTime: number, fromCache: boolean): void {
+    this.assetCollector.recordAssetLoad(assetId, loadTime, fromCache);
+  }
+
+  recordShaderCompile(shaderId: string, compileTime: number): void {
+    this.shaderCollector.recordCompile(shaderId, compileTime);
+  }
+
+  recordNetworkSend(bytes: number): void {
+    this.networkCollector.recordSend(bytes);
+  }
+
+  recordNetworkReceive(bytes: number): void {
+    this.networkCollector.recordReceive(bytes);
+  }
+
+  recordNetworkRTT(rtt: number): void {
+    this.networkCollector.recordRoundTrip(rtt);
+  }
+
+  recordTextureUpload(bytes: number): void {
+    this.textureCollector.recordTextureUpload(bytes);
+  }
+
+  recordTextureAtlasFragmentation(_fragmentation: number): void {
+    // TextureCollector doesn't have a direct recordFragmentation method
+    // It calculates fragmentation from atlas size/usage
+    // This is a no-op for now
   }
 
   private adjustQuality(): void {
@@ -395,9 +550,18 @@ export class PerformanceMonitor extends UIPanel {
       bottleneck = 'cpu';
     }
 
-    // Calculate vertex/index buffer sizes (estimate)
-    const vertexBufferSize = (this.verticesThisFrame * 8 * 4) / (1024 * 1024); // 8 floats per vertex
-    const indexBufferSize = (this.indicesThisFrame * 2) / (1024 * 1024); // Uint16Array
+    // Get actual buffer sizes from renderer (if available)
+    let vertexBufferSize = 0;
+    let indexBufferSize = 0;
+    if (this.renderer && typeof this.renderer.getBufferMemoryUsage === 'function') {
+      const bufferUsage = this.renderer.getBufferMemoryUsage();
+      vertexBufferSize = bufferUsage.vertex;
+      indexBufferSize = bufferUsage.index;
+    } else {
+      // Fallback to estimate
+      vertexBufferSize = (this.verticesThisFrame * 8 * 4) / (1024 * 1024); // 8 floats per vertex
+      indexBufferSize = (this.indicesThisFrame * 2) / (1024 * 1024); // Uint16Array
+    }
 
     // Culling metrics
     const cullingInFrustum = (this as any).cullingInFrustum || this.entitiesRenderedThisFrame;
@@ -457,7 +621,18 @@ export class PerformanceMonitor extends UIPanel {
 
       // Performance score
       performanceScore: performanceScore,
-      bottleneck: bottleneck
+      bottleneck: bottleneck,
+      
+      // Collect from specialized collectors
+      ...this.inputCollector.collect(),
+      ...this.spikeCollector.collect(),
+      ...this.assetCollector.collect(),
+      ...this.gpuCollector.collect(),
+      ...this.networkCollector.collect(),
+      ...this.textureCollector.collect(),
+      ...this.listenerCollector.collect(),
+      ...this.longTaskCollector.collect(),
+      ...this.shaderCollector.collect()
     };
   }
 
@@ -681,11 +856,32 @@ export class PerformanceMonitor extends UIPanel {
         </div>
 
         <div class="section-header">💾 MEMORY</div>
+        <div class="ui-hint">JS HEAP (RAM)</div>
         <div class="ui-section">
           <div class="ui-row">
-            <span class="ui-label">JS Heap</span>
+            <span class="ui-label">Used</span>
             <span class="ui-value" data-metric="memory">0MB</span>
           </div>
+          <div class="ui-row">
+            <span class="ui-label">Limit</span>
+            <span class="ui-value" data-metric="heaplimit">0MB</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">GC Pressure</span>
+            <span class="ui-value" data-metric="gcpressure">0%</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">GC Events</span>
+            <span class="ui-value" data-metric="gcevents">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Heap Trend</span>
+            <span class="ui-value" data-metric="heaptrend">—</span>
+          </div>
+          <div class="ui-hint">Includes: V8 engine, page code, Vectorium lib, DevTools, DOM, all JS objects</div>
+        </div>
+        <div class="ui-hint">GPU MEMORY (VRAM)</div>
+        <div class="ui-section">
           <div class="ui-row">
             <span class="ui-label">Vertex Buf</span>
             <span class="ui-value" data-metric="vbuffer">0MB</span>
@@ -699,12 +895,92 @@ export class PerformanceMonitor extends UIPanel {
             <span class="ui-value" data-metric="textatlas">0MB</span>
           </div>
           <div class="ui-row">
-            <span class="ui-label">Heap Limit</span>
-            <span class="ui-value" data-metric="heaplimit">0MB</span>
+            <span class="ui-label">Total VRAM</span>
+            <span class="ui-value" data-metric="totalvram">0MB</span>
+          </div>
+        </div>
+
+        <div class="section-header">🎮 INPUT RESPONSIVENESS</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Input Lag</span>
+            <span class="ui-value" data-metric="inputlag">0.0ms</span>
           </div>
           <div class="ui-row">
-            <span class="ui-label">GC Pressure</span>
-            <span class="ui-value" data-metric="gcpressure">0%</span>
+            <span class="ui-label">P95 Lag</span>
+            <span class="ui-value" data-metric="inputlagp95">0.0ms</span>
+          </div>
+        </div>
+
+        <div class="section-header">📊 FRAME SPIKES</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Minor (16-20ms)</span>
+            <span class="ui-value" data-metric="minorspikes">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Major (20-33ms)</span>
+            <span class="ui-value" data-metric="majorspikes">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Severe (>33ms)</span>
+            <span class="ui-value" data-metric="severespikes">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Total Spikes</span>
+            <span class="ui-value" data-metric="totalspikes">0</span>
+          </div>
+        </div>
+
+        <div class="section-header">📦 ASSETS</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Loaded</span>
+            <span class="ui-value" data-metric="assetsloaded">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Failed</span>
+            <span class="ui-value" data-metric="assetsfailed">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Cache Hit Rate</span>
+            <span class="ui-value" data-metric="cachehitrate">0%</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Avg Load Time</span>
+            <span class="ui-value" data-metric="avgloadtime">0.0ms</span>
+          </div>
+        </div>
+
+        <div class="section-header">🎮 GPU UTILIZATION</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Utilization</span>
+            <span class="ui-value" data-metric="gpuutilization">0%</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Bottleneck</span>
+            <span class="ui-value" data-metric="gpubottleneck">No</span>
+          </div>
+        </div>
+
+        <div class="section-header">⚠️ DIAGNOSTICS</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Long Tasks</span>
+            <span class="ui-value" data-metric="longtasks">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Longest Task</span>
+            <span class="ui-value" data-metric="longesttask">0.0ms</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">DOM Elements</span>
+            <span class="ui-value" data-metric="domelements">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">DOM Growth</span>
+            <span class="ui-value" data-metric="domgrowth">0/s</span>
           </div>
         </div>
 
@@ -758,52 +1034,109 @@ export class PerformanceMonitor extends UIPanel {
         }
       }
     };
+    
+    // Helper: Color classification based on thresholds (green → yellow → orange → red)
+    const getColorClass = (value: number, thresholds: {excellent?: number, good?: number, ok?: number, warning: number, critical: number, severe?: number}, inverted = false) => {
+      if (inverted) {
+        // For metrics where higher is better (FPS, batch efficiency, etc)
+        if (thresholds.excellent && value >= thresholds.excellent) return 'excellent';
+        if (thresholds.good && value >= thresholds.good) return 'good';
+        if (thresholds.ok && value >= thresholds.ok) return 'ok';
+        if (value >= thresholds.warning) return 'warning';
+        if (thresholds.severe && value < thresholds.severe) return 'severe';
+        return 'critical';
+      } else {
+        // For metrics where lower is better (frame time, memory, etc)
+        if (thresholds.excellent && value <= thresholds.excellent) return 'excellent';
+        if (thresholds.good && value <= thresholds.good) return 'good';
+        if (thresholds.ok && value <= thresholds.ok) return 'ok';
+        if (value <= thresholds.warning) return 'warning';
+        if (thresholds.severe && value >= thresholds.severe) return 'severe';
+        return 'critical';
+      }
+    };
 
     // Performance section (top of UI)
     set('quality', metrics.quality.toUpperCase());
-    const scoreClass = metrics.performanceScore < 50 ? 'critical' : metrics.performanceScore < 75 ? 'warning' : 'good';
+    const scoreClass = getColorClass(metrics.performanceScore, {excellent: 90, good: 75, ok: 60, warning: 50, critical: 25}, true);
     set('score', metrics.performanceScore.toFixed(0), scoreClass);
     set('bottleneck', metrics.bottleneck.toUpperCase());
     
     // Frame budget (16.67ms for 60 FPS)
     const budgetUsage = (metrics.frameTime / 16.67) * 100;
-    const budgetClass = budgetUsage > 95 ? 'critical' : budgetUsage > 80 ? 'warning' : 'good';
+    const budgetClass = getColorClass(budgetUsage, {excellent: 50, good: 70, ok: 80, warning: 90, critical: 95, severe: 110}, false);
     set('framebudget', `${metrics.frameTime.toFixed(2)}/16.67ms`, budgetClass);
     
-    // Update frame budget bar
+    // Update frame budget bar with gradient
     const budgetBar = this.container!.querySelector('[data-metric="framebudgetbar"]') as HTMLElement;
     if (budgetBar) {
       budgetBar.style.width = `${Math.min(budgetUsage, 100)}%`;
-      budgetBar.style.backgroundColor = budgetUsage > 95 ? '#ff4444' : budgetUsage > 80 ? '#ffaa00' : '#44ff44';
+      // Gradient: green → yellow → orange → red
+      if (budgetUsage <= 50) budgetBar.style.backgroundColor = '#00ff88';
+      else if (budgetUsage <= 70) budgetBar.style.backgroundColor = '#a6e22e';
+      else if (budgetUsage <= 80) budgetBar.style.backgroundColor = '#e6db74';
+      else if (budgetUsage <= 90) budgetBar.style.backgroundColor = '#fd971f';
+      else if (budgetUsage <= 100) budgetBar.style.backgroundColor = '#f92672';
+      else budgetBar.style.backgroundColor = '#ff0066';
     }
 
     // Frame Metrics
-    const fpsClass = metrics.fps < 30 ? 'critical' : metrics.fps < 50 ? 'warning' : 'good';
+    const fpsClass = getColorClass(metrics.fps, {excellent: 60, good: 55, ok: 45, warning: 35, critical: 25, severe: 15}, true);
     set('fps', metrics.fps.toFixed(1), fpsClass);
     set('fpsavg', this.getAverageFPS().toFixed(1));
-    set('frame', `${metrics.frameTime.toFixed(2)}ms`);
+    
+    const frameTimeClass = getColorClass(metrics.frameTime, {excellent: 8, good: 12, ok: 14, warning: 16, critical: 20, severe: 30}, false);
+    set('frame', `${metrics.frameTime.toFixed(2)}ms`, frameTimeClass);
     set('minmax', `${metrics.frameTimeMin.toFixed(1)}/${metrics.frameTimeMax.toFixed(1)}ms`);
 
     // Render Pipeline
-    const drawCallClass = metrics.drawCalls > 50 ? 'warning' : metrics.drawCalls > 100 ? 'critical' : '';
+    const drawCallClass = getColorClass(metrics.drawCalls, {excellent: 10, good: 25, ok: 50, warning: 100, critical: 200, severe: 500}, false);
     set('drawcalls', metrics.drawCalls.toString(), drawCallClass);
-    set('webgl', `${metrics.webglDrawCalls}`);
-    set('text', `${metrics.textDrawCalls}`);
-    set('vertices', `${(metrics.verticesRendered / 1000).toFixed(1)}K`);
-    set('triangles', `${(metrics.trianglesRendered / 1000).toFixed(1)}K`);
-    const batchClass = metrics.batchEfficiency < 0.3 ? 'warning' : metrics.batchEfficiency > 0.7 ? 'good' : '';
-    set('batch', `${(metrics.batchEfficiency * 100).toFixed(0)}%`, batchClass);
-    set('upload', `${metrics.bufferUploadSize.toFixed(2)}MB`);
-    set('states', metrics.stateChanges.toString());
+    
+    const webglCallClass = getColorClass(metrics.webglDrawCalls, {excellent: 5, good: 15, ok: 30, warning: 60, critical: 100, severe: 200}, false);
+    set('webgl', `${metrics.webglDrawCalls}`, webglCallClass);
+    
+    const textCallClass = getColorClass(metrics.textDrawCalls, {excellent: 5, good: 10, ok: 25, warning: 50, critical: 100, severe: 200}, false);
+    set('text', `${metrics.textDrawCalls}`, textCallClass);
+    
+    const vertexCount = metrics.verticesRendered / 1000;
+    const vertexClass = getColorClass(vertexCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    set('vertices', `${vertexCount.toFixed(1)}K`, vertexClass);
+    
+    const triangleCount = metrics.trianglesRendered / 1000;
+    const triangleClass = getColorClass(triangleCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    set('triangles', `${triangleCount.toFixed(1)}K`, triangleClass);
+    
+    const batchEffPct = metrics.batchEfficiency * 100;
+    const batchClass = getColorClass(batchEffPct, {excellent: 90, good: 75, ok: 50, warning: 30, critical: 15, severe: 5}, true);
+    set('batch', `${batchEffPct.toFixed(0)}%`, batchClass);
+    
+    const uploadClass = getColorClass(metrics.bufferUploadSize, {excellent: 0.5, good: 1, ok: 2, warning: 5, critical: 10, severe: 20}, false);
+    set('upload', `${metrics.bufferUploadSize.toFixed(2)}MB`, uploadClass);
+    
+    const stateClass = getColorClass(metrics.stateChanges, {excellent: 10, good: 20, ok: 50, warning: 100, critical: 200, severe: 500}, false);
+    set('states', metrics.stateChanges.toString(), stateClass);
 
     // Physics Metrics
-    const physicsClass = metrics.physicsTime > 10 ? 'warning' : metrics.physicsTime > 5 ? '' : 'good';
-    set('physicstime', `${metrics.physicsTime.toFixed(2)}ms`, physicsClass);
-    set('gravitytime', `${metrics.gravityTime.toFixed(2)}ms`);
-    set('hashbuild', `${metrics.collisionBuildTime.toFixed(2)}ms`);
-    set('collisiontime', `${metrics.collisionDetectTime.toFixed(2)}ms`);
-    set('boundarytime', `${metrics.boundaryTime.toFixed(2)}ms`);
-    set('collisionchecks', `${(metrics.collisionChecks / 1000).toFixed(1)}K`);
+    const physicsTimeClass = getColorClass(metrics.physicsTime, {excellent: 2, good: 5, ok: 10, warning: 13, critical: 16, severe: 20}, false);
+    set('physicstime', `${metrics.physicsTime.toFixed(2)}ms`, physicsTimeClass);
+    
+    const gravityTimeClass = getColorClass(metrics.gravityTime, {excellent: 0.5, good: 1, ok: 2, warning: 3, critical: 5, severe: 10}, false);
+    set('gravitytime', `${metrics.gravityTime.toFixed(2)}ms`, gravityTimeClass);
+    
+    const hashBuildClass = getColorClass(metrics.collisionBuildTime, {excellent: 0.5, good: 1, ok: 2, warning: 3, critical: 5, severe: 10}, false);
+    set('hashbuild', `${metrics.collisionBuildTime.toFixed(2)}ms`, hashBuildClass);
+    
+    const collisionTimeClass = getColorClass(metrics.collisionDetectTime, {excellent: 1, good: 3, ok: 5, warning: 8, critical: 12, severe: 20}, false);
+    set('collisiontime', `${metrics.collisionDetectTime.toFixed(2)}ms`, collisionTimeClass);
+    
+    const boundaryTimeClass = getColorClass(metrics.boundaryTime, {excellent: 0.3, good: 0.5, ok: 1, warning: 2, critical: 3, severe: 5}, false);
+    set('boundarytime', `${metrics.boundaryTime.toFixed(2)}ms`, boundaryTimeClass);
+    
+    const collisionChecksK = metrics.collisionChecks / 1000;
+    const collisionChecksClass = getColorClass(collisionChecksK, {excellent: 1, good: 5, ok: 10, warning: 25, critical: 50, severe: 100}, false);
+    set('collisionchecks', `${collisionChecksK.toFixed(1)}K`, collisionChecksClass);
+    
     set('hashcells', `${metrics.spatialHashCells}/${metrics.spatialHashMaxBucket}`);
     
     // New physics metrics - sleeping entities and active collision pairs
@@ -819,53 +1152,171 @@ export class PerformanceMonitor extends UIPanel {
     }
 
     // ECS Metrics
-    set('active', `${(metrics.entitiesProcessed / 1000).toFixed(1)}K`);
+    const activeCount = metrics.entitiesProcessed / 1000;
+    const activeClass = getColorClass(activeCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    set('active', `${activeCount.toFixed(1)}K`, activeClass);
     
     // Shape and text entity counts (from World)
     const world = (window as any).vectoriumCurrentWorld;
     if (world) {
       const shapeCount = world.getShapeEntityCount();
       const textCount = world.getTextEntityCount();
-      set('shapes', shapeCount.toString());
-      set('textentities', textCount.toString());
+      
+      const shapeCountK = shapeCount / 1000;
+      const shapeClass = getColorClass(shapeCountK, {excellent: 5, good: 25, ok: 50, warning: 100, critical: 250, severe: 500}, false);
+      set('shapes', shapeCountK > 1 ? `${shapeCountK.toFixed(1)}K` : shapeCount.toString(), shapeClass);
+      
+      const textCountK = textCount / 1000;
+      const textClass = getColorClass(textCountK, {excellent: 1, good: 5, ok: 10, warning: 25, critical: 50, severe: 100}, false);
+      set('textentities', textCountK > 1 ? `${textCountK.toFixed(1)}K` : textCount.toString(), textClass);
     } else {
       set('shapes', '0');
       set('textentities', '0');
     }
     
-    set('rendered', `${(metrics.entitiesRendered / 1000).toFixed(1)}K`);
-    set('culled', `${((metrics.entitiesCulled || 0) / 1000).toFixed(1)}K`);
-    set('timeperentity', `${metrics.timePerEntity.toFixed(1)}μs`);
+    const renderedCount = metrics.entitiesRendered / 1000;
+    const renderedClass = getColorClass(renderedCount, {excellent: 10, good: 50, ok: 100, warning: 250, critical: 500, severe: 1000}, false);
+    set('rendered', `${renderedCount.toFixed(1)}K`, renderedClass);
+    
+    const culledCount = (metrics.entitiesCulled || 0) / 1000;
+    set('culled', `${culledCount.toFixed(1)}K`);
+    
+    const timePerEntityClass = getColorClass(metrics.timePerEntity, {excellent: 5, good: 10, ok: 20, warning: 50, critical: 100, severe: 200}, false);
+    set('timeperentity', `${metrics.timePerEntity.toFixed(1)}μs`, timePerEntityClass);
 
     // Update/Render Breakdown (from Scene)
     const scenePerfMetrics = (window as any).vectoriumCurrentScene?.perfMetrics;
     if (scenePerfMetrics) {
-      set('updatetotal', `${scenePerfMetrics.updateTotal.toFixed(2)}ms`);
-      set('updatephysics', `${scenePerfMetrics.updatePhysics.toFixed(2)}ms`);
-      set('updateanimation', `${scenePerfMetrics.updateAnimation.toFixed(2)}ms`);
-      set('updateentitysync', `${scenePerfMetrics.updateEntitySync.toFixed(2)}ms`);
-      set('rendertotal', `${scenePerfMetrics.renderTotal.toFixed(2)}ms`);
+      const updateTotalClass = getColorClass(scenePerfMetrics.updateTotal, {excellent: 2, good: 5, ok: 8, warning: 12, critical: 15, severe: 20}, false);
+      set('updatetotal', `${scenePerfMetrics.updateTotal.toFixed(2)}ms`, updateTotalClass);
+      
+      const updatePhysicsClass = getColorClass(scenePerfMetrics.updatePhysics, {excellent: 1, good: 3, ok: 5, warning: 8, critical: 12, severe: 16}, false);
+      set('updatephysics', `${scenePerfMetrics.updatePhysics.toFixed(2)}ms`, updatePhysicsClass);
+      
+      const updateAnimClass = getColorClass(scenePerfMetrics.updateAnimation, {excellent: 0.5, good: 1, ok: 2, warning: 3, critical: 5, severe: 8}, false);
+      set('updateanimation', `${scenePerfMetrics.updateAnimation.toFixed(2)}ms`, updateAnimClass);
+      
+      const updateSyncClass = getColorClass(scenePerfMetrics.updateEntitySync, {excellent: 0.3, good: 0.5, ok: 1, warning: 2, critical: 3, severe: 5}, false);
+      set('updateentitysync', `${scenePerfMetrics.updateEntitySync.toFixed(2)}ms`, updateSyncClass);
+      
+      const renderTotalClass = getColorClass(scenePerfMetrics.renderTotal, {excellent: 2, good: 5, ok: 8, warning: 12, critical: 15, severe: 20}, false);
+      set('rendertotal', `${scenePerfMetrics.renderTotal.toFixed(2)}ms`, renderTotalClass);
     }
 
     // Memory
-    const memClass = metrics.memory > 500 ? 'warning' : metrics.memory > 1000 ? 'critical' : '';
+    const memClass = getColorClass(metrics.memory, {excellent: 100, good: 250, ok: 500, warning: 750, critical: 1000, severe: 1500}, false);
     set('memory', `${metrics.memory.toFixed(0)}MB`, memClass);
-    set('vbuffer', `${metrics.vertexBufferSize.toFixed(2)}MB`);
-    set('ibuffer', `${metrics.indexBufferSize.toFixed(2)}MB`);
-    set('textatlas', `${metrics.textMemory.toFixed(2)}MB`);
+    
+    const vBufferClass = getColorClass(metrics.vertexBufferSize, {excellent: 5, good: 10, ok: 20, warning: 50, critical: 100, severe: 200}, false);
+    set('vbuffer', `${metrics.vertexBufferSize.toFixed(2)}MB`, vBufferClass);
+    
+    const iBufferClass = getColorClass(metrics.indexBufferSize, {excellent: 2, good: 5, ok: 10, warning: 20, critical: 50, severe: 100}, false);
+    set('ibuffer', `${metrics.indexBufferSize.toFixed(2)}MB`, iBufferClass);
+    
+    const textAtlasClass = getColorClass(metrics.textMemory, {excellent: 2, good: 5, ok: 10, warning: 20, critical: 50, severe: 100}, false);
+    set('textatlas', `${metrics.textMemory.toFixed(2)}MB`, textAtlasClass);
+    
+    // Total VRAM
+    const totalVRAM = metrics.vertexBufferSize + metrics.indexBufferSize + metrics.textMemory;
+    const vramClass = getColorClass(totalVRAM, {excellent: 10, good: 25, ok: 50, warning: 100, critical: 200, severe: 500}, false);
+    set('totalvram', `${totalVRAM.toFixed(2)}MB`, vramClass);
     
     // New memory metrics - heap limit and GC pressure
     const memory = (performance as any).memory;
     if (memory) {
       const heapLimit = memory.jsHeapSizeLimit / (1024 * 1024);
-      const gcPressure = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
-      const gcClass = gcPressure > 90 ? 'critical' : gcPressure > 75 ? 'warning' : '';
       set('heaplimit', `${heapLimit.toFixed(0)}MB`);
+      
+      const gcPressure = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
+      const gcClass = getColorClass(gcPressure, {excellent: 40, good: 60, ok: 75, warning: 85, critical: 92, severe: 97}, false);
       set('gcpressure', `${gcPressure.toFixed(0)}%`, gcClass);
+      
+      // GC activity tracking
+      set('gcevents', this.gcEventCount.toString());
+      
+      // Heap trend analysis (over last 2 seconds)
+      if (this.heapHistory.length >= 60) {
+        const recentHeap = this.heapHistory.slice(-60);
+        const oldestHeap = recentHeap[0];
+        const newestHeap = recentHeap[recentHeap.length - 1];
+        const heapChange = (newestHeap - oldestHeap) / (1024 * 1024); // MB
+        
+        let trendText = '';
+        let trendClass = '';
+        if (Math.abs(heapChange) < 5) {
+          trendText = 'Stable ✓';
+          trendClass = 'good';
+        } else if (heapChange > 0) {
+          trendText = `+${heapChange.toFixed(1)}MB ⚠`;
+          trendClass = heapChange > 20 ? 'critical' : 'warning';
+        } else {
+          trendText = `${heapChange.toFixed(1)}MB`;
+          trendClass = 'good';
+        }
+        
+        set('heaptrend', trendText, trendClass);
+      } else {
+        set('heaptrend', 'Measuring...');
+      }
     } else {
       set('heaplimit', 'N/A');
       set('gcpressure', 'N/A');
+      set('gcevents', 'N/A');
+      set('heaptrend', 'N/A');
     }
+
+    // Input Responsiveness
+    const inputLagClass = getColorClass(metrics.inputLag, {excellent: 5, good: 10, ok: 16, warning: 25, critical: 40, severe: 60}, false);
+    set('inputlag', `${metrics.inputLag.toFixed(1)}ms`, inputLagClass);
+    
+    const inputLagP95Class = getColorClass(metrics.inputLagP95, {excellent: 8, good: 15, ok: 20, warning: 30, critical: 50, severe: 80}, false);
+    set('inputlagp95', `${metrics.inputLagP95.toFixed(1)}ms`, inputLagP95Class);
+
+    // Frame Spikes
+    const minorSpikesClass = getColorClass(metrics.minorSpikes, {excellent: 0, good: 5, ok: 15, warning: 30, critical: 60, severe: 120}, false);
+    set('minorspikes', metrics.minorSpikes.toString(), minorSpikesClass);
+    
+    const majorSpikesClass = getColorClass(metrics.majorSpikes, {excellent: 0, good: 2, ok: 5, warning: 10, critical: 20, severe: 40}, false);
+    set('majorspikes', metrics.majorSpikes.toString(), majorSpikesClass);
+    
+    const severeSpikesClass = getColorClass(metrics.severeSpikes, {excellent: 0, good: 0, ok: 1, warning: 3, critical: 8, severe: 15}, false);
+    set('severespikes', metrics.severeSpikes.toString(), severeSpikesClass);
+    
+    const totalSpikesClass = getColorClass(metrics.totalSpikes, {excellent: 0, good: 5, ok: 20, warning: 40, critical: 80, severe: 150}, false);
+    set('totalspikes', metrics.totalSpikes.toString(), totalSpikesClass);
+
+    // Assets
+    set('assetsloaded', metrics.assetsLoaded.toString());
+    
+    const assetsFailedClass = metrics.assetsFailed > 0 ? 'critical' : 'good';
+    set('assetsfailed', metrics.assetsFailed.toString(), assetsFailedClass);
+    
+    const cacheHitPct = metrics.cacheHitRate * 100;
+    const cacheHitClass = getColorClass(cacheHitPct, {excellent: 90, good: 75, ok: 50, warning: 30, critical: 15, severe: 5}, true);
+    set('cachehitrate', `${cacheHitPct.toFixed(0)}%`, cacheHitClass);
+    
+    const avgLoadTimeClass = getColorClass(metrics.avgLoadTime, {excellent: 10, good: 30, ok: 50, warning: 100, critical: 250, severe: 500}, false);
+    set('avgloadtime', `${metrics.avgLoadTime.toFixed(1)}ms`, avgLoadTimeClass);
+
+    // GPU Utilization
+    const gpuUtilPct = metrics.gpuUtilization * 100;
+    const gpuUtilClass = getColorClass(gpuUtilPct, {excellent: 50, good: 70, ok: 85, warning: 92, critical: 97, severe: 99}, false);
+    set('gpuutilization', `${gpuUtilPct.toFixed(0)}%`, gpuUtilClass);
+    
+    set('gpubottleneck', metrics.gpuBottleneck ? 'Yes' : 'No', metrics.gpuBottleneck ? 'warning' : 'good');
+
+    // Diagnostics
+    const longTasksClass = getColorClass(metrics.longTaskCount || 0, {excellent: 0, good: 2, ok: 5, warning: 10, critical: 20, severe: 40}, false);
+    set('longtasks', (metrics.longTaskCount || 0).toString(), longTasksClass);
+    
+    const longestTaskClass = getColorClass(metrics.longestTask || 0, {excellent: 17, good: 20, ok: 30, warning: 50, critical: 80, severe: 120}, false);
+    set('longesttask', `${(metrics.longestTask || 0).toFixed(1)}ms`, longestTaskClass);
+    
+    const domElementsClass = getColorClass(metrics.domElementCount || 0, {excellent: 100, good: 500, ok: 1000, warning: 2500, critical: 5000, severe: 10000}, false);
+    set('domelements', (metrics.domElementCount || 0).toString(), domElementsClass);
+    
+    const domGrowthClass = getColorClass(metrics.domGrowthRate || 0, {excellent: 0, good: 1, ok: 5, warning: 10, critical: 25, severe: 50}, false);
+    set('domgrowth', `${(metrics.domGrowthRate || 0).toFixed(1)}/s`, domGrowthClass);
 
   }
 
@@ -915,18 +1366,54 @@ export class PerformanceMonitor extends UIPanel {
       
       // Memory details
       memoryDetailed: memory ? {
-        jsHeapSize: memory.usedJSHeapSize,
-        jsHeapSizeLimit: memory.jsHeapSizeLimit,
-        totalJSHeapSize: memory.totalJSHeapSize,
-        gcPressure: (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100,
-        heapUsageMB: memory.usedJSHeapSize / (1024 * 1024),
-        heapLimitMB: memory.jsHeapSizeLimit / (1024 * 1024)
-      } : null,
+        jsHeap: {
+          used: memory.usedJSHeapSize,
+          total: memory.totalJSHeapSize,
+          limit: memory.jsHeapSizeLimit,
+          usedMB: memory.usedJSHeapSize / (1024 * 1024),
+          limitMB: memory.jsHeapSizeLimit / (1024 * 1024),
+          gcPressure: (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100,
+          gcActivity: {
+            totalEvents: this.gcEventCount,
+            lastGCTime: this.lastGCTime,
+            heapGrowthBytes: this.heapGrowth,
+            heapGrowthMB: this.heapGrowth / (1024 * 1024),
+            isStable: this.heapHistory.length >= 60 && 
+                     Math.abs((this.heapHistory[this.heapHistory.length - 1] - this.heapHistory[Math.max(0, this.heapHistory.length - 60)]) / (1024 * 1024)) < 5,
+            heapTrend: this.heapHistory.length >= 60 ? {
+              samples: this.heapHistory.length,
+              oldestMB: this.heapHistory[0] / (1024 * 1024),
+              newestMB: this.heapHistory[this.heapHistory.length - 1] / (1024 * 1024),
+              changeMB: (this.heapHistory[this.heapHistory.length - 1] - this.heapHistory[0]) / (1024 * 1024),
+              minMB: Math.min(...this.heapHistory) / (1024 * 1024),
+              maxMB: Math.max(...this.heapHistory) / (1024 * 1024),
+              avgMB: (this.heapHistory.reduce((a, b) => a + b, 0) / this.heapHistory.length) / (1024 * 1024)
+            } : null
+          },
+          note: 'Includes V8 engine, page code, Vectorium lib, DevTools, DOM, all JS objects'
+        },
+        gpuMemory: {
+          vertexBuffer: metrics.vertexBufferSize,
+          indexBuffer: metrics.indexBufferSize,
+          textAtlas: metrics.textMemory,
+          totalVRAM: metrics.vertexBufferSize + metrics.indexBufferSize + metrics.textMemory,
+          note: 'GPU buffers and textures (separate from JS heap)'
+        }
+      } : {
+        jsHeap: null,
+        gpuMemory: {
+          vertexBuffer: metrics.vertexBufferSize,
+          indexBuffer: metrics.indexBufferSize,
+          textAtlas: metrics.textMemory,
+          totalVRAM: metrics.vertexBufferSize + metrics.indexBufferSize + metrics.textMemory,
+          note: 'GPU buffers and textures (separate from JS heap)'
+        }
+      },
       
       // Physics extended
       physicsDetailed: physicsMetrics ? {
         sleepingEntities: physicsMetrics.sleepingEntities || 0,
-        awakeEntities: (world?.getActiveEntityCount() || 0) - (physicsMetrics.sleepingEntities || 0),
+        awakeEntities: (world?.getActiveCount() || 0) - (physicsMetrics.sleepingEntities || 0),
         activeCollisionPairs: physicsMetrics.activeCollisionPairs || 0,
         spatialHashEfficiency: metrics.spatialHashCells > 0 ? 
           metrics.spatialHashMaxBucket / metrics.spatialHashCells : 0
@@ -934,11 +1421,10 @@ export class PerformanceMonitor extends UIPanel {
       
       // World/Scene stats
       worldStats: world ? {
-        totalEntities: world.getActiveEntityCount(),
+        totalEntities: world.getTotalCount(),
+        activeEntities: world.getActiveCount(),
         shapeEntities: world.getShapeEntityCount(),
-        textEntities: world.getTextEntityCount(),
-        collisionEnabled: world.getCollisionEntityCount?.() || 0,
-        gravityEnabled: world.getGravityEntityCount?.() || 0
+        textEntities: world.getTextEntityCount()
       } : null,
       
       // Scene performance
@@ -950,7 +1436,20 @@ export class PerformanceMonitor extends UIPanel {
         renderTotal: scene.perfMetrics.renderTotal,
         renderBatch: scene.perfMetrics.renderBatch,
         renderCustom: scene.perfMetrics.renderCustom
-      } : null
+      } : null,
+      
+      // Collector metrics
+      inputMetrics: this.inputCollector.collect(),
+      spikeMetrics: this.spikeCollector.collect(),
+      assetMetrics: this.assetCollector.collect(),
+      gpuMetrics: this.gpuCollector.collect(),
+      networkMetrics: this.networkCollector.collect(),
+      textureMetrics: this.textureCollector.collect(),
+      diagnostics: {
+        eventListeners: this.listenerCollector.collect(),
+        longTasks: this.longTaskCollector.collect(),
+        shaderCompiles: this.shaderCollector.collect()
+      }
     };
     
     const exportData = {
@@ -1003,10 +1502,31 @@ export class PerformanceMonitor extends UIPanel {
     // Clear history for clean measurement
     this.frameTimeHistory = [];
     
+    // Reset collectors
+    this.inputCollector.reset();
+    this.spikeCollector.reset();
+    this.assetCollector.reset();
+    this.gpuCollector.reset();
+    this.networkCollector.reset();
+    this.textureCollector.reset();
+    this.listenerCollector.reset();
+    this.longTaskCollector.reset();
+    this.shaderCollector.reset();
+    
+    // Reset GC tracking for this measurement
+    const startGCEvents = this.gcEventCount;
+    const memory = (performance as any).memory;
+    const startHeap = memory ? memory.usedJSHeapSize : 0;
+    
     return new Promise((resolve) => {
       setTimeout(() => {
         const metrics = this.getMetrics();
         metrics.timestamp = Date.now();
+        
+        // Calculate GC activity during measurement
+        const gcEventsDuring = this.gcEventCount - startGCEvents;
+        const endHeap = memory ? memory.usedJSHeapSize : 0;
+        const heapChangeMB = (endHeap - startHeap) / (1024 * 1024);
         
         console.log(`📊 Measurement complete:`);
         console.log(`   FPS: ${metrics.fps.toFixed(1)} (avg: ${this.getAverageFPS().toFixed(1)})`);
@@ -1018,17 +1538,28 @@ export class PerformanceMonitor extends UIPanel {
         console.log(`   Bottleneck: ${metrics.bottleneck.toUpperCase()}`);
         console.log(`   Quality Score: ${metrics.performanceScore.toFixed(0)}/100`);
         
-        // Additional detailed metrics
-        const memory = (performance as any).memory;
+        // Memory analysis
         if (memory) {
           const gcPressure = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
           console.log(`   GC Pressure: ${gcPressure.toFixed(0)}% (${(memory.usedJSHeapSize/(1024*1024)).toFixed(0)}MB / ${(memory.jsHeapSizeLimit/(1024*1024)).toFixed(0)}MB)`);
+          console.log(`   GC Events: ${gcEventsDuring} during measurement`);
+          console.log(`   Heap Change: ${heapChangeMB >= 0 ? '+' : ''}${heapChangeMB.toFixed(1)}MB`);
+          
+          // Memory leak warning
+          if (heapChangeMB > 20) {
+            console.warn(`   ⚠️ Heap grew by ${heapChangeMB.toFixed(1)}MB - possible memory leak!`);
+          } else if (Math.abs(heapChangeMB) < 5) {
+            console.log(`   ✓ Heap stable (${heapChangeMB >= 0 ? '+' : ''}${heapChangeMB.toFixed(1)}MB)`);
+          }
         }
         
-        // Auto-export
+        // Auto-export with measurement metadata
         const jsonData = this.exportMetrics({
           measurementDuration: durationMs,
-          sampleCount: this.frameTimeHistory.length
+          sampleCount: this.frameTimeHistory.length,
+          gcEventsDuringMeasurement: gcEventsDuring,
+          heapChangeKB: heapChangeMB,
+          heapStable: Math.abs(heapChangeMB) < 5
         });
         
         const result = { metrics, jsonData };

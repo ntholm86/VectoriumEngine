@@ -110,6 +110,7 @@ export class Vectorium {
     
     // Connect performance monitor to renderer for detailed metrics
     this.renderer.setPerformanceMonitor(this.performanceMonitor);
+    this.performanceMonitor.setRenderer(this.renderer);
     
     // Initialize buffer pool
     this.bufferPool = new BufferPool();
@@ -395,6 +396,9 @@ export class Vectorium {
     // Record metrics from rendering
     this.performanceMonitor.recordWebGLDrawCalls(this.renderer.getDrawCallCount());
     // Text rendering now unified through WebGLBatchRenderer (included in draw call count above)
+    
+    // Record text memory usage
+    this.performanceMonitor.recordTextMemory(this.textRenderer.getMemoryUsage());
     
     // Record physics metrics
     if (this.currentScene) {
