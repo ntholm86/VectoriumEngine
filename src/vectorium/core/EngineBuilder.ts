@@ -21,7 +21,7 @@ export class VectoriumBuilder {
   private scenes: Map<string, Scene> = new Map();
   private initialSceneName?: string;
   private shouldExposeGlobals: boolean = false;
-  private enableWasm: boolean = true;  // 🚀 WASM enabled by default
+  // WASM enabled by default (no config needed)
 
   /**
    * Set the canvas element (required)
@@ -137,8 +137,8 @@ export class VectoriumBuilder {
    * Enable WASM physics acceleration (enabled by default)
    * 🚀 Provides 5-10x performance improvement for physics calculations
    */
-  withWasm(enabled: boolean = true): this {
-    this.enableWasm = enabled;
+  withWasm(_enabled: boolean = true): this {
+    // WASM always enabled
     return this;
   }
 

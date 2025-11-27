@@ -78,6 +78,14 @@ export class InputManager {
   private clickCallbacks = new Array<((entity: EntityId, pointer: PointerState) => void) | null>(this.MAX_CALLBACKS);
   private hoverCallbacks = new Array<((entity: EntityId, pointer: PointerState) => void) | null>(this.MAX_CALLBACKS);
   
+  // 🚀 OPT-IN PICKING: Only pick entities when callbacks are registered
+  private hasClickCallbacks = false;
+  private hasHoverCallbacks = false;
+  private lastPickedEntity: EntityId | null = null; // Cache last picked entity
+  private lastPickX = 0;
+  private lastPickY = 0;
+  private pickCacheValid = false;
+  
   // 🚀 KEY CALLBACKS: Pre-allocated arrays (max 10 callbacks per key)
   private readonly MAX_KEY_CALLBACKS = 10;
   private keyCallbacksA = new Array<(() => void) | null>(64 * this.MAX_KEY_CALLBACKS); // 64 keys × 10 callbacks
@@ -144,10 +152,13 @@ export class InputManager {
   }
 
   /**
-   * 🚀 OPTIMIZED: Mouse move handler
+   * 🚀 OPTIMIZED: Mouse move handler (opt-in picking)
    */
   private onPointerMove = (e: MouseEvent): void => {
     this.updatePointer(e.clientX, e.clientY);
+    
+    // Invalidate pick cache on movement
+    this.pickCacheValid = false;
     
     // Update drag if active (branchless with null check)
     if (this.dragEntity !== null) {
@@ -156,18 +167,32 @@ export class InputManager {
       posX[this.dragEntity] = this.pointer.worldX - this.dragOffsetX;
       posY[this.dragEntity] = this.pointer.worldY - this.dragOffsetY;
     }
+    
+    // 🚀 OPT-IN: Only fire hover callbacks if any are registered
+    if (this.hasHoverCallbacks) {
+      const entity = this.pickEntityCached(this.pointer.worldX, this.pointer.worldY);
+      if (entity !== null && entity < this.MAX_CALLBACKS) {
+        const callback = this.hoverCallbacks[entity];
+        if (callback) {
+          callback(entity, this.pointer);
+        }
+      }
+    }
   };
 
   /**
-   * 🚀 OPTIMIZED: Mouse down handler
+   * 🚀 OPTIMIZED: Mouse down handler (opt-in picking)
    */
   private onPointerDown = (e: MouseEvent): void => {
     this.pointer.isDown = true;
     this.pointer.button = e.button;
     this.updatePointer(e.clientX, e.clientY);
     
-    // Pick entity at click position
-    const entity = this.pickEntity(this.pointer.worldX, this.pointer.worldY);
+    // 🚀 OPT-IN: Only pick entities if click callbacks are registered
+    if (!this.hasClickCallbacks) return;
+    
+    // Pick entity at click position (uses cache if available)
+    const entity = this.pickEntityCached(this.pointer.worldX, this.pointer.worldY);
     
     if (entity !== null && entity < this.MAX_CALLBACKS) {
       // Fire click callback (pre-allocated array, no Map lookup)
@@ -358,6 +383,29 @@ export class InputManager {
   }
 
   /**
+   * 🚀 OPTIMIZED: Pick entity with caching (avoid repeated spatial hash queries)
+   */
+  private pickEntityCached(worldX: number, worldY: number): EntityId | null {
+    // Check cache validity (within 1 pixel tolerance)
+    if (this.pickCacheValid && 
+        Math.abs(worldX - this.lastPickX) < 1 &&
+        Math.abs(worldY - this.lastPickY) < 1) {
+      return this.lastPickedEntity;
+    }
+    
+    // Cache miss - do the pick
+    const entity = this.pickEntity(worldX, worldY);
+    
+    // Update cache
+    this.lastPickedEntity = entity;
+    this.lastPickX = worldX;
+    this.lastPickY = worldY;
+    this.pickCacheValid = true;
+    
+    return entity;
+  }
+  
+  /**
    * 🚀 OPTIMIZED: Pick entity using spatial hash (direct query, no overhead)
    */
   pickEntity(worldX: number, worldY: number): EntityId | null {
@@ -398,27 +446,29 @@ export class InputManager {
    */
   onClick(entity: EntityId, callback: (entity: EntityId, pointer: PointerState) => void): void {
     if (entity >= this.MAX_CALLBACKS) {
-      console.warn(`Entity ID ${entity} exceeds max callbacks (${this.MAX_CALLBACKS})`);
+      console.warn(`Entity ${entity} exceeds max callbacks (${this.MAX_CALLBACKS})`);
       return;
     }
     
     this.clickCallbacks[entity] = callback;
+    this.hasClickCallbacks = true; // Enable opt-in picking
     
     // Mark entity as interactive (bit 5)
     const flags = this.world.getFlags();
     flags[entity] |= (1 << 5);
   }
-
+  
   /**
    * 🚀 OPTIMIZED: Register hover callback (pre-allocated array, no Map)
    */
   onHover(entity: EntityId, callback: (entity: EntityId, pointer: PointerState) => void): void {
     if (entity >= this.MAX_CALLBACKS) {
-      console.warn(`Entity ID ${entity} exceeds max callbacks (${this.MAX_CALLBACKS})`);
+      console.warn(`Entity ${entity} exceeds max callbacks (${this.MAX_CALLBACKS})`);
       return;
     }
     
     this.hoverCallbacks[entity] = callback;
+    this.hasHoverCallbacks = true; // Enable opt-in picking
     
     // Mark entity as interactive (bit 5)
     const flags = this.world.getFlags();

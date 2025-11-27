@@ -524,8 +524,10 @@ void main() {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
     
     // Disable texture by default
-    const hasTextureLoc = gl.getUniformLocation(this.program, 'u_hasTexture');
-    gl.uniform1i(hasTextureLoc, 0);
+    if (this.program) {
+      const hasTextureLoc = gl.getUniformLocation(this.program, 'u_hasTexture');
+      gl.uniform1i(hasTextureLoc, 0);
+    }
     
     this.vertexCount = 0;
     this.drawCallCount = 0;

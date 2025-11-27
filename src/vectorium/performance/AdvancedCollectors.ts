@@ -5,6 +5,9 @@
 
 import { MetricsCollector } from './MetricsCollector';
 
+// Type declaration for FinalizationRegistry (ES2021)
+declare var FinalizationRegistry: any;
+
 // =============================================================================
 // GPU TIMING & QUERIES (WebGL2)
 // =============================================================================
@@ -250,7 +253,7 @@ export class AllocationTracker extends MetricsCollector {
   private allocationCounts: Map<string, number> = new Map();
   private allocationSizes: Map<string, number> = new Map();
   private leakCandidates: Map<string, number> = new Map();
-  private registry: FinalizationRegistry<string>;
+  private registry: any; // FinalizationRegistry
   
   constructor() {
     super();
@@ -289,9 +292,6 @@ export class AllocationTracker extends MetricsCollector {
     if (!this.enabled) return;
     
     // Objects alive for > 30 seconds might be leaks
-    const now = Date.now();
-    const threshold = 30000;
-    
     this.leakCandidates.clear();
     
     this.allocationCounts.forEach((count, type) => {
@@ -385,7 +385,6 @@ export class FunctionProfiler extends MetricsCollector {
   private totalTimes: Map<string, number> = new Map();
   private selfTimes: Map<string, number> = new Map();
   private activeCalls: Map<string, number> = new Map();
-  private maxSamples = 1000;
   
   startFunction(name: string): void {
     if (!this.enabled) return;
@@ -459,7 +458,6 @@ export class PlatformMetricsCollector extends MetricsCollector {
   private thermalState: string = 'unknown';
   private vsyncMisses = 0;
   private displayRefreshRate = 60;
-  private lastFrameTime = 0;
   
   async initBatteryAPI(): Promise<void> {
     if ('getBattery' in navigator) {
@@ -489,8 +487,6 @@ export class PlatformMetricsCollector extends MetricsCollector {
     if (frameTime > expectedFrameTime * 1.5) {
       this.vsyncMisses++;
     }
-    
-    this.lastFrameTime = frameTime;
   }
   
   setDisplayRefreshRate(hz: number): void {

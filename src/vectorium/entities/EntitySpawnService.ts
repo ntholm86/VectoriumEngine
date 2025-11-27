@@ -1,7 +1,9 @@
 /**
  * 🚀 ULTRA-OPTIMIZED Entity Spawn Service
+ * Zero allocation, batch processing, WASM-friendly
  * 
  * PERFORMANCE ENHANCEMENTS:
+ * ✅ Removed ServiceAwareBase (direct dependency injection)
  * ✅ Zero allocation spawning (pre-allocated buffers)
  * ✅ Batch physics configuration (SIMD-friendly)
  * ✅ Direct ECS array manipulation (no factory overhead)
@@ -23,9 +25,10 @@
  */
 
 import { Scene } from '../core/Engine';
-import { EntityId } from '../core/World';
-import { ServiceAwareBase } from '../core/ServiceAwareBase';
+import { EntityId, World } from '../core/World';
 import { ShapeType } from '../shapes/ShapeType';
+import { AnimationManager } from '../animation/AnimationManager';
+import { TextPool } from '../core/TextPool';
 
 // Type aliases for cleaner API
 export type PhysicsMode = 'none' | 'gravity' | 'collision' | 'full';
@@ -73,9 +76,14 @@ export interface SpawnConfig {
 
 /**
  * 🚀 ULTRA-OPTIMIZED Entity Spawn Service
- * Zero allocation, batch processing, WASM-friendly
+ * Direct dependency injection, zero allocation, batch processing
  */
-export class EntitySpawnService extends ServiceAwareBase {
+export class EntitySpawnService {
+  // 🚀 Direct references (no ServiceAwareBase overhead)
+  private world: World;
+  private textPool: TextPool;
+  private animationManager: AnimationManager;
+  
   // 🎨 Pre-calculated color palette (RGB bytes, no conversion needed)
   private readonly colorPalette: Uint8Array;
   private readonly colorCount = 7;
@@ -117,9 +125,16 @@ export class EntitySpawnService extends ServiceAwareBase {
   private readonly sinTable: Float32Array;
   private readonly cosTable: Float32Array;
   
-  constructor(private scene: Scene) {
-    super();
-    this.services = (scene as any).services;
+  constructor(
+    private scene: Scene,
+    world: World,
+    textPool: TextPool,
+    animationManager: AnimationManager
+  ) {
+    // 🚀 Direct assignment (no ServiceAwareBase)
+    this.world = world;
+    this.textPool = textPool;
+    this.animationManager = animationManager;
     
     // 🎨 Pre-calculate rainbow color palette (no runtime conversion)
     this.colorPalette = new Uint8Array(this.colorCount * 3);

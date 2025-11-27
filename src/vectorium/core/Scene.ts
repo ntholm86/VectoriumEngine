@@ -96,22 +96,51 @@ export class Scene {
    * - Early exits for empty systems
    * - Single camera.update() call
    * - Zero allocations
+   * - UNIFIED WASM CALL: Physics + Animations + Culling in one transaction
    */
   update(dt: number): void {
     const startTime = performance.now();
     
-    // Phase 1: WASM Physics (with island sleeping)
+    // Phase 1: Camera update (smooth movement, shake, bounds)
+    // Must happen BEFORE unified update so camera position is fresh
+    this.camera.update(dt);
+    
+    // Phase 2: UNIFIED WASM UPDATE (Physics + Animations + Culling)
+    // 🚀 PERFORMANCE: Single JS↔WASM transition instead of 3 separate calls
+    // Returns packed result: (visibleCount << 16) | collisionCount
     const physicsStart = performance.now();
-    this.world.updatePhysics(dt, this.viewport.worldWidth, this.viewport.worldHeight);
+    
+    // Calculate culling bounds from viewport
+    const worldWidth = this.viewport.worldWidth;
+    const worldHeight = this.viewport.worldHeight;
+    const cullingMargin = 50; // Extra margin for smoother culling
+    
+    const result = this.world.updateFrame(
+      dt,
+      this.viewport.worldWidth,
+      this.viewport.worldHeight,
+      this.camera.x,
+      this.camera.y,
+      worldWidth,
+      worldHeight,
+      cullingMargin,
+      this.visibleIndices
+    );
     this.perfMetrics.updatePhysics = performance.now() - physicsStart;
     
-    // Phase 2: Animations (rotation, pulse, etc.)
-    const animStart = performance.now();
-    this.world.updateAnimations(dt);
-    this.perfMetrics.updateAnimation = performance.now() - animStart;
+    // Unpack result
+    this.visibleCount = (result >> 16) & 0xFFFF;
+    // Note: collisionCount (lower 16 bits) available if needed for metrics
     
-    // Phase 3: Camera update (smooth movement, shake, bounds)
-    this.camera.update(dt);
+    // Update culling metrics
+    this.culledCount = this.world.getActiveCount() - this.visibleCount;
+    
+    // Phase 3: Frame animations & tweens (if AnimationSystem is available)
+    const animStart = performance.now();
+    if ((this as any).animationSystem) {
+      (this as any).animationSystem.update(dt);
+    }
+    this.perfMetrics.updateAnimation = performance.now() - animStart;
     
     // Update metrics
     this.perfMetrics.updateEntitySync = 0;

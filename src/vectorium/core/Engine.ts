@@ -182,8 +182,8 @@ export class Vectorium {
       if (cam) {
         cam.setZoom(camera.zoom);
         cam.setZoomRange(camera.minZoom, camera.maxZoom);
-        cam.setSmooth(camera.smooth, camera.smoothFactor);
-        cam.setFollowSettings(camera.followLerp, camera.followDeadzoneX, camera.followDeadzoneY);
+        // Note: setSmooth and setFollowSettings removed in optimized Camera
+        // Update position manually or use tweens for smooth movement
         cam.setCullingMargin(camera.cullingMargin);
       }
     });
@@ -249,27 +249,20 @@ export class Vectorium {
     // 🚀 Phase 1: Create and set AnimationSystem for this scene
     const animSystem = new AnimationSystem(this.currentScene.world, this.animationManager);
     
-    // 🚀 Inject all services into scene BEFORE load() so they're available
-    this.currentScene['services'].initialize({
-      world: this.currentScene.world,
-      camera: this.currentScene.getCamera(),
-      renderer: this.renderer,
-      textRenderer: this.textRenderer,
-      canvas: this.canvas,
-      textPool: this.textPool,
-      animationManager: this.animationManager,
-      animationSystem: animSystem,
-      inputManager: this.inputManager,
-      textureManager: this.textureManager,
-      runtimeConfig: this.runtimeConfig
-    });
+    // 🚀 Store AnimationSystem reference (optimized Scene no longer uses services container)
+    (this.currentScene as any).animationSystem = animSystem;
     
-    // 🚀 Now call scene.load() - services are ready!
+    // 🚀 Now call scene.load()
     await this.currentScene.load();
     
     // 🚀 Always instantiate EntitySpawnService (core service)
     import('../entities/EntitySpawnService').then(({ EntitySpawnService }) => {
-      (this.currentScene as any).spawnService = new EntitySpawnService(this.currentScene!);
+      (this.currentScene as any).spawnService = new EntitySpawnService(
+        this.currentScene!,
+        this.currentScene!.world,
+        this.textPool,
+        this.animationManager
+      );
       console.log('✅ EntitySpawnService auto-configured');
       
       // Auto-wire with EntitySpawner UI if it's registered
@@ -592,24 +585,11 @@ export class Vectorium {
 
   /**
    * Setup automatic click-to-spawn behavior
-   * Wires up camera shake and spawner automatically
    */
-  enableClickToSpawn(options?: {
-    shakeThresholds?: { min: number; intensity: number; duration: number }[];
-  }): void {
-    const defaultShake = [
-      { min: 100000, intensity: 20, duration: 500 },
-      { min: 10000, intensity: 10, duration: 300 }
-    ];
-    
+  enableClickToSpawn(): void {
     this.onClick((x, y) => {
       const spawner = this.getEntitySpawner();
       if (!spawner) return;
-      
-      const config = spawner.getSpawnConfig();
-      
-      // Conditional shake based on spawn count
-      this.getCamera()?.shakeIf(config.count, options?.shakeThresholds ?? defaultShake);
       
       // Trigger spawn (EntitySpawnService is auto-registered)
       spawner.triggerSpawn(x, y);

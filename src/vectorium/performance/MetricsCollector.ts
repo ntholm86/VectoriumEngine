@@ -165,7 +165,7 @@ export class GPUMetricsCollector extends MetricsCollector {
   private gpuDrawTimes: number[] = [];
   private maxSamples = 120;
   
-  recordFrame(frameTime: number, gpuDrawTime: number = 0): void {
+  recordFrame(_frameTime: number, gpuDrawTime: number = 0): void {
     if (!this.enabled) return;
     
     this.gpuDrawTimes.push(gpuDrawTime);

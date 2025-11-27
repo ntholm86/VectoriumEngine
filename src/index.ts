@@ -21,7 +21,7 @@ export type { EngineConfig, BrowserCapabilities } from './vectorium/core/Feature
 
 // Rendering
 export { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';
-export type { Sprite } from './vectorium/rendering/WebGLBatchRenderer';
+// Sprite type removed (not implemented)
 
 export { TextRenderer } from './vectorium/rendering/TextRenderer';
 export type { TextStyle } from './vectorium/rendering/TextRenderer';

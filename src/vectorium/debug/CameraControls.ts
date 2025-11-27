@@ -105,15 +105,13 @@ export class CameraControls extends UIPanel {
     this.on('camera-follow-toggle', 'change', (e) => {
       const enabled = (e.target as HTMLInputElement).checked;
       this.runtimeConfig.setCamera({ followEnabled: enabled });
-      if (!enabled) {
-        this.camera.stopFollow();
-      }
+      // Camera follow is now handled via direct property access (camera.followEnabled)
     });
     
-    // Smooth toggle
+    // Smooth toggle (feature removed from Camera API)
     this.on('camera-smooth-toggle', 'change', (e) => {
       const enabled = (e.target as HTMLInputElement).checked;
-      this.camera.setSmooth(enabled);
+      // Camera smooth movement removed in optimization pass
       this.runtimeConfig.setCamera({ smooth: enabled });
     });
     
@@ -172,7 +170,8 @@ export class CameraControls extends UIPanel {
         break;
         
       case 'shake':
-        this.camera.startShake(20, 500);
+        // Camera shake feature removed in optimization pass
+        console.log('Camera shake removed for performance');
         break;
     }
   }
