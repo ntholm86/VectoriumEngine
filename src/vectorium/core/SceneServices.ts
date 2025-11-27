@@ -15,8 +15,6 @@ import type { AnimationManager } from '../animation/AnimationManager';
 import type { AnimationSystem } from '../animation/AnimationSystem';
 import type { InputManager } from '../input/InputManager';
 import type { TextureManager } from '../rendering/TextureManager';
-import type { AssetLoader } from '../assets/AssetLoader';
-import type { LoadingManager } from '../assets/LoadingManager';
 import type { RuntimeConfig } from './RuntimeConfig';
 import type { World } from './World';
 import type { Camera } from './Camera';
@@ -41,8 +39,6 @@ export interface SceneServices {
   readonly animationSystem: AnimationSystem;
   readonly inputManager: InputManager;
   readonly textureManager: TextureManager;
-  readonly assetLoader: AssetLoader;
-  readonly loadingManager: LoadingManager;
   readonly runtimeConfig: RuntimeConfig;
 }
 
@@ -64,8 +60,6 @@ export class SceneServicesContainer implements SceneServices {
   private _animationSystem: AnimationSystem | null = null;
   private _inputManager: InputManager | null = null;
   private _textureManager: TextureManager | null = null;
-  private _assetLoader: AssetLoader | null = null;
-  private _loadingManager: LoadingManager | null = null;
   private _runtimeConfig: RuntimeConfig | null = null;
   
   get world(): World {
@@ -118,16 +112,6 @@ export class SceneServicesContainer implements SceneServices {
     return this._textureManager;
   }
   
-  get assetLoader(): AssetLoader {
-    if (!this._assetLoader) throw new Error('AssetLoader not initialized');
-    return this._assetLoader;
-  }
-  
-  get loadingManager(): LoadingManager {
-    if (!this._loadingManager) throw new Error('LoadingManager not initialized');
-    return this._loadingManager;
-  }
-  
   get runtimeConfig(): RuntimeConfig {
     if (!this._runtimeConfig) throw new Error('RuntimeConfig not initialized');
     return this._runtimeConfig;
@@ -148,8 +132,6 @@ export class SceneServicesContainer implements SceneServices {
     animationSystem: AnimationSystem;
     inputManager: InputManager;
     textureManager: TextureManager;
-    assetLoader: AssetLoader;
-    loadingManager: LoadingManager;
     runtimeConfig: RuntimeConfig;
   }): void {
     this._world = services.world;
@@ -162,8 +144,6 @@ export class SceneServicesContainer implements SceneServices {
     this._animationSystem = services.animationSystem;
     this._inputManager = services.inputManager;
     this._textureManager = services.textureManager;
-    this._assetLoader = services.assetLoader;
-    this._loadingManager = services.loadingManager;
     this._runtimeConfig = services.runtimeConfig;
   }
   
@@ -181,8 +161,6 @@ export class SceneServicesContainer implements SceneServices {
            this._animationSystem !== null &&
            this._inputManager !== null &&
            this._textureManager !== null &&
-           this._assetLoader !== null &&
-           this._loadingManager !== null &&
            this._runtimeConfig !== null;
   }
 }

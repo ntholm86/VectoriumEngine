@@ -22,8 +22,6 @@ import { DebugToolRegistry } from '../debug/DebugToolRegistry';
 import { TextureManager } from '../rendering/TextureManager';
 import { AnimationManager } from '../animation/AnimationManager';
 import { AnimationSystem } from '../animation/AnimationSystem';
-import { AssetLoader } from '../assets/AssetLoader';
-import { LoadingManager } from '../assets/LoadingManager';
 import { InputManager } from '../input/InputManager';
 
 // Re-export for convenience
@@ -45,8 +43,6 @@ export class Vectorium {
   readonly runtimeConfig: RuntimeConfig;
   readonly textureManager: TextureManager;
   readonly animationManager: AnimationManager;
-  readonly loadingManager: LoadingManager;
-  readonly assetLoader: AssetLoader;
   private inputManager: InputManager | null = null;  // Created when scene loads
   readonly panelManager: UIPanelManager;
   readonly debugRegistry: DebugToolRegistry;
@@ -118,8 +114,6 @@ export class Vectorium {
     // 🚀 Phase 1: Initialize new systems
     this.textureManager = new TextureManager(this.renderer.getContext() as WebGL2RenderingContext);
     this.animationManager = new AnimationManager();
-    this.loadingManager = new LoadingManager();
-    this.assetLoader = new AssetLoader(this.textureManager, this.loadingManager);
     
     // 🚀 Initialize UI panel manager
     this.panelManager = new UIPanelManager({ enableConsoleAPI: true });
@@ -267,8 +261,6 @@ export class Vectorium {
       animationSystem: animSystem,
       inputManager: this.inputManager,
       textureManager: this.textureManager,
-      assetLoader: this.assetLoader,
-      loadingManager: this.loadingManager,
       runtimeConfig: this.runtimeConfig
     });
     
@@ -568,20 +560,6 @@ export class Vectorium {
    */
   getAnimationManager(): AnimationManager {
     return this.animationManager;
-  }
-  
-  /**
-   * Get the loading manager
-   */
-  getLoadingManager(): LoadingManager {
-    return this.loadingManager;
-  }
-  
-  /**
-   * Get the asset loader
-   */
-  getAssetLoader(): AssetLoader {
-    return this.assetLoader;
   }
   
   /**
