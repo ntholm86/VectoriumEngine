@@ -217,7 +217,7 @@ export function createCollisionEntity(
   const id = createBouncingEntity(world, x, y, options);
   
   // Enable collisions
-  world.setCollisionEnabled(id, true);
+  world.setCollisionsEnabled(id, true);
   
   return id;
 }
@@ -236,7 +236,7 @@ export function createCollisionBurst(
   
   // Enable collisions for all
   for (const id of entities) {
-    world.setCollisionEnabled(id, true);
+    world.setCollisionsEnabled(id, true);
   }
   
   return entities;
@@ -256,7 +256,7 @@ export function createFullPhysicsEntity(
   
   // Enable both gravity and collisions
   world.setGravityEnabled(id, true);
-  world.setCollisionEnabled(id, true);
+  world.setCollisionsEnabled(id, true);
   
   return id;
 }
@@ -276,7 +276,7 @@ export function createFullPhysicsBurst(
   // Enable gravity and collisions for all
   for (const id of entities) {
     world.setGravityEnabled(id, true);
-    world.setCollisionEnabled(id, true);
+    world.setCollisionsEnabled(id, true);
   }
   
   return entities;

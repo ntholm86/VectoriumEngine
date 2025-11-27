@@ -892,6 +892,12 @@ void main() {
   ): void {
     const HALF = 0.5;  // Hoist constant
     
+    // 🚀 OPTIMIZATION: Pre-calculate camera transform constants
+    const viewportCenterX = this.gl.canvas.width * 0.5;
+    const viewportCenterY = this.gl.canvas.height * 0.5;
+    const negCameraX = -cameraX;
+    const negCameraY = -cameraY;
+    
     for (let start = 0; start < count; start += this.maxBatchSize) {
       const end = Math.min(start + this.maxBatchSize, count);
       let visibleCount = 0;  // Track actual visible entities
@@ -908,7 +914,7 @@ void main() {
         const cos = this.cosCache[rotDeg];
         const sin = this.sinCache[rotDeg];
         
-        // Color bytes
+        // Color bytes (convert alpha once)
         const rByte = colorR[i];
         const gByte = colorG[i];
         const bByte = colorB[i];
@@ -919,10 +925,11 @@ void main() {
         const baseByteOffset = (this.vertexCount + visibleCount * 4) * 20;
         visibleCount++;
         
-        // Apply camera transformation: camera is CENTER of viewport
-        // (world - camera) * zoom + viewport_center
-        const screenX = (x - cameraX) * cameraZoom + this.gl.canvas.width / 2;
-        const screenY = (y - cameraY) * cameraZoom + this.gl.canvas.height / 2;
+        // 🚀 OPTIMIZED: Apply camera transformation with pre-calculated constants
+        const worldX = x + negCameraX;
+        const worldY = y + negCameraY;
+        const screenX = worldX * cameraZoom + viewportCenterX;
+        const screenY = worldY * cameraZoom + viewportCenterY;
         const screenHw = hw * cameraZoom;
         const screenHwCos = screenHw * cos;
         const screenHwSin = screenHw * sin;

@@ -329,6 +329,11 @@ export class EntitySpawnService extends ServiceAwareBase {
   private applyPhysics(entityId: EntityId, mode: PhysicsMode): void {
     const world = this.scene.world;
     
+    // Enable physics flag for all modes except 'none'
+    if (mode !== 'none') {
+      world.setPhysicsEnabled(entityId, true);
+    }
+    
     switch (mode) {
       case 'none':
         // No physics (just bouncing)
@@ -337,11 +342,11 @@ export class EntitySpawnService extends ServiceAwareBase {
         world.setGravityEnabled(entityId, true);
         break;
       case 'collision':
-        world.setCollisionEnabled(entityId, true);
+        world.setCollisionsEnabled(entityId, true);
         break;
       case 'full':
         world.setGravityEnabled(entityId, true);
-        world.setCollisionEnabled(entityId, true);
+        world.setCollisionsEnabled(entityId, true);
         break;
     }
   }

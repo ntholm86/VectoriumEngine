@@ -26,16 +26,23 @@ export class GPUTimingCollector extends MetricsCollector {
   initializeGL(gl: WebGL2RenderingContext): boolean {
     this.gl = gl;
     
+    // DISABLED: WebGL2 only allows ONE active query at a time per target
+    // The current usage tries to start 'draw' and 'text' simultaneously which fails
+    // Use CPU fallback instead (performance.now() is accurate enough)
+    console.warn('⚠️ GPU timing disabled (WebGL2 limitation), using CPU fallback');
+    this.cpuFallback = true;
+    return false;
+    
     // Try to get timer query extension
-    this.ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
-    
-    if (!this.ext) {
-      console.warn('⚠️ GPU timing not available, using CPU fallback');
-      this.cpuFallback = true;
-      return false;
-    }
-    
-    return true;
+    // this.ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    // 
+    // if (!this.ext) {
+    //   console.warn('⚠️ GPU timing not available, using CPU fallback');
+    //   this.cpuFallback = true;
+    //   return false;
+    // }
+    // 
+    // return true;
   }
   
   startTiming(label: string): void {
@@ -48,9 +55,9 @@ export class GPUTimingCollector extends MetricsCollector {
     
     if (!this.gl || !this.ext) return;
     
-    // Check if there's a pending query for this label
-    if (this.pendingQueries.has(label)) {
-      return; // Skip if still waiting for previous result
+    // Check if there's already an active or pending query for this label
+    if (this.queries.has(label) || this.pendingQueries.has(label)) {
+      return; // Skip if query already active or still waiting for previous result
     }
     
     const query = this.gl.createQuery();
@@ -75,13 +82,13 @@ export class GPUTimingCollector extends MetricsCollector {
     
     if (!this.gl || !this.ext) return;
     
-    this.gl.endQuery(this.ext.TIME_ELAPSED_EXT);
-    
+    // Only end query if we have an active query for this label
     const query = this.queries.get(label);
-    if (query) {
-      this.pendingQueries.set(label, query);
-      this.queries.delete(label);
-    }
+    if (!query) return;
+    
+    this.gl.endQuery(this.ext.TIME_ELAPSED_EXT);
+    this.pendingQueries.set(label, query);
+    this.queries.delete(label);
   }
   
   /**

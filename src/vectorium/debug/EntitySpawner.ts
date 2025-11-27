@@ -12,7 +12,7 @@ import { isSpawnableScene } from '../core/ISpawnableScene';
 export class EntitySpawner extends UIPanel {
   private clickSpawnCount = 100; // Number of entities to spawn per click
   private activeButton: string = 'spawn100';
-  private physicsMode: 'none' | 'gravity' | 'collision' | 'full' = 'none';
+  private physicsMode: 'none' | 'gravity' | 'collision' | 'full' = 'full';  // 🚀 Default to full physics for WASM demo
   private visualType: 'sprite' | 'circle' | 'star5' | 'triangle' | 'hexagon' | 'heart' | 'square' | 'diamond' | 'text' = 'sprite';
   private textureUrl: string = '';
   private animationType: 'none' | 'frame' | 'tween' = 'none';

@@ -70,6 +70,12 @@ engine.start();
 - **Performance Monitoring**: Real-time metrics with 60-sample rolling average
 - **Browser Quirk Handling**: Safari, iOS, and mobile device compatibility layer
 
+### 🎮 **Game Development Features**
+- **State Machine System**: Type-safe finite state machines for game states, UI flows, and animations
+- **Scene Management**: Hot-swappable scenes with lifecycle hooks (load/start/update/destroy)
+- **Input Management**: Keyboard and mouse handling with state tracking
+- **Camera System**: 2D camera with smooth movement and zoom
+
 ## 🏗️ Architecture
 
 ### **Entity Component System (ECS)**
@@ -276,6 +282,160 @@ class PhysicsEntity implements Entity {
 renderer.setMaxBatchSize(65000);  // Max performance
 renderer.setMaxBatchSize(32000);  // Lower memory
 ```
+
+### **State Machine System**
+
+Vectorium provides a type-safe, high-performance state machine system for managing game states, UI flows, and animations.
+
+**Basic Usage:**
+```typescript
+import { Scene, StateMachine } from 'vectorium-engine';
+
+class GameScene extends Scene {
+  private gameState: StateMachine<'menu' | 'playing' | 'paused' | 'gameover'>;
+  
+  constructor() {
+    super('game');
+    
+    // Create state machine with initial state
+    this.gameState = this.createStateMachine<'menu' | 'playing' | 'paused' | 'gameover'>('menu');
+    
+    // Setup state transitions and callbacks
+    this.setupGameStates();
+  }
+  
+  private setupGameStates() {
+    // Enter callbacks - called when entering a state
+    this.gameState.onEnter('menu', () => {
+      console.log('Showing menu');
+      this.showMenu();
+    });
+    
+    this.gameState.onEnter('playing', () => {
+      console.log('Game started!');
+      this.spawnPlayer();
+      this.spawnEnemies();
+    });
+    
+    // Update callbacks - called every frame while in state
+    this.gameState.onUpdate('playing', (dt) => {
+      this.updateGameplay(dt);
+      
+      // Check for pause
+      if (this.inputManager?.isKeyJustPressed('Escape')) {
+        this.gameState.transition('paused');
+      }
+    });
+    
+    // Exit callbacks - called when leaving a state
+    this.gameState.onExit('playing', () => {
+      console.log('Game paused');
+    });
+    
+    // Define valid transitions (optional)
+    this.gameState
+      .allowTransition('menu', 'playing')
+      .allowTransition('playing', 'paused')
+      .allowTransition('paused', 'playing')
+      .allowTransition('playing', 'gameover')
+      .allowTransition('gameover', 'menu');
+  }
+  
+  private startGame() {
+    this.gameState.transition('playing');
+  }
+  
+  update(dt: number) {
+    super.update(dt);
+    
+    // State machine automatically calls update callback for current state
+  }
+}
+```
+
+**Advanced Features:**
+
+```typescript
+// Time-based transitions
+this.gameState.onUpdate('intro', (dt) => {
+  if (this.gameState.getStateTime() > 3.0) {
+    this.gameState.transition('gameplay');
+  }
+});
+
+// Return to previous state
+if (this.inputManager?.isKeyJustPressed('Backspace')) {
+  this.gameState.returnToPreviousState();
+}
+
+// Check current state
+if (this.gameState.isInState('playing')) {
+  // Game logic
+}
+
+// Check multiple states
+if (this.gameState.isInAnyState('playing', 'paused')) {
+  this.renderGame();
+}
+
+// Get debug info
+const debug = this.gameState.getDebugInfo();
+console.log(`Current: ${debug.currentState}, Time: ${debug.stateTime}s`);
+```
+
+**Animation State Machine:**
+```typescript
+class Player {
+  private animState = new StateMachine<'idle' | 'walk' | 'run' | 'jump'>('idle');
+  
+  constructor() {
+    this.animState
+      .allowTransition('idle', 'walk')
+      .allowTransition('walk', 'run')
+      .allowTransition('walk', 'idle')
+      .allowTransition('run', 'walk')
+      .allowTransition('idle', 'jump')
+      .allowTransition('walk', 'jump')
+      .allowTransition('run', 'jump')
+      .allowTransition('jump', 'idle');
+    
+    this.animState.onEnter('jump', () => {
+      this.playAnimation('jump');
+      this.velocity.y = -500;
+    });
+    
+    this.animState.onUpdate('jump', (dt) => {
+      if (this.isGrounded()) {
+        this.animState.transition('idle');
+      }
+    });
+  }
+  
+  handleInput(input: InputState) {
+    if (input.space && this.isGrounded()) {
+      this.animState.transition('jump');
+    } else if (input.speed > 200) {
+      this.animState.transition('run');
+    } else if (input.speed > 0) {
+      this.animState.transition('walk');
+    } else {
+      this.animState.transition('idle');
+    }
+  }
+}
+```
+
+**Key Features:**
+- **Type Safety**: Union types ensure only valid states can be used
+- **Zero Allocation**: Callback reuse with no dynamic allocation in hot path
+- **Lifecycle Hooks**: onEnter, onUpdate, onExit for complete control
+- **State Validation**: Optional transition rules prevent invalid state changes
+- **State Timing**: Track time spent in each state for time-based logic
+- **Previous State**: Built-in history for "back" functionality
+- **Fluent API**: Method chaining for clean declarative setup
+- **Error Handling**: Automatic try-catch with logging for callbacks
+
+See `demo-state-machine.html` for a complete working example with menu, gameplay, pause, and game over states.
 
 ## 📊 Performance Analysis
 

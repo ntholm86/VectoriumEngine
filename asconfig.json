@@ -1,0 +1,16 @@
+{
+  "targets": {
+    "release": {
+      "outFile": "public/physics.wasm",
+      "textFile": "public/physics.wat",
+      "sourceMap": true,
+      "optimize": true,
+      "optimizeLevel": 3,
+      "shrinkLevel": 2
+    }
+  },
+  "options": {
+    "runtime": "stub",
+    "exportRuntime": true
+  }
+}
