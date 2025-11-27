@@ -31,8 +31,6 @@ import type { AnimationManager } from '../animation/AnimationManager';
 import type { AnimationSystem } from '../animation/AnimationSystem';
 import type { InputManager } from '../input/InputManager';
 import type { TextureManager } from '../rendering/TextureManager';
-import type { AssetLoader } from '../assets/AssetLoader';
-import type { LoadingManager } from '../assets/LoadingManager';
 import type { RuntimeConfig } from './RuntimeConfig';
 
 /**
@@ -95,16 +93,6 @@ export abstract class ServiceAwareBase {
   /** Texture loading and caching */
   protected get textureManager(): TextureManager {
     return this.services.textureManager;
-  }
-  
-  /** Asset loading with progress tracking */
-  protected get assetLoader(): AssetLoader {
-    return this.services.assetLoader;
-  }
-  
-  /** Loading state management */
-  protected get loadingManager(): LoadingManager {
-    return this.services.loadingManager;
   }
   
   /** Engine configuration */

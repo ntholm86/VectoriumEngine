@@ -569,7 +569,7 @@ export class PerformanceMonitor extends UIPanel {
   }
   
   recordBatchComplete(spriteCount: number): void {
-    this.batchBreakCollector.recordBatch();
+    this.batchBreakCollector.recordBatch(spriteCount);
     this.recordBatch(spriteCount); // Keep existing tracking
   }
   
@@ -669,12 +669,11 @@ export class PerformanceMonitor extends UIPanel {
   }
 
   getMetrics(): PerformanceMetrics {
-    // Calculate batch efficiency
-    let batchEfficiency = 0;
-    if (this.batchSpriteCounts.length > 0) {
-      const avgSpritesPerBatch = this.batchSpriteCounts.reduce((a, b) => a + b, 0) / this.batchSpriteCounts.length;
-      batchEfficiency = avgSpritesPerBatch / this.maxBatchSize;
-    }
+    // Calculate batch efficiency from batch collector
+    const batchMetrics = this.batchBreakCollector.collect();
+    const batchEfficiency = this.maxBatchSize > 0 && batchMetrics.avgSpritesPerBatch > 0
+      ? batchMetrics.avgSpritesPerBatch / this.maxBatchSize
+      : 0;
 
     // Calculate frame time variance
     let frameTimeVariance = 0;

@@ -178,6 +178,7 @@ export class BatchBreakCollector extends MetricsCollector {
   private stateChangeBreaks = 0;
   private manualFlushes = 0;
   private totalBatches = 0;
+  private totalSprites = 0;
   
   recordTextureSwap(): void {
     if (!this.enabled) return;
@@ -204,9 +205,10 @@ export class BatchBreakCollector extends MetricsCollector {
     this.manualFlushes++;
   }
   
-  recordBatch(): void {
+  recordBatch(spriteCount: number = 0): void {
     if (!this.enabled) return;
     this.totalBatches++;
+    this.totalSprites += spriteCount;
   }
   
   reset(): void {
@@ -216,9 +218,11 @@ export class BatchBreakCollector extends MetricsCollector {
     this.stateChangeBreaks = 0;
     this.manualFlushes = 0;
     this.totalBatches = 0;
+    this.totalSprites = 0;
   }
   
   collect() {
+    const avgSprites = this.totalBatches > 0 ? this.totalSprites / this.totalBatches : 0;
     return {
       totalBatches: this.totalBatches,
       textureSwaps: this.textureSwaps,
@@ -228,7 +232,7 @@ export class BatchBreakCollector extends MetricsCollector {
       manualFlushes: this.manualFlushes,
       // Percentage of batches broken by each reason
       textureSwapRate: this.totalBatches > 0 ? this.textureSwaps / this.totalBatches : 0,
-      avgSpritesPerBatch: this.totalBatches > 0 ? 0 : 0 // Will be set by renderer
+      avgSpritesPerBatch: avgSprites
     };
   }
 }
@@ -363,8 +367,8 @@ export class RenderStatCollector extends MetricsCollector {
       screenPixels: this.screenPixels,
       fillRate, // 1.0 = filled once, 2.0 = filled twice (overdraw)
       overdrawRatio, // 0.0 = no overdraw, 0.5 = 50% overdraw
-      overdrawPercentage: overdrawRatio * 100,
-      drawCalls: this.drawCallPixels.length
+      overdrawPercentage: overdrawRatio * 100
+      // Note: drawCalls removed - tracked by PerformanceMonitor directly
     };
   }
 }
