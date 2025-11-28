@@ -307,7 +307,7 @@ export class World {
     this.rotation[id] = Math.floor(Math.random() * 360);
     this.rotationSpeed[id] = Math.floor((Math.random() - 0.5) * 360);
     this.scale[id] = 1.0;
-    this.size[id] = 4 + Math.random() * 8;
+    this.size[id] = 6 + Math.random() * 6; // 🚀 Reduced from 4-12 to 6-12 for fill rate optimization
     this.baseSize[id] = this.size[id];
     this.colorR[id] = Math.floor(Math.random() * 256);
     this.colorG[id] = Math.floor(Math.random() * 256);
@@ -380,9 +380,9 @@ export class World {
     if (this.enableGravity[id]) this.gravityEntityCount--;
     if (this.animationType[id] !== 0) this.animatedEntityCount--;
     
-    // 🎨 Shape & Text cleanup
-    if (this.shapeType[id] > 0) this.shapeEntityCount--;
-    if (this.textIndex[id] >= 0) this.textEntityCount--;
+    // 🎨 Shape & Text cleanup (with bounds checking)
+    if (this.shapeType[id] > 0 && this.shapeEntityCount > 0) this.shapeEntityCount--;
+    if (this.textIndex[id] >= 0 && this.textEntityCount > 0) this.textEntityCount--;
     
     this.enableCollisions[id] = 0;
     this.enableGravity[id] = 0;
@@ -585,10 +585,8 @@ export class World {
       4 + 4 +  // alpha, flags (Float32, Uint32)
       1 +  // animationType (Uint8)
       4 + 4 + 4 + 4 + 1 + 4 +  // animation state (Float32 × 5, Int8 × 1)
-      1 + 4 +  // 🎨 shapeType (Uint8), textIndex (Int32)
-      // 🚀 Phase 1: Texture System (22 bytes)
+      1 + 4 +  // shapeType (Uint8), textIndex (Int32)
       2 + 2 + 2 + 2 + 2 +  // textureId, uvU0, uvV0, uvU1, uvV1 (Uint16 × 5)
-      // 🚀 Phase 1: Animation System (50 bytes)
       2 + 2 + 4 + 1 +  // frameAnimId, frameIndex, frameTime, animLoop
       2 + 4 + 1 + 16 + 16;  // tweenId, tweenTime, tweenActive, startValues, endValues
     
@@ -668,7 +666,7 @@ export class World {
     if (wasShape !== isShape) {
       if (isShape) {
         this.shapeEntityCount++;
-      } else {
+      } else if (this.shapeEntityCount > 0) {
         this.shapeEntityCount--;
       }
     }
@@ -688,7 +686,7 @@ export class World {
     if (hadText !== hasText) {
       if (hasText) {
         this.textEntityCount++;
-      } else {
+      } else if (this.textEntityCount > 0) {
         this.textEntityCount--;
       }
     }
@@ -951,6 +949,30 @@ export class World {
   
   public get PHYSICS_FLAG(): number {
     return this.FLAG_PHYSICS;
+  }
+  
+  /**
+   * Clear all entities from the world
+   */
+  clearAllEntities(): void {
+    // Destroy all active entities
+    for (let id = 0; id < this.entityCount; id++) {
+      if (this.flags[id] & this.FLAG_ACTIVE) {
+        this.destroyEntity(id);
+      }
+    }
+    
+    // Reset counters
+    this.entityCount = 0;
+    this.activeEntityCount = 0;
+    this.collisionEntityCount = 0;
+    this.gravityEntityCount = 0;
+    this.animatedEntityCount = 0;
+    this.shapeEntityCount = 0;
+    this.textEntityCount = 0;
+    
+    // Clear free list
+    this.freeList = [];
   }
 }
 

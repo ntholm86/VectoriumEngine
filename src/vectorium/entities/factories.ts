@@ -110,7 +110,7 @@ export function createBouncingEntity(
     const [minSize, maxSize] = options.sizeRange;
     size = minSize + Math.random() * (maxSize - minSize);
   } else {
-    size = 4 + Math.random() * 8;
+    size = 20 + Math.random() * 20; // Range: 20-40 pixels
   }
   
   // Create entity in ECS
@@ -160,7 +160,7 @@ export function createBouncingBurst(
       const [minSize, maxSize] = options.sizeRange;
       size = minSize + Math.random() * (maxSize - minSize);
     } else {
-      size = 4 + Math.random() * 8;
+      size = 20 + Math.random() * 20; // Range: 20-40 pixels
     }
     
     // Create entity
@@ -851,6 +851,7 @@ export async function createSprite(
     vy?: number;
     frame?: string;  // Optional atlas frame name
     interactive?: boolean;
+    physics?: boolean;  // Enable physics (velocity integration, bouncing). Default: false
   } = {}
 ): Promise<EntityId> {
   // Load texture if not cached
@@ -858,6 +859,12 @@ export async function createSprite(
   
   // Create entity
   const id = world.createEntity(x, y, options.vx || 0, options.vy || 0);
+  
+  // Disable physics by default for sprites (no automatic velocity/bouncing)
+  // User can enable with { physics: true }
+  if (options.physics !== true) {
+    world.setPhysicsEnabled(id, false);
+  }
   
   // Set size
   world.setSize(id, size);
@@ -910,6 +917,7 @@ export function createAnimatedSprite(
     vy?: number;
     loop?: boolean;
     interactive?: boolean;
+    physics?: boolean;  // Enable physics. Default: false
   } = {}
 ): EntityId {
   // Get texture (must be pre-loaded)
@@ -926,6 +934,11 @@ export function createAnimatedSprite(
   
   // Create entity
   const id = world.createEntity(x, y, options.vx || 0, options.vy || 0);
+  
+  // Disable physics by default for sprites
+  if (options.physics !== true) {
+    world.setPhysicsEnabled(id, false);
+  }
   
   // Set size
   world.setSize(id, size);

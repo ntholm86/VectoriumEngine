@@ -205,10 +205,12 @@ export class EntitySpawnService {
     const count = Math.min(config.count, this.maxBatchSize);
     
     // 🎯 Pre-calculate random values in vectorizable loop
+    // 🎯 Spawn radius: entities spread around center point (200px radius for benchmark clustering)
+    const spawnRadius = 200;
     for (let i = 0; i < count; i++) {
       this.spawnAngles[i] = Math.random() * Math.PI * 2;
       this.spawnSpeeds[i] = 150 + Math.random() * 250;
-      this.spawnSizes[i] = 12 + Math.random() * 24;
+      this.spawnSizes[i] = 20 + Math.random() * 20; // Range: 20-40 pixels
     }
     
     // 🚀 Get direct references to ECS arrays (zero overhead access)
@@ -227,8 +229,14 @@ export class EntitySpawnService {
     // 🚀 Batch create entities (WASM-friendly zero-copy)
     const entities: EntityId[] = [];
     for (let i = 0; i < count; i++) {
+      // 🎯 Spawn position: spread around center point within spawn radius
+      const spawnAngle = this.spawnAngles[i];
+      const spawnDist = Math.random() * spawnRadius;
+      const spawnX = config.x + Math.cos(spawnAngle) * spawnDist;
+      const spawnY = config.y + Math.sin(spawnAngle) * spawnDist;
+      
       // Create entity (allocates ID, sets default values)
-      const id = world.createEntity(config.x, config.y, 0, 0);
+      const id = world.createEntity(spawnX, spawnY, 0, 0);
       
       // 🎯 Calculate velocity using pre-calculated sin/cos
       const angle = this.spawnAngles[i];
@@ -312,13 +320,22 @@ export class EntitySpawnService {
       baseX = config.x + estimatedTextWidth;
     }
     
+    // 🎯 Spawn radius for dynamic text entities
+    const spawnRadius = 200;
+    
     // 🚀 Batch create text entities
     const entities: EntityId[] = [];
     const textContent = textCfg.content;
     
     for (let i = 0; i < count; i++) {
+      // 🎯 Initial spawn position around center
+      const spawnAngle = Math.random() * Math.PI * 2;
+      const spawnDist = Math.random() * spawnRadius;
+      const spawnX = config.x + Math.cos(spawnAngle) * spawnDist;
+      const spawnY = config.y + Math.sin(spawnAngle) * spawnDist;
+      
       // Create entity
-      const id = world.createEntity(config.x, config.y, 0, 0);
+      const id = world.createEntity(spawnX, spawnY, 0, 0);
       
       // Position calculation (static grid or dynamic radial)
       if (isStaticMode) {
@@ -382,7 +399,16 @@ export class EntitySpawnService {
    * Applies physics settings to multiple entities at once
    */
   private batchApplyPhysics(entities: EntityId[], mode: PhysicsMode): void {
-    if (mode === 'none') return;
+    if (mode === 'none') {
+      // Explicitly disable physics for 'none' mode
+      const world = this.world;
+      const flags = world.entityFlags;
+      const FLAG_PHYSICS = world.PHYSICS_FLAG;
+      for (let i = 0; i < entities.length; i++) {
+        flags[entities[i]] &= ~FLAG_PHYSICS;
+      }
+      return;
+    }
     
     const world = this.world;
     

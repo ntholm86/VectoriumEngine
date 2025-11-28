@@ -42,7 +42,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:wasm && npm run build:lib && npm run build:types",
-    "build:wasm": "asc assembly/physics.ts --outFile public/physics.wasm --optimize --sourceMap && asc assembly/rendering.ts --outFile public/rendering.wasm --optimize --sourceMap",
+    "build:wasm": "asc assembly/physics.ts --outFile public/physics.wasm --optimize --enable simd --sourceMap && asc assembly/rendering.ts --outFile public/rendering.wasm --optimize --sourceMap",
     "build:lib": "vite build --config vite.config.lib.ts",
     "build:types": "tsc --project tsconfig.build.json",
     "build:demo": "vite build",

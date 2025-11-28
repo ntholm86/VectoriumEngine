@@ -57,6 +57,40 @@ export class VectoriumBuilder {
   }
 
   /**
+   * Set canvas resolution using preset or custom dimensions
+   * 
+   * Presets:
+   * - 'HD': 1280×720
+   * - 'FullHD': 1920×1080
+   * - 'QHD': 2560×1440
+   * - '4K': 3840×2160
+   * 
+   * Custom: { width: number, height: number }
+   * 
+   * @example
+   * .withResolution('FullHD')
+   * .withResolution({ width: 1600, height: 900 })
+   */
+  withResolution(preset: 'HD' | 'FullHD' | 'QHD' | '4K' | { width: number; height: number }): this {
+    const resolutions = {
+      'HD': { width: 1280, height: 720 },
+      'FullHD': { width: 1920, height: 1080 },
+      'QHD': { width: 2560, height: 1440 },
+      '4K': { width: 3840, height: 2160 }
+    };
+    
+    if (typeof preset === 'string') {
+      const res = resolutions[preset];
+      this.config.width = res.width;
+      this.config.height = res.height;
+    } else {
+      this.config.width = preset.width;
+      this.config.height = preset.height;
+    }
+    return this;
+  }
+
+  /**
    * Set quality preset
    */
   withQuality(quality: QualityPreset): this {

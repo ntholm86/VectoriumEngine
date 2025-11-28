@@ -69,14 +69,17 @@ export class Scene {
     this.name = name;
     this.world = new World(maxEntities);
     
-    // Initialize viewport with world bounds multiplier
+    // Initialize viewport with placeholder dimensions (will be set by Engine on registration)
+    // Using 1920×1080 as default placeholder (most common resolution)
+    // Engine.registerScene() or Engine.loadScene() will call setCanvasDimensions() to set actual size
     this.viewport = new Viewport(1920, 1080, worldBoundsMultiplier);
     
-    // Initialize camera centered on viewport
+    // Initialize camera at origin (top-left of world)
+    // Camera x,y represents top-left corner of view, not center
     this.camera = new Camera(
       this.viewport.width, 
       this.viewport.height,
-      { x: this.viewport.width / 2, y: this.viewport.height / 2, zoom: 1 }
+      { x: 0, y: 0, zoom: 1 }
     );
     
     // 🚀 Allocate buffers once (ZERO allocations per frame!)
@@ -183,6 +186,7 @@ export class Scene {
    * 2. SIMD-style scale multiplication (process 4 entities at once)
    * 3. Smart culling (auto-disable when world = viewport)
    * 4. Zero-copy indexed rendering
+   * 5. Texture-aware rendering (switches to sprite path when textures present)
    * 
    * Performance: 10-100x faster than per-entity rendering
    */
@@ -199,6 +203,7 @@ export class Scene {
     const alphas = this.world.getAlphas();
     const flags = this.world.getFlags();
     const shapeTypes = this.world.getShapeTypes();
+    const textureIds = this.world.getTextureIds();
     
     const totalCount = this.world.getActiveCount();
     
@@ -220,6 +225,15 @@ export class Scene {
       this.scaledSizes[i] = sizes[i] * scales[i];
     }
     
+    // 🚀 DETECT TEXTURED ENTITIES: Check if any entities use textures
+    let hasTextures = false;
+    for (let j = 0; j < totalCount; j++) {
+      if (textureIds[j] > 0) {
+        hasTextures = true;
+        break;
+      }
+    }
+    
     // 🚀 SMART CULLING: Auto-disable when world = viewport
     const worldScale = this.viewport.worldScale;
     const shouldCull = this.cullingEnabled && worldScale > 1.01;
@@ -231,21 +245,32 @@ export class Scene {
         this.visibleIndices[j] = j;
       }
       
-      if (renderer.isGPUAccelerationEnabled()) {
-        renderer.drawBulkShapesIndexed(
-          posX, posY, rotation, this.scaledSizes,
-          colorR, colorG, colorB, alphas, shapeTypes,
-          flags, this.visibleIndices, totalCount, this.world.FLAG_VISIBLE,
-          this.camera.x, this.camera.y, this.camera.getZoom()
-        );
-      } else {
-        renderer.drawBulkIndexed(
+      // 🚀 TEXTURED SPRITE RENDERING: Use when entities have textures
+      if (hasTextures && typeof (renderer as any).drawBulkSpritesIndexed === 'function') {
+        const textureManager = (renderer as any).textureManager || null;
+        (renderer as any).drawBulkSpritesIndexed(
           posX, posY, rotation, this.scaledSizes,
           colorR, colorG, colorB, alphas,
+          textureIds,
+          this.world.getUVU0(), this.world.getUVV0(),
+          this.world.getUVU1(), this.world.getUVV1(),
           flags, this.visibleIndices, totalCount, this.world.FLAG_VISIBLE,
-          this.camera.x, this.camera.y, this.camera.getZoom()
+          this.camera.x, this.camera.y, this.camera.getZoom(),
+          textureManager
         );
+        
+        this.culledCount = 0;
+        this.visibleCount = totalCount;
+        return;
       }
+      
+      // 🚀 Always use indexed shape rendering (proven faster than instancing for typical counts)
+      renderer.drawBulkShapesIndexed(
+        posX, posY, rotation, this.scaledSizes,
+        colorR, colorG, colorB, alphas, shapeTypes,
+        flags, this.visibleIndices, totalCount, this.world.FLAG_VISIBLE,
+        this.camera.x, this.camera.y, this.camera.getZoom()
+      );
       
       this.culledCount = 0;
       this.visibleCount = totalCount;
@@ -261,22 +286,33 @@ export class Scene {
       this.visibleIndices
     );
     
-    // 🚀 ZERO-COPY INDEXED RENDERING (2-10x faster with culling)
-    if (renderer.isGPUAccelerationEnabled()) {
-      renderer.drawBulkShapesIndexed(
-        posX, posY, rotation, this.scaledSizes,
-        colorR, colorG, colorB, alphas, shapeTypes,
-        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
-        this.camera.x, this.camera.y, this.camera.getZoom()
-      );
-    } else {
-      renderer.drawBulkIndexed(
+    // 🚀 TEXTURED SPRITE RENDERING: Use when entities have textures
+    if (hasTextures && typeof (renderer as any).drawBulkSpritesIndexed === 'function') {
+      const textureManager = (renderer as any).textureManager || null;
+      (renderer as any).drawBulkSpritesIndexed(
         posX, posY, rotation, this.scaledSizes,
         colorR, colorG, colorB, alphas,
+        textureIds,
+        this.world.getUVU0(), this.world.getUVV0(),
+        this.world.getUVU1(), this.world.getUVV1(),
         flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
-        this.camera.x, this.camera.y, this.camera.getZoom()
+        this.camera.x, this.camera.y, this.camera.getZoom(),
+        textureManager
       );
+      
+      this.culledCount = totalCount - visibleCount;
+      this.visibleCount = visibleCount;
+      return;
     }
+    
+    // 🚀 ZERO-COPY INDEXED RENDERING (2-10x faster with culling)
+    // 🚀 Always use indexed shape rendering (proven faster than instancing)
+    renderer.drawBulkShapesIndexed(
+      posX, posY, rotation, this.scaledSizes,
+      colorR, colorG, colorB, alphas, shapeTypes,
+      flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
+      this.camera.x, this.camera.y, this.camera.getZoom()
+    );
     
     this.culledCount = totalCount - visibleCount;
     this.visibleCount = visibleCount;

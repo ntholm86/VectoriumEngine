@@ -21,6 +21,7 @@ type RenderHandler = (renderer: WebGLBatchRenderer, textRenderer: TextRenderer, 
 export class SceneBuilder {
   private name: string;
   private capacity: number = 100000;
+  private worldBoundsMultiplier: number = 1.0;
   private loadHandler?: LoadHandler;
   private updateHandler?: UpdateHandler;
   private renderHandler?: RenderHandler;
@@ -34,6 +35,20 @@ export class SceneBuilder {
    */
   withCapacity(capacity: number): this {
     this.capacity = capacity;
+    return this;
+  }
+
+  /**
+   * Set world bounds multiplier for physics
+   * 
+   * When worldScale = 1.0: World bounds = viewport (entities bounce at screen edges)
+   * When worldScale > 1.0: World bounds > viewport (larger physics space, requires culling)
+   * 
+   * @example
+   * .withWorldScale(1.5)  // World is 1.5x larger than viewport
+   */
+  withWorldScale(multiplier: number): this {
+    this.worldBoundsMultiplier = multiplier;
     return this;
   }
 
@@ -94,7 +109,7 @@ export class SceneBuilder {
       }
     }
 
-    return new CustomScene(this.name, this.capacity);
+    return new CustomScene(this.name, this.capacity, this.worldBoundsMultiplier);
   }
 }
 
@@ -105,6 +120,7 @@ export function createScene(
   name: string,
   options: {
     capacity?: number;
+    worldScale?: number;
     onLoad?: LoadHandler;
     onUpdate?: UpdateHandler;
     onRender?: RenderHandler;
@@ -113,6 +129,7 @@ export function createScene(
   const builder = new SceneBuilder(name);
   
   if (options.capacity) builder.withCapacity(options.capacity);
+  if (options.worldScale) builder.withWorldScale(options.worldScale);
   if (options.onLoad) builder.onLoad(options.onLoad);
   if (options.onUpdate) builder.onUpdate(options.onUpdate);
   if (options.onRender) builder.onRender(options.onRender);

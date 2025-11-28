@@ -32,6 +32,10 @@ export { ObjectPool, BufferPool, bufferPool } from './vectorium/memory/Pooling';
 // Performance
 export { PerformanceMonitor } from './vectorium/performance/PerformanceMonitor';
 export type { QualityLevel, QualitySettings, PerformanceMetrics } from './vectorium/performance/PerformanceMonitor';
+export { PerformanceBenchmark, BENCHMARK_SUITES } from './vectorium/performance/PerformanceBenchmark';
+export type { BenchmarkConfig, BenchmarkResult, BenchmarkSuite } from './vectorium/performance/PerformanceBenchmark';
+export { PerformanceAnalyzer } from './vectorium/performance/PerformanceAnalyzer';
+export type { OptimizationOpportunity, AnalysisReport } from './vectorium/performance/PerformanceAnalyzer';
 
 // Configuration
 export { RuntimeConfig } from './vectorium/core/RuntimeConfig';
@@ -39,3 +43,7 @@ export type { RenderingSettings, PhysicsSettings, DebugSettings, QualitySettings
 
 // Debug Tools
 export { DebugPanel } from './vectorium/debug/DebugPanel';
+
+// Particle System
+export { ParticleSystemManager, ParticleEmitter } from './vectorium/particles/ParticleSystem';
+export type { ParticleEmitterConfig } from './vectorium/particles/ParticleSystem';

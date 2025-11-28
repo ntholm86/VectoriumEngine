@@ -27,7 +27,10 @@ export class WasmPhysics {
     collisionDetectTime: 0,
     boundaryTime: 0,
     totalCollisionChecks: 0,
-    spatialHashStats: {} as any
+    spatialHashStats: {} as any,
+    frameTime: 0,
+    sleeping: 0,
+    awake: 0
   };
   
   constructor() {
@@ -129,6 +132,10 @@ export class WasmPhysics {
     // Update metrics
     this.metrics.totalCollisionChecks = totalCollisions;
     
+    // 🚀 Get sleeping/awake counts from WASM
+    this.metrics.sleeping = this.wasmBridge.getSleepingCount();
+    this.metrics.awake = this.wasmBridge.getAwakeCount();
+    
     const wasmTime = performance.now() - t0;
     // Estimate time breakdown (WASM doesn't report individual phases)
     this.metrics.gravityTime = wasmTime * 0.15;
@@ -147,7 +154,11 @@ export class WasmPhysics {
                         this.metrics.collisionBuildTime + 
                         this.metrics.collisionDetectTime + 
                         this.metrics.boundaryTime,
-      spatialHashStats: this.spatialHash.stats
+      spatialHashStats: {
+        activeCells: this.wasmReady ? this.wasmBridge.getSpatialHashActiveCells() : 0,
+        totalChecks: 0, // WASM handles this internally
+        hits: 0 // WASM handles this internally
+      }
     };
   }
   
@@ -217,11 +228,16 @@ export class WasmPhysics {
   ): number {
     if (!this.wasmReady) return 0;
     
+    // Reset metrics at frame start
+    this.metrics.totalCollisionChecks = 0;
+    
+    const t0 = performance.now();
+    
     const restitutionValue = 0.03;
     const airDamping = 0.98;
     const groundDamping = 0.75;
     
-    return this.wasmBridge.updateFrame(
+    const result = this.wasmBridge.updateFrame(
       entityCount,
       dt,
       gravityY,
@@ -239,6 +255,17 @@ export class WasmPhysics {
       cullingMargin,
       visibleIndices
     );
+    
+    // Update metrics
+    const collisionCount = result & 0xFFFF;
+    this.metrics.totalCollisionChecks = collisionCount;
+    this.metrics.frameTime = performance.now() - t0;
+    
+    // 🚀 Get sleeping/awake counts from WASM
+    this.metrics.sleeping = this.wasmBridge.getSleepingCount();
+    this.metrics.awake = this.wasmBridge.getAwakeCount();
+    
+    return result;
   }
   
   /**

@@ -241,6 +241,30 @@ export class WasmPhysicsBridge {
   }
   
   /**
+   * 🚀 Get count of sleeping entities
+   */
+  getSleepingCount(): number {
+    if (!this.isLoaded) return 0;
+    return this.wasmModule.getSleepingCount();
+  }
+  
+  /**
+   * 🚀 Get count of awake entities
+   */
+  getAwakeCount(): number {
+    if (!this.isLoaded) return 0;
+    return this.wasmModule.getAwakeCount();
+  }
+  
+  /**
+   * 🚀 Get spatial hash active cells count
+   */
+  getSpatialHashActiveCells(): number {
+    if (!this.isLoaded) return 0;
+    return this.wasmModule.getSpatialHashActiveCells();
+  }
+  
+  /**
    * 🎬 WASM ANIMATION UPDATE (3-5x faster than JS)
    * 
    * Replaces World.updateAnimations() with WASM-accelerated version
@@ -276,14 +300,21 @@ export class WasmPhysicsBridge {
   ): number {
     if (!this.isLoaded) return 0;
     
-    return this.wasmModule.cullEntities(
+    // Call WASM function (writes to internal buffer)
+    const visibleCount = this.wasmModule.cullEntities(
       cameraX,
       cameraY,
       worldWidth,
       worldHeight,
-      cullingMargin,
-      visibleIndices
+      cullingMargin
     );
+    
+    // Read results from WASM memory
+    const ptr = this.wasmModule.getVisibleIndicesPtr();
+    const wasmIndices = new Uint32Array(this.wasmMemory!.buffer, ptr, visibleCount);
+    visibleIndices.set(wasmIndices.subarray(0, visibleCount));
+    
+    return visibleCount;
   }
   
   /**
@@ -294,6 +325,7 @@ export class WasmPhysicsBridge {
    * - Animation updates  
    * - Camera frustum culling
    * 
+   * @param visibleIndices - Output array for visible entity indices (will be filled from WASM memory)
    * @returns Packed result: visible count (upper 16 bits) | collision count (lower 16 bits)
    */
   updateFrame(
@@ -316,7 +348,8 @@ export class WasmPhysicsBridge {
   ): number {
     if (!this.isLoaded) return 0;
     
-    return this.wasmModule.updateFrame(
+    // Call WASM function (writes to internal buffer)
+    const result = this.wasmModule.updateFrame(
       count,
       dt,
       gravityY,
@@ -331,8 +364,17 @@ export class WasmPhysicsBridge {
       cameraY,
       worldWidth,
       worldHeight,
-      cullingMargin,
-      visibleIndices
+      cullingMargin
     );
+    
+    // Extract visible count from packed result
+    const visibleCount = (result >> 16) & 0xFFFF;
+    
+    // Read visible indices from WASM memory
+    const ptr = this.wasmModule.getVisibleIndicesPtr();
+    const wasmIndices = new Uint32Array(this.wasmMemory!.buffer, ptr, visibleCount);
+    visibleIndices.set(wasmIndices.subarray(0, visibleCount));
+    
+    return result;
   }
 }

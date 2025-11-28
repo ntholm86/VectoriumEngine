@@ -238,6 +238,58 @@ await engine.loadScene('game');
 engine.start();
 ```
 
+### **Resolution Configuration** ✨
+
+Vectorium provides a flexible resolution system with presets and custom dimensions:
+
+```typescript
+import { VectoriumBuilder } from 'vectorium-engine';
+
+// Using resolution presets
+const engine = new VectoriumBuilder()
+  .withCanvas(document.getElementById('game-canvas'))
+  .withResolution('FullHD')  // 1920×1080
+  .withQuality('high')
+  .enableDebugTools()
+  .build();
+
+// Available presets:
+// 'HD'      → 1280×720
+// 'FullHD'  → 1920×1080
+// 'QHD'     → 2560×1440
+// '4K'      → 3840×2160
+
+// Or use custom dimensions:
+  .withResolution({ width: 1600, height: 900 })
+
+// Traditional approach (still supported):
+  .withSize(1920, 1080)
+```
+
+**Scene Configuration with World Scale:**
+
+```typescript
+import { SceneBuilder } from 'vectorium-engine';
+
+const scene = new SceneBuilder('game')
+  .withCapacity(100000)           // Max entities
+  .withWorldScale(1.5)            // World 1.5x larger than viewport
+  .onLoad(async () => {
+    console.log('Scene loaded!');
+  })
+  .onUpdate((dt) => {
+    // Custom update logic
+  })
+  .build();
+
+engine.registerScene('game', scene);
+```
+
+**World Scale Explained:**
+- `worldScale = 1.0`: World bounds = viewport (entities bounce at screen edges)
+- `worldScale > 1.0`: World bounds > viewport (larger physics space, enables camera movement)
+- Example: With viewport 1920×1080 and worldScale 2.0, world is 3840×2160
+
 ### **Advanced Features**
 
 **Frustum Culling:**

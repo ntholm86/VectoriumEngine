@@ -46,6 +46,7 @@ export interface PerformanceMetrics {
   textDrawCalls: number;
   memory: number;
   textMemory: number;
+  particleCount?: number;
   quality: QualityLevel;
   timestamp?: number; // For tracking when measurement was taken
 
@@ -53,6 +54,9 @@ export interface PerformanceMetrics {
   gpuFrameTime?: number; // GPU execution time (WebGL2 queries)
   gpuWaitTime?: number; // CPU waiting for GPU
   vertexThroughput?: number; // Vertices per second
+  gpuInstancingEnabled?: boolean; // GPU instancing available
+  instancedDrawCalls?: number; // Number of instanced draw calls
+  instanceCount?: number; // Total instances rendered
   
   // Rendering efficiency
   verticesRendered: number;
@@ -228,9 +232,16 @@ export class PerformanceMonitor extends UIPanel {
   private drawCalls = 0;
   private webglDrawCalls = 0;
   private textDrawCalls = 0;
+  private instancedDrawCalls = 0;
+  private instanceCount = 0;
+  private gpuInstancingEnabled = false;
   private textMemory = 0;
+  private particleCount = 0;
   private adaptiveEnabled = true;
   private qualityChangeDelay = 0;
+  private lightweightMode = false; // 🚀 Reduce overhead when DevTools open
+  private devToolsOpen = false;
+  private devToolsCheckInterval = 0;
 
   // Enhanced tracking
   private frameTimeHistory: number[] = []; // For variance calculation
@@ -295,6 +306,9 @@ export class PerformanceMonitor extends UIPanel {
     
     this.targetFPS = targetFPS;
     this.currentQuality = initialQuality;
+    
+    // 🚀 Detect DevTools (causes 30-50% performance drop)
+    this.detectDevTools();
     this.adaptiveEnabled = false; // Disable adaptive quality by default - it's too aggressive
     
     // Initialize metric collectors
@@ -354,6 +368,8 @@ export class PerformanceMonitor extends UIPanel {
     this.drawCalls = 0;
     this.webglDrawCalls = 0;
     this.textDrawCalls = 0;
+    this.instancedDrawCalls = 0;
+    this.instanceCount = 0;
     this.textMemory = 0;
     
     // Reset per-frame counters
@@ -376,7 +392,10 @@ export class PerformanceMonitor extends UIPanel {
     // Periodic scans (every 60 frames)
     if (this.frameTimes.length % 60 === 0) {
       this.listenerCollector.scan();
-      this.allocationTracker.scanForLeaks();
+      // 🚀 Skip leak scanning in lightweight mode (expensive!)
+      if (!this.lightweightMode) {
+        this.allocationTracker.scanForLeaks();
+      }
     }
   }
 
@@ -401,15 +420,19 @@ export class PerformanceMonitor extends UIPanel {
     // Track frame spikes and GPU metrics
     this.spikeCollector.recordFrame(frameTime);
     this.gpuCollector.recordFrame(frameTime, gpuDrawTime);
-    this.platformCollector.recordFrame(frameTime);
     
-    // Track long tasks
-    if (frameTime > 16.67) {
-      this.longTaskCollector.recordTask(frameTime);
+    // 🚀 Skip expensive profiling in lightweight mode (DevTools open)
+    if (!this.lightweightMode) {
+      this.platformCollector.recordFrame(frameTime);
+      
+      // Track long tasks
+      if (frameTime > 16.67) {
+        this.longTaskCollector.recordTask(frameTime);
+      }
+      
+      // Track input lag
+      this.inputCollector.recordFrameRender();
     }
-    
-    // Track input lag
-    this.inputCollector.recordFrameRender();
     
     // Track GC activity
     const memory = (performance as any).memory;
@@ -441,6 +464,9 @@ export class PerformanceMonitor extends UIPanel {
       this.adjustQuality();
     }
     
+    // 🚀 Periodic DevTools detection (every 2 seconds)
+    this.detectDevTools();
+    
     if (this.qualityChangeDelay > 0) {
       this.qualityChangeDelay--;
     }
@@ -460,8 +486,21 @@ export class PerformanceMonitor extends UIPanel {
     this.drawCalls = this.webglDrawCalls + this.textDrawCalls;
   }
 
+  setGPUInstancingEnabled(enabled: boolean): void {
+    this.gpuInstancingEnabled = enabled;
+  }
+
+  recordInstancedDrawCall(instanceCount: number): void {
+    this.instancedDrawCalls++;
+    this.instanceCount += instanceCount;
+  }
+
   recordTextMemory(memory: number): void {
     this.textMemory = memory;
+  }
+
+  recordParticleCount(count: number): void {
+    this.particleCount = count;
   }
 
   // Enhanced recording methods
@@ -574,6 +613,7 @@ export class PerformanceMonitor extends UIPanel {
   }
   
   trackAllocation(obj: object, type: string, size: number = 0): void {
+    if (this.lightweightMode) return; // 🚀 Skip in lightweight mode
     this.allocationTracker.trackAllocation(obj, type, size);
   }
   
@@ -582,10 +622,12 @@ export class PerformanceMonitor extends UIPanel {
   }
   
   startFunctionProfile(name: string): void {
+    if (this.lightweightMode) return; // 🚀 Skip in lightweight mode
     this.functionProfiler.startFunction(name);
   }
   
   endFunctionProfile(name: string): void {
+    if (this.lightweightMode) return; // 🚀 Skip in lightweight mode
     this.functionProfiler.endFunction(name);
   }
   
@@ -606,6 +648,37 @@ export class PerformanceMonitor extends UIPanel {
       this.physicsDeepCollector.recordBodyStates(metrics.sleeping, metrics.awake);
     }
     if (metrics.iterations !== undefined) this.physicsDeepCollector.recordConstraintIterations(metrics.iterations);
+  }
+
+  /**
+   * 🚀 Detect DevTools (causes 30-50% performance drop)
+   * Uses threshold detection + periodic checks
+   */
+  private detectDevTools(): void {
+    // Check window.outerWidth/innerWidth difference (DevTools docked)
+    const widthThreshold = window.outerWidth - window.innerWidth > 160;
+    const heightThreshold = window.outerHeight - window.innerHeight > 160;
+    
+    // Check for debugger breakpoints (DevTools open)
+    const devToolsDetected = widthThreshold || heightThreshold;
+    
+    if (devToolsDetected !== this.devToolsOpen) {
+      this.devToolsOpen = devToolsDetected;
+      this.lightweightMode = devToolsDetected;
+      
+      if (devToolsDetected) {
+        console.log('🔧 DevTools detected - enabling lightweight profiling mode');
+      } else {
+        console.log('✅ DevTools closed - full profiling restored');
+      }
+    }
+    
+    // Periodic check every 2 seconds
+    this.devToolsCheckInterval++;
+    if (this.devToolsCheckInterval >= 120) { // 2 seconds at 60fps
+      this.devToolsCheckInterval = 0;
+      // Will check again next time
+    }
   }
 
   private adjustQuality(): void {
@@ -743,7 +816,13 @@ export class PerformanceMonitor extends UIPanel {
       textDrawCalls: this.textDrawCalls,
       memory: memory,
       textMemory: this.textMemory,
+      particleCount: this.particleCount,
       quality: this.currentQuality,
+
+      // GPU instancing metrics
+      gpuInstancingEnabled: this.gpuInstancingEnabled,
+      instancedDrawCalls: this.instancedDrawCalls,
+      instanceCount: this.instanceCount,
 
       // Rendering efficiency
       verticesRendered: this.verticesThisFrame,
@@ -1010,6 +1089,26 @@ export class PerformanceMonitor extends UIPanel {
               </div>
             </div>
 
+            <div class="section-header">🚀 GPU INSTANCING</div>
+            <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Status</span>
+                <span class="ui-value" data-metric="instancingstatus">OFF</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Draw Calls</span>
+                <span class="ui-value" data-metric="instanceddrawcalls">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Instances</span>
+                <span class="ui-value" data-metric="instancecount">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Speedup</span>
+                <span class="ui-value" data-metric="instancingspeedup">N/A</span>
+              </div>
+            </div>
+
             <div class="section-header">📦 BATCH ANALYSIS</div>
             <div class="ui-section">
               <div class="ui-row">
@@ -1079,6 +1178,10 @@ export class PerformanceMonitor extends UIPanel {
               <div class="ui-row">
                 <span class="ui-label">└─ Text</span>
                 <span class="ui-value" data-metric="textentities">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Particles</span>
+                <span class="ui-value" data-metric="particles">0</span>
               </div>
               <div class="ui-row">
                 <span class="ui-label">Rendered</span>
@@ -1498,16 +1601,10 @@ export class PerformanceMonitor extends UIPanel {
     set('hashcells', `${metrics.spatialHashCells}/${metrics.spatialHashMaxBucket}`);
     
     // New physics metrics - sleeping entities and active collision pairs
-    const physicsMetrics = (this as any).lastPhysicsMetrics;
-    if (physicsMetrics) {
-      const sleepingCount = physicsMetrics.sleepingEntities || 0;
-      const activePairs = physicsMetrics.activeCollisionPairs || 0;
-      set('sleeping', sleepingCount.toString());
-      set('activepairs', activePairs.toString());
-    } else {
-      set('sleeping', '0');
-      set('activepairs', '0');
-    }
+    const sleepingCount = (metrics as any).sleepingBodies || 0;
+    const awakeCount = (metrics as any).awakeBodies || 0;
+    set('sleeping', sleepingCount.toString());
+    set('activepairs', awakeCount.toString());
 
     // ECS Metrics
     const activeCount = metrics.entitiesProcessed / 1000;
@@ -1531,6 +1628,12 @@ export class PerformanceMonitor extends UIPanel {
       set('shapes', '0');
       set('textentities', '0');
     }
+    
+    // Particle count
+    const particleCountVal = metrics.particleCount || 0;
+    const particleCountK = particleCountVal / 1000;
+    const particleClass = getColorClass(particleCountK, {excellent: 10, good: 25, ok: 50, warning: 75, critical: 100, severe: 150}, false);
+    set('particles', particleCountK > 1 ? `${particleCountK.toFixed(1)}K` : particleCountVal.toString(), particleClass);
     
     const renderedCount = metrics.entitiesRendered / 1000;
     const renderedClass = getColorClass(renderedCount, {excellent: 5, good: 10, ok: 25, warning: 50, critical: 100, severe: 200}, false);
@@ -1708,6 +1811,29 @@ export class PerformanceMonitor extends UIPanel {
     
     set('gputimefallback', metrics.usingGPUTimingFallback ? 'Yes' : 'No', metrics.usingGPUTimingFallback ? 'critical' : 'excellent');
 
+    // GPU Instancing section
+    const instancingEnabled = metrics.gpuInstancingEnabled || false;
+    set('instancingstatus', instancingEnabled ? '✅ ACTIVE' : '⚠️ OFF', instancingEnabled ? 'excellent' : 'warning');
+    
+    const instancedDrawCalls = metrics.instancedDrawCalls || 0;
+    const instancedCallsClass = getColorClass(instancedDrawCalls, {excellent: 5, good: 10, ok: 20, warning: 50, critical: 100}, false);
+    set('instanceddrawcalls', instancedDrawCalls.toString(), instancedCallsClass);
+    
+    const instanceCount = metrics.instanceCount || 0;
+    const instanceCountK = instanceCount / 1000;
+    const instanceCountClass = getColorClass(instanceCountK, {excellent: 2, good: 5, ok: 10, warning: 25, critical: 50}, false);
+    set('instancecount', instanceCount > 1000 ? `${instanceCountK.toFixed(1)}K` : instanceCount.toString(), instanceCountClass);
+    
+    // Calculate estimated speedup (instances per draw call)
+    if (instancingEnabled && instancedDrawCalls > 0 && instanceCount > 0) {
+      const avgInstancesPerCall = instanceCount / instancedDrawCalls;
+      const speedup = avgInstancesPerCall > 1 ? `${avgInstancesPerCall.toFixed(0)}x` : 'N/A';
+      const speedupClass = getColorClass(avgInstancesPerCall, {excellent: 100, good: 50, ok: 25, warning: 10, critical: 5}, true);
+      set('instancingspeedup', speedup, speedupClass);
+    } else {
+      set('instancingspeedup', 'N/A');
+    }
+
     // Batch Analysis section
     const batchCountClass = getColorClass(metrics.totalBatches || 0, {excellent: 5, good: 20, ok: 50, warning: 100, critical: 200, severe: 500}, false);
     set('batchcount', (metrics.totalBatches || 0).toString(), batchCountClass);
@@ -1825,7 +1951,6 @@ export class PerformanceMonitor extends UIPanel {
     // Gather extended metrics from engine/world
     const world = (window as any).vectoriumCurrentWorld;
     const scene = (window as any).vectoriumCurrentScene;
-    const physicsMetrics = (this as any).lastPhysicsMetrics;
     const memory = (performance as any).memory;
     
     const extendedMetrics = {
@@ -1884,13 +2009,13 @@ export class PerformanceMonitor extends UIPanel {
       },
       
       // Physics extended
-      physicsDetailed: physicsMetrics ? {
-        sleepingEntities: physicsMetrics.sleepingEntities || 0,
-        awakeEntities: (world?.getActiveCount() || 0) - (physicsMetrics.sleepingEntities || 0),
-        activeCollisionPairs: physicsMetrics.activeCollisionPairs || 0,
+      physicsDetailed: {
+        sleepingEntities: (metrics as any).sleepingBodies || 0,
+        awakeEntities: (metrics as any).awakeBodies || 0,
+        activeCollisionPairs: (metrics as any).collisionPairs || 0,
         spatialHashEfficiency: metrics.spatialHashCells > 0 ? 
           metrics.spatialHashMaxBucket / metrics.spatialHashCells : 0
-      } : null,
+      },
       
       // World/Scene stats
       worldStats: world ? {
