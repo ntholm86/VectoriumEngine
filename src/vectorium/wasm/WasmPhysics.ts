@@ -109,10 +109,10 @@ export class WasmPhysics {
     
     const t0 = performance.now();
     
-    // Physics constants
-    const restitutionValue = (_restitution && _restitution[0]) || 0.03;
-    const airDamping = 0.98;
-    const groundDamping = 0.75;
+    // Physics constants - NO damping for bunnymark (bunnies never settle)
+    const restitutionValue = (_restitution && _restitution[0]) || 1.0;
+    const airDamping = 1.0;  // No air resistance
+    const groundDamping = 1.0; // No ground friction
     
     // ✅ SINGLE-PASS WASM CALL (replaces 7 separate calls)
     // All physics happens in WASM: gravity, integration, collisions, boundaries

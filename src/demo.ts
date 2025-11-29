@@ -14,32 +14,7 @@ class WasmDemoScene extends Scene {
     console.log('🐰 Bunnymark Standard Demo');
   }
   
-  update(dt: number): void {
-    super.update(dt);
-    
-    // Make bunnies jump when they hit the ground
-    if (!this.isRunning) return;
-    
-    const world = this.world;
-    const canvasHeight = BUNNYMARK_CONFIG.canvas.height;
-    const bunnyHeight = BUNNYMARK_CONFIG.entity.height;
-    const groundY = canvasHeight - bunnyHeight / 2;
-    
-    // Get array references
-    const posY = world.getPositionY();
-    const velocityY = world.velocities.y;
-    
-    // Check all entities for ground collision
-    for (let i = 0; i < world.getEntityCount(); i++) {
-      // If bunny is on or below ground and moving slowly downward (settled)
-      if (posY[i] >= groundY && Math.abs(velocityY[i]) < BUNNYMARK_CONFIG.jump.threshold) {
-        // Make it jump with upward velocity from config
-        const jumpStrength = BUNNYMARK_CONFIG.jump.strength.min + 
-          Math.random() * (BUNNYMARK_CONFIG.jump.strength.max - BUNNYMARK_CONFIG.jump.strength.min);
-        velocityY[i] = -jumpStrength;
-      }
-    }
-  }
+  // Standard bunnymark - no custom update logic needed
   
   /**
    * Start the bunnymark benchmark

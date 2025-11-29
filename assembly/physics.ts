@@ -889,9 +889,9 @@ export function updatePhysicsComplete(
   // PHASE 2: Position Integration (SIMD-optimized, skip sleeping)
   integratePositions(dt);
   
-  // PHASE 3: Velocity Damping (branchless, SIMD-optimized, skip sleeping)
-  const groundHeight = boundsHeight * 0.95;
-  applyDamping(airDamping, groundDamping, groundHeight);
+  // PHASE 3: Velocity Damping - DISABLED for bunnymark (no energy loss)
+  // const groundHeight = boundsHeight * 0.95;
+  // applyDamping(airDamping, groundDamping, groundHeight);
   
   // PHASE 4: Collision Detection & Response (SIMD-optimized, skip sleeping)
   // Sleeping entities are automatically woken on collision
@@ -906,7 +906,7 @@ export function updatePhysicsComplete(
   
   // PHASE 5: Boundary Constraints (SIMD-optimized, all entities checked)
   // Boundaries can wake sleeping entities
-  applyBoundaryConstraints(boundsWidth, boundsHeight, 0.95); // High restitution for bouncy behavior
+  applyBoundaryConstraints(boundsWidth, boundsHeight, 1.0); // Perfect elastic collision (PixiJS bunnymark standard)
   
   return totalCollisions;
 }
@@ -1359,8 +1359,9 @@ export function updateFrame(
   
   integratePositions(dt);
   
-  const groundHeight = boundsHeight * 0.95;
-  applyDamping(airDamping, groundDamping, groundHeight);
+  // PHASE 3: Velocity Damping - DISABLED for bunnymark (no energy loss)
+  // const groundHeight = boundsHeight * 0.95;
+  // applyDamping(airDamping, groundDamping, groundHeight);
   
   let totalCollisions = 0;
   if (collisionCount > 0) {
@@ -1371,7 +1372,7 @@ export function updateFrame(
     }
   }
   
-  applyBoundaryConstraints(boundsWidth, boundsHeight, 0.95); // High restitution for bouncy behavior
+  applyBoundaryConstraints(boundsWidth, boundsHeight, 1.0); // Perfect elastic collision (PixiJS bunnymark standard)
   
   // PHASE 2: Animation Update (SIMD-optimized)
   const simdCount = entityCount & ~3;
