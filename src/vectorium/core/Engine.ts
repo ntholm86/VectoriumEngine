@@ -273,6 +273,7 @@ export class Vectorium {
       this.textureManager  // ← Direct injection, not via renderer
     );
     (this.currentScene as any).spawnService = spawnService;
+    (this.currentScene as any).performanceMonitor = this.performanceMonitor;
     
     // Initialize after Scene is ready (preloads textures) - AWAIT to ensure textures loaded
     await spawnService.initialize();

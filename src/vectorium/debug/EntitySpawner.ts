@@ -34,6 +34,7 @@ export class EntitySpawner extends UIPanel {
   private spawnCallbacks: Map<string, () => void> = new Map();
   private onSpawnCallback: ((x: number, y: number, config: any) => void) | null = null;
   private performanceMonitor: PerformanceMonitor | null = null;
+  private scene: Scene;
   
   constructor(scene: Scene, inputManager: InputManager, performanceMonitor?: PerformanceMonitor) {
     const config: UIPanelConfig = {
@@ -46,6 +47,7 @@ export class EntitySpawner extends UIPanel {
     };
     super(config, inputManager);
     
+    this.scene = scene;
     this.performanceMonitor = performanceMonitor || null;
     
     // 🚀 Auto-register callbacks if scene implements ISpawnableScene
@@ -565,69 +567,19 @@ export class EntitySpawner extends UIPanel {
 
   /**
    * Run Bunnymark Standard benchmark
-   * Follows industry standard: progressive spawn 800 bunnies per batch until <60 FPS
-   * Canvas: 800x600, Gravity: ON, Bounce: ON, Collision: OFF
+   * Triggers the scene's benchmark instead of managing it here
    */
   private async runBunnymarkBenchmark(): Promise<void> {
-    console.log('🐰 Starting Bunnymark Standard Benchmark');
-    console.log('📋 Configuration: 800x600 canvas, gravity + bounce, NO collision');
-    console.log('📊 Progressive spawn: 800 bunnies per batch until FPS < 60');
-    
     // Clear all entities first
     this.triggerCallback('clearAll');
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Configure for Bunnymark Standard
-    this.visualType = 'sprite';
-    this.physicsMode = 'gravity'; // Gravity ON, Collision OFF
-    this.textureUrl = '/bunny.png';
-    
-    const SPAWN_INCREMENT = 800; // Industry standard: 800 bunnies per batch
-    const TARGET_FPS = 60;
-    const CANVAS_WIDTH = 800;
-    const CANVAS_HEIGHT = 600;
-    
-    let totalSpawned = 0;
-    let isRunning = true;
-    
-    const spawnWave = async () => {
-      if (!isRunning) return;
-      
-      // Spawn batch at random positions across canvas
-      const centerX = CANVAS_WIDTH / 2;
-      const centerY = CANVAS_HEIGHT / 2;
-      
-      if (this.onSpawnCallback) {
-        const config = { 
-          ...this.getSpawnConfig(), 
-          count: SPAWN_INCREMENT 
-        };
-        this.onSpawnCallback(centerX, centerY, config);
-      }
-      
-      totalSpawned += SPAWN_INCREMENT;
-      console.log(`🐰 Spawned ${SPAWN_INCREMENT} bunnies → Total: ${totalSpawned.toLocaleString()}`);
-      
-      // Wait 250ms for FPS to stabilize, then check
-      await new Promise(resolve => setTimeout(resolve, 250));
-      
-      const currentFPS = this.performanceMonitor?.getMetrics().fps || 60;
-      console.log(`   📊 FPS: ${currentFPS.toFixed(1)}`);
-      
-      // Continue if FPS is acceptable and not at limit
-      if (currentFPS >= TARGET_FPS && totalSpawned < 500000) {
-        setTimeout(() => spawnWave(), 250); // Spawn next batch after 250ms
-      } else {
-        console.log('');
-        console.log('✅ BUNNYMARK STANDARD COMPLETE!');
-        console.log(`🏆 Final Score: ${totalSpawned.toLocaleString()} bunnies @ ${currentFPS.toFixed(1)} FPS`);
-        console.log('');
-        isRunning = false;
-      }
-    };
-    
-    // Start first wave
-    setTimeout(() => spawnWave(), 500);
+    // Trigger the scene's benchmark
+    if (this.scene && typeof (this.scene as any).startBenchmark === 'function') {
+      (this.scene as any).startBenchmark();
+    } else {
+      console.error('Scene does not have startBenchmark method');
+    }
   }
 
   /**
