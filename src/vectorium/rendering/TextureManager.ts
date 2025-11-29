@@ -183,7 +183,8 @@ export class TextureManager {
     const u1 = this.normalizeUV(frame.x + frame.width, textureWidth);
     const v1 = this.normalizeUV(frame.y + frame.height, textureHeight);
     
-    return { u0, v0, u1, v1 };
+    // Flip V coordinates (OpenGL texture coordinates start at bottom-left)
+    return { u0, v0: v1, u1, v1: v0 };
   }
 
   /**

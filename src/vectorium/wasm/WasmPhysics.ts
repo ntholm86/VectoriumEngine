@@ -46,11 +46,11 @@ export class WasmPhysics {
    * 🚀 Initialize WASM physics module
    * Non-blocking: Falls back to JS if WASM fails to load
    */
-  async initialize(): Promise<boolean> {
-    console.log('🚀 WASM Physics Engine: Initializing...');
+  async initialize(maxEntities: number = 2000000): Promise<boolean> {
+    console.log(`🚀 WASM Physics Engine: Initializing with capacity ${maxEntities}...`);
     
     try {
-      await this.wasmBridge.initialize(200000); // Support 200K entities
+      await this.wasmBridge.initialize(maxEntities); // Use passed capacity
       this.wasmReady = true;
       console.log('✅ WASM Physics: 5-10x acceleration enabled');
       console.log('✅ Zero-copy shared memory enabled');
@@ -214,8 +214,12 @@ export class WasmPhysics {
   updateFrame(
     entityCount: number,
     dt: number,
+    gravityY: number,
     boundsWidth: number,
     boundsHeight: number,
+    airDamping: number,
+    groundDamping: number,
+    restitution: number,
     gravityEntityCount: number,
     collisionEntityCount: number,
     cameraX: number,
@@ -223,8 +227,7 @@ export class WasmPhysics {
     worldWidth: number,
     worldHeight: number,
     cullingMargin: number,
-    visibleIndices: Uint32Array,
-    gravityY: number = 1200
+    visibleIndices: Uint32Array
   ): number {
     if (!this.wasmReady) return 0;
     
@@ -232,10 +235,6 @@ export class WasmPhysics {
     this.metrics.totalCollisionChecks = 0;
     
     const t0 = performance.now();
-    
-    const restitutionValue = 0.03;
-    const airDamping = 0.98;
-    const groundDamping = 0.75;
     
     const result = this.wasmBridge.updateFrame(
       entityCount,
@@ -245,7 +244,7 @@ export class WasmPhysics {
       boundsHeight,
       airDamping,
       groundDamping,
-      restitutionValue,
+      restitution,
       gravityEntityCount,
       collisionEntityCount,
       cameraX,

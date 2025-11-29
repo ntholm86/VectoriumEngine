@@ -198,15 +198,24 @@ export class PerformanceBenchmark {
       const anim = animationConfigs[animIndex];
       
       // Spawn batch with current shape/animation combo
-      const entities = this.spawnService.spawnEntities(
-        entitiesToSpawn,
-        centerX,
-        centerY,
-        {
-          physicsMode,
-          visualType
-        }
-      );
+      const entities = this.spawnService.spawn({
+        position: { x: centerX, y: centerY },
+        count: entitiesToSpawn,
+        distribution: { type: 'circle', radius: 200 },
+        visual: {
+          type: visualType === 'sprite' ? 'sprite' : 'shape',
+          shape: visualType === 'sprite' ? 0 : this.getShapeTypeFromString(visualType),
+          texture: visualType === 'sprite' ? '/bunny.png' : undefined,
+        },
+        size: { min: 20, max: 40 },
+        color: 'palette',
+        physics: {
+          velocity: 'radial',
+          speed: { min: 100, max: 400 },
+          gravity: physicsMode === 'gravity' || physicsMode === 'full',
+          collision: physicsMode === 'collision' || physicsMode === 'full',
+        },
+      });
       
       // Apply animation to spawned entities (direct array access for performance)
       for (const entityId of entities) {
@@ -225,6 +234,19 @@ export class PerformanceBenchmark {
     }
   }
   
+  private getShapeTypeFromString(visualType: string): number {
+    const shapeMap: Record<string, number> = {
+      'circle': 1,
+      'star5': 2,
+      'triangle': 3,
+      'hexagon': 4,
+      'heart': 5,
+      'square': 6,
+      'diamond': 7,
+    };
+    return shapeMap[visualType] || 1;
+  }
+  
   /**
    * Analyze collected samples
    */
@@ -237,43 +259,13 @@ export class PerformanceBenchmark {
     const fps = this.samples.map(s => s.fps);
     const frameTime = this.samples.map(s => s.frameTime);
     const drawCalls = this.samples.map(s => s.drawCalls);
-    const webglDrawCalls = this.samples.map(s => s.webglDrawCalls);
-    const textDrawCalls = this.samples.map(s => s.textDrawCalls);
-    const vertices = this.samples.map(s => s.verticesRendered);
-    const triangles = this.samples.map(s => s.trianglesRendered);
-    const batchEff = this.samples.map(s => s.batchEfficiency);
-    const stateChanges = this.samples.map(s => s.stateChanges);
     const physicsTime = this.samples.map(s => s.physicsTime);
-    const gravityTime = this.samples.map(s => s.gravityTime);
-    const collisionBuildTime = this.samples.map(s => s.collisionBuildTime);
-    const collisionDetectTime = this.samples.map(s => s.collisionDetectTime);
-    const boundaryTime = this.samples.map(s => s.boundaryTime);
     const collisionChecks = this.samples.map(s => s.collisionChecks);
     const spatialCells = this.samples.map(s => s.spatialHashCells);
     const spatialMaxBucket = this.samples.map(s => s.spatialHashMaxBucket);
     const memory = this.samples.map(s => s.memory);
-    const vertexBufferSize = this.samples.map(s => s.vertexBufferSize);
-    const indexBufferSize = this.samples.map(s => s.indexBufferSize);
-    const textureMemory = this.samples.map(s => s.textureMemory);
-    const bufferUploadSize = this.samples.map(s => s.bufferUploadSize);
-    const gpuUtil = this.samples.map(s => s.gpuUtilization);
-    const gpuDrawTime = this.samples.map(s => s.gpuDrawTime || 0);
-    const gpuTextTime = this.samples.map(s => s.gpuTextTime || 0);
     const entitiesProcessed = this.samples.map(s => s.entitiesProcessed);
     const entitiesRendered = this.samples.map(s => s.entitiesRendered);
-    const timePerEntity = this.samples.map(s => s.timePerEntity);
-    const inputLag = this.samples.map(s => s.inputLag || 0);
-    const inputLagP95 = this.samples.map(s => s.inputLagP95 || 0);
-    const fillRate = this.samples.map(s => s.fillRate || 0);
-    const overdraw = this.samples.map(s => s.overdrawPercentage || 0);
-    const totalBatches = this.samples.map(s => s.totalBatches || 1);
-    const textureSwaps = this.samples.map(s => s.textureSwaps || 0);
-    const shaderSwaps = this.samples.map(s => s.shaderSwaps || 0);
-    const spritesPerBatch = this.samples.map(s => s.avgSpritesPerBatch || 0);
-    const instancedDrawCalls = this.samples.map(s => s.instancedDrawCalls || 0);
-    const instanceCount = this.samples.map(s => s.instanceCount || 0);
-    const vsyncMisses = this.samples.map(s => s.vsyncMisses || 0);
-    const batteryPct = this.samples.map(s => s.batteryPercentage || 100);
     
     // Calculate core statistics
     const avgFPS = this.average(fps);
@@ -285,35 +277,9 @@ export class PerformanceBenchmark {
     
     // Frame stability
     const frameTimeVariance = this.variance(frameTime);
-    const frameTimeMin = Math.min(...frameTime);
-    const frameTimeMax = Math.max(...frameTime);
     
     // Count spikes
-    const minorSpikes = this.samples.reduce((sum, s) => sum + (s.minorSpikes || 0), 0);
-    const majorSpikes = this.samples.reduce((sum, s) => sum + (s.majorSpikes || 0), 0);
-    const severeSpikes = this.samples.reduce((sum, s) => sum + (s.severeSpikes || 0), 0);
     const totalSpikes = this.samples.reduce((sum, s) => sum + (s.totalSpikes || 0), 0);
-    const spikeRate = (totalSpikes / this.samples.length) * 60; // spikes per second
-    
-    // Performance score (weighted average, clamped 0-100)
-    const fpsScore = Math.min(avgFPS / 60, 1) * 40; // 40% weight
-    const spikeScore = (1 - Math.min(severeSpikes / this.samples.length, 1)) * 30; // 30% weight
-    const efficiencyScore = Math.max(0, Math.min(1, this.average(batchEff))) * 30; // 30% weight, clamped 0-1
-    const performanceScore = Math.max(0, Math.min(100, Math.round(fpsScore + spikeScore + efficiencyScore)));
-    
-    // Determine bottleneck
-    const avgGPUUtil = this.average(gpuUtil);
-    const gpuBottleneck = avgGPUUtil > 0.85;
-    const bottleneck: 'cpu' | 'gpu' | 'memory' | 'balanced' = 
-      gpuBottleneck ? 'gpu' :
-      avgFrameTime > 16 && avgGPUUtil < 0.5 ? 'cpu' :
-      memory.some(m => m > 1000) ? 'memory' :
-      'balanced';
-    
-    // Platform info
-    const isCharging = this.samples.some(s => s.isCharging === true);
-    const displayRefreshRate = this.samples.find(s => s.displayRefreshRate)?.displayRefreshRate || 60;
-    const gpuInstancingEnabled = this.samples.some(s => s.gpuInstancingEnabled === true);
     
     return {
       timestamp: new Date().toISOString(),

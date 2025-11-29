@@ -57,9 +57,9 @@ export class Scene {
   public culledCount = 0;
   public visibleCount = 0;
   
-  // 🍭 Minimal text support for EntitySpawnService (deprecated, prefer pure ECS)
-  private textEntities = new Map<EntityId, { text: string; style: any }>();
-  private textAnimations = new Map<EntityId, {
+  // Text support for EntitySpawnService (accessed directly)
+  public textEntities = new Map<EntityId, { text: string; style: any }>();
+  public textAnimations = new Map<EntityId, {
     rotationSpeed: number;
     pulseSpeed: number;
     pulsePhase: number;
@@ -131,9 +131,8 @@ export class Scene {
     );
     this.perfMetrics.updatePhysics = performance.now() - physicsStart;
     
-    // Unpack result
-    this.visibleCount = (result >> 16) & 0xFFFF;
-    // Note: collisionCount (lower 16 bits) available if needed for metrics
+    // Result is now the full visible count (no bit packing)
+    this.visibleCount = result;
     
     // Update culling metrics
     this.culledCount = this.world.getActiveCount() - this.visibleCount;
@@ -206,6 +205,9 @@ export class Scene {
     const textureIds = this.world.getTextureIds();
     
     const totalCount = this.world.getActiveCount();
+    const worldMax = (this.world as any).maxEntities;
+    
+    console.log(`[SCENE] renderECSBatch: totalCount=${totalCount}, worldMax=${worldMax}`);
     
     // 🚀 SIMD-STYLE SCALE MULTIPLICATION (process 4 at once)
     // This is 4x faster than naive loop due to CPU pipelining
@@ -248,6 +250,7 @@ export class Scene {
       // 🚀 TEXTURED SPRITE RENDERING: Use when entities have textures
       if (hasTextures && typeof (renderer as any).drawBulkSpritesIndexed === 'function') {
         const textureManager = (renderer as any).textureManager || null;
+        console.log(`[SCENE] Calling drawBulkSpritesIndexed with count=${totalCount}`);
         (renderer as any).drawBulkSpritesIndexed(
           posX, posY, rotation, this.scaledSizes,
           colorR, colorG, colorB, alphas,
@@ -441,41 +444,5 @@ export class Scene {
    */
   destroy(): void {
     this.clear();
-  }
-  
-  // ============================================================================
-  // LEGACY API (for compatibility with EntitySpawnService)
-  // ============================================================================
-  
-  /**
-   * @deprecated Use pure ECS patterns instead
-   */
-  getTextEntities(): Map<EntityId, { text: string; style: any }> {
-    return this.textEntities;
-  }
-  
-  /**
-   * @deprecated Use pure ECS patterns instead
-   */
-  registerTextAnimation(entityId: EntityId, animData: {
-    rotationSpeed: number;
-    pulseSpeed: number;
-    pulsePhase: number;
-  }): void {
-    this.textAnimations.set(entityId, animData);
-  }
-  
-  /**
-   * @deprecated Use pure ECS patterns instead
-   */
-  removeTextAnimation(entityId: EntityId): void {
-    this.textAnimations.delete(entityId);
-  }
-  
-  /**
-   * @deprecated No-op for compatibility
-   */
-  setWarningsEnabled(_enabled: boolean): void {
-    // No-op: Performance warnings removed for pure performance
   }
 }

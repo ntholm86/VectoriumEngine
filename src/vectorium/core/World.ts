@@ -107,7 +107,7 @@ export class World {
   readonly ANIM_SPIN = 3;
   readonly ANIM_FADE = 4;
   
-  constructor(maxEntities: number = 200000) {
+  constructor(maxEntities: number = 2000000) {
     this.maxEntities = maxEntities;
     this.wasmPhysics = new WasmPhysics();
     
@@ -185,8 +185,8 @@ export class World {
    * Expected performance gain: 65 FPS → 75-80 FPS @ 150K entities (15-20% improvement)
    */
   async initializeWasm(): Promise<boolean> {
-    // Initialize WASM physics engine
-    await this.wasmPhysics.initialize();
+    // Initialize WASM physics engine with max capacity
+    await this.wasmPhysics.initialize(this.maxEntities);
     
     // Check if WASM physics bridge is available
     const wasmBridge = (this.wasmPhysics as any).wasmBridge;
@@ -299,32 +299,32 @@ export class World {
       id = this.entityCount++;
     }
     
-    // Initialize components with defaults
+    // Initialize components with CLEAN defaults (no random effects)
     this.positionX[id] = x;
     this.positionY[id] = y;
     this.velocityX[id] = vx;
     this.velocityY[id] = vy;
-    this.rotation[id] = Math.floor(Math.random() * 360);
-    this.rotationSpeed[id] = Math.floor((Math.random() - 0.5) * 360);
+    this.rotation[id] = 0;  // No rotation by default
+    this.rotationSpeed[id] = 0;  // No rotation by default
     this.scale[id] = 1.0;
-    this.size[id] = 6 + Math.random() * 6; // 🚀 Reduced from 4-12 to 6-12 for fill rate optimization
+    this.size[id] = 10;  // Default size (override with setSize())
     this.baseSize[id] = this.size[id];
-    this.colorR[id] = Math.floor(Math.random() * 256);
-    this.colorG[id] = Math.floor(Math.random() * 256);
-    this.colorB[id] = Math.floor(Math.random() * 256);
+    this.colorR[id] = 255;  // Default white (override with setColor())
+    this.colorG[id] = 255;
+    this.colorB[id] = 255;
     this.alpha[id] = 1.0;
-    this.flags[id] = this.FLAG_ACTIVE | this.FLAG_VISIBLE | this.FLAG_PHYSICS | this.FLAG_ROTATING;
+    this.flags[id] = this.FLAG_ACTIVE | this.FLAG_VISIBLE;  // Only active and visible by default
     this.activeEntityCount++;
     
-    // Random animation type
-    this.animationType[id] = Math.floor(Math.random() * 5);
+    // NO animation by default (ANIM_ROTATE = 0 means no animation)
+    this.animationType[id] = 0;
     
-    // Initialize animation state
-    this.pulseTime[id] = Math.random() * Math.PI * 2;
-    this.pulseSpeed[id] = 2 + Math.random() * 3;
+    // Initialize animation state (all zeros = no animation)
+    this.pulseTime[id] = 0;
+    this.pulseSpeed[id] = 0;
     this.wobbleOffset[id] = 0;
-    this.wobbleSpeed[id] = 3 + Math.random() * 4;
-    this.fadeDirection[id] = 1;
+    this.wobbleSpeed[id] = 0;
+    this.fadeDirection[id] = 0;
     
     // CRITICAL FIX: Initialize physics properties to prevent stale data
     // When entities are reused from pool, they must have clean physics state
@@ -353,8 +353,7 @@ export class World {
     this.tweenTimes[id] = 0;
     this.tweenActive[id] = 0;
     
-    // 🚀 P0 OPTIMIZATION: Track animation count (default: all entities animated)
-    this.animatedEntityCount++;
+    // NO animation count increment (animation type is 0 = none)
     
     return id;
   }
@@ -485,8 +484,12 @@ export class World {
     return this.wasmPhysics.updateFrame(
       this.entityCount,
       dt,
+      600, // gravityY - standard gravity
       boundsWidth,
       boundsHeight,
+      0.999, // airDamping - minimal (0.1% loss)
+      0.95, // groundDamping - slight friction when on ground
+      0.8, // restitution - 80% bounce (standard for Bunnymark)
       this.gravityEntityCount,
       this.collisionEntityCount,
       cameraX,
@@ -746,9 +749,9 @@ export class World {
     id: EntityId,
     textureId: number,
     u0: number = 0,
-    v0: number = 0,
+    v0: number = 65535,  // Flipped: start at bottom (1.0)
     u1: number = 65535,
-    v1: number = 65535
+    v1: number = 0       // Flipped: end at top (0.0)
   ): void {
     this.textureIds[id] = textureId;
     this.uvU0[id] = u0;
@@ -866,6 +869,121 @@ export class World {
     this.colorR[id] = (rgb >> 16) & 0xFF;
     this.colorG[id] = (rgb >> 8) & 0xFF;
     this.colorB[id] = rgb & 0xFF;
+  }
+  
+  /**
+   * Set random color for entity
+   */
+  setRandomColor(id: EntityId): void {
+    this.colorR[id] = Math.floor(Math.random() * 256);
+    this.colorG[id] = Math.floor(Math.random() * 256);
+    this.colorB[id] = Math.floor(Math.random() * 256);
+  }
+  
+  /**
+   * Set rotation for entity (0-360 degrees)
+   */
+  setRotation(id: EntityId, degrees: number): void {
+    this.rotation[id] = Math.floor(degrees) % 360;
+  }
+  
+  /**
+   * Set rotation speed for entity (degrees per second)
+   */
+  setRotationSpeed(id: EntityId, degreesPerSecond: number): void {
+    this.rotationSpeed[id] = Math.floor(degreesPerSecond);
+    if (degreesPerSecond !== 0) {
+      this.flags[id] |= this.FLAG_ROTATING;
+    } else {
+      this.flags[id] &= ~this.FLAG_ROTATING;
+    }
+  }
+  
+  /**
+   * Apply random rotation effect to entity
+   */
+  setRandomRotation(id: EntityId): void {
+    this.rotation[id] = Math.floor(Math.random() * 360);
+    this.rotationSpeed[id] = Math.floor((Math.random() - 0.5) * 360);
+    if (this.rotationSpeed[id] !== 0) {
+      this.flags[id] |= this.FLAG_ROTATING;
+    }
+  }
+  
+  /**
+   * Apply pulse animation to entity
+   */
+  setPulseAnimation(id: EntityId, speed: number = 2.5): void {
+    if (this.animationType[id] === 0) this.animatedEntityCount++;
+    this.animationType[id] = this.ANIM_PULSE;
+    this.pulseTime[id] = Math.random() * Math.PI * 2;
+    this.pulseSpeed[id] = speed;
+  }
+  
+  /**
+   * Apply wobble animation to entity
+   */
+  setWobbleAnimation(id: EntityId, speed: number = 5): void {
+    if (this.animationType[id] === 0) this.animatedEntityCount++;
+    this.animationType[id] = this.ANIM_WOBBLE;
+    this.wobbleOffset[id] = 0;
+    this.wobbleSpeed[id] = speed;
+  }
+  
+  /**
+   * Apply fade animation to entity
+   */
+  setFadeAnimation(id: EntityId): void {
+    if (this.animationType[id] === 0) this.animatedEntityCount++;
+    this.animationType[id] = this.ANIM_FADE;
+    this.fadeDirection[id] = 1;
+  }
+  
+  /**
+   * Apply spin animation to entity
+   */
+  setSpinAnimation(id: EntityId): void {
+    if (this.animationType[id] === 0) this.animatedEntityCount++;
+    this.animationType[id] = this.ANIM_SPIN;
+  }
+  
+  /**
+   * Apply random animation to entity
+   */
+  setRandomAnimation(id: EntityId): void {
+    const animType = Math.floor(Math.random() * 5);
+    if (animType === 0) return; // No animation
+    
+    if (this.animationType[id] === 0) this.animatedEntityCount++;
+    this.animationType[id] = animType;
+    
+    switch (animType) {
+      case this.ANIM_PULSE:
+        this.pulseTime[id] = Math.random() * Math.PI * 2;
+        this.pulseSpeed[id] = 2 + Math.random() * 3;
+        break;
+      case this.ANIM_WOBBLE:
+        this.wobbleSpeed[id] = 3 + Math.random() * 4;
+        break;
+      case this.ANIM_FADE:
+        this.fadeDirection[id] = 1;
+        break;
+    }
+  }
+  
+  /**
+   * Clear animation from entity
+   */
+  clearAnimation(id: EntityId): void {
+    if (this.animationType[id] !== 0 && this.animatedEntityCount > 0) {
+      this.animatedEntityCount--;
+    }
+    this.animationType[id] = 0;
+    this.pulseTime[id] = 0;
+    this.pulseSpeed[id] = 0;
+    this.wobbleOffset[id] = 0;
+    this.wobbleSpeed[id] = 0;
+    this.fadeDirection[id] = 0;
   }
   
   /**

@@ -24,6 +24,7 @@ import { AnimationManager } from '../animation/AnimationManager';
 import { AnimationSystem } from '../animation/AnimationSystem';
 import { InputManager } from '../input/InputManager';
 import { ParticleSystemManager } from '../particles/ParticleSystem';
+import { EntitySpawnService } from '../entities/EntitySpawnService';
 
 // Re-export for convenience
 export { Viewport, Scene };
@@ -264,22 +265,18 @@ export class Vectorium {
     // 🚀 Now call scene.load()
     await this.currentScene.load();
     
-    // 🚀 Always instantiate EntitySpawnService (core service)
-    import('../entities/EntitySpawnService').then(({ EntitySpawnService }) => {
-      (this.currentScene as any).spawnService = new EntitySpawnService(
-        this.currentScene!,
-        this.currentScene!.world,
-        this.textPool,
-        this.animationManager
-      );
-      console.log('✅ EntitySpawnService auto-configured');
-      
-      // Auto-wire with EntitySpawner UI if it's registered
-      const uiPanel = this.panelManager.get('spawner');
-      if (uiPanel) {
-        (this.currentScene as any).spawnService.registerWithSpawner(uiPanel);
-      }
-    });
+    // 🚀 Always instantiate EntitySpawnService (core service) - SYNCHRONOUSLY
+    const spawnService = new EntitySpawnService(
+      this.currentScene,
+      this.currentScene.world,
+      this.textPool,
+      this.textureManager  // ← Direct injection, not via renderer
+    );
+    (this.currentScene as any).spawnService = spawnService;
+    
+    // Initialize after Scene is ready (preloads textures) - AWAIT to ensure textures loaded
+    await spawnService.initialize();
+    console.log('✅ EntitySpawnService initialized with textures loaded');
     
     // 🚀 Register debug panels with UIPanelManager
     if (this.config.enableDebugTools) {
@@ -290,14 +287,12 @@ export class Vectorium {
       const debugPanel = new DebugPanel(this.runtimeConfig, this.inputManager);
       this.panelManager.register('debug', debugPanel);
       
-      // Register Entity Spawner UI Panel (Press E)
-      const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager);
+      // Register Entity Spawner UI Panel (Press E) - pass performance monitor for benchmarks
+      const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager, this.performanceMonitor);
       this.panelManager.register('spawner', entitySpawner);
       
-      // Wire with service when service is ready
-      if ((this.currentScene as any).spawnService) {
-        (this.currentScene as any).spawnService.registerWithSpawner(entitySpawner);
-      }
+      // Wire spawn service with UI panel (guaranteed to exist now)
+      spawnService.registerWithSpawner(entitySpawner);
       
       // Register Camera Controls (Press V)
       const camera = this.getCamera();
@@ -532,9 +527,6 @@ export class Vectorium {
   
   setOptimizationWarnings(enabled: boolean): void {
     this.renderer.setWarningsEnabled(enabled);
-    if (this.currentScene) {
-      this.currentScene.setWarningsEnabled(enabled);
-    }
   }
   
   /**

@@ -1,34 +1,19 @@
 /**
- * 🚀 ULTRA-OPTIMIZED Entity Spawn Service
- * Zero allocation, batch processing, WASM-friendly
+ * EntitySpawnService - Generic, high-performance entity creation system
  * 
- * PERFORMANCE ENHANCEMENTS:
- * ✅ Removed ServiceAwareBase (direct dependency injection)
- * ✅ Zero allocation spawning (pre-allocated buffers)
- * ✅ Batch physics configuration (SIMD-friendly)
- * ✅ Direct ECS array manipulation (no factory overhead)
- * ✅ Pre-calculated sin/cos/random values
- * ✅ Cached color palette (zero conversion overhead)
- * ✅ Vectorized operations where possible
- * ✅ Inlined hot paths (zero function call overhead)
- * 
- * WASM INTEGRATION:
- * ✅ Directly writes to WASM-shared memory
- * ✅ Batch operations compatible with WASM physics
- * ✅ Zero-copy entity creation
- * 
- * Expected Performance:
- * - 10-50x faster than old version for large batches
- * - Zero GC pressure (no allocations)
- * - SIMD auto-vectorization by compiler
- * - Cache-friendly memory access patterns
+ * Design Philosophy:
+ * - Single responsibility: Create and configure entities
+ * - Composable: Configuration through simple objects
+ * - Zero allocation: Pre-allocated buffers, object pooling
+ * - Batch-first: All operations optimized for bulk creation
+ * - Type-safe: Strong typing with sensible defaults
  */
 
 import { Scene } from '../core/Engine';
 import { EntityId, World } from '../core/World';
 import { ShapeType } from '../shapes/ShapeType';
-import { AnimationManager } from '../animation/AnimationManager';
 import { TextPool } from '../core/TextPool';
+import { BUNNYMARK_CONFIG } from '../config/BunnymarkConfig';
 
 // Type aliases for cleaner API
 export type PhysicsMode = 'none' | 'gravity' | 'collision' | 'full';
@@ -38,564 +23,538 @@ export type VisualType =
   | 'pentagram' | 'vesica' | 'moon' | 'cross' | 'egg' | 'roundedx' 
   | 'pie' | 'arc' | 'ring' | 'trapezoid' | 'horseshoe' | 'text';
 
-export interface TextConfig {
-  mode: 'static' | 'dynamic';
-  content: string;
-  bold: boolean;
-  italic: boolean;
-  size: number;
-  align: 'left' | 'center' | 'right';
-  shadow: boolean;
-  outline: boolean;
-  glow: boolean;
-}
-
-export interface TextureConfig {
-  textureUrl: string;
-}
-
-export interface AnimationConfig {
-  type: 'none' | 'frame' | 'tween';
-  fps: number;
-  loop: boolean;
-  tweenProperty: 'x' | 'y' | 'scale' | 'size' | 'alpha';
-  tweenDuration: number;
-  tweenEasing: 'linear' | 'easeInOut' | 'bounce';
-}
-
 export interface SpawnConfig {
-  x: number;
-  y: number;
+  // Position & quantity
+  position: { x: number; y: number };
   count: number;
-  physicsMode: PhysicsMode;
-  visualType: VisualType;
-  textConfig?: TextConfig;
-  textureConfig?: TextureConfig;
-  animationConfig?: AnimationConfig;
-}
-
-/**
- * 🚀 ULTRA-OPTIMIZED Entity Spawn Service
- * Direct dependency injection, zero allocation, batch processing
- */
-export class EntitySpawnService {
-  // 🚀 Direct references (no ServiceAwareBase overhead)
-  private world: World;
-  private textPool: TextPool;
-  private animationManager: AnimationManager;
   
-  // 🎨 Pre-calculated color palette (RGB bytes, no conversion needed)
-  private readonly colorPalette: Uint8Array;
-  private readonly colorCount = 7;
-  
-  // 🎨 Shape type lookup (constant-time, no map overhead)
-  private readonly shapeTypeLUT: Record<VisualType, ShapeType> = {
-    'sprite': ShapeType.SQUARE,
-    'circle': ShapeType.CIRCLE,
-    'star5': ShapeType.STAR_5,
-    'star6': ShapeType.STAR_6,
-    'triangle': ShapeType.TRIANGLE,
-    'pentagon': ShapeType.PENTAGON,
-    'hexagon': ShapeType.HEXAGON,
-    'octagon': ShapeType.OCTAGON,
-    'heart': ShapeType.HEART,
-    'square': ShapeType.SQUARE,
-    'diamond': ShapeType.DIAMOND,
-    'pentagram': ShapeType.PENTAGRAM,
-    'vesica': ShapeType.VESICA,
-    'moon': ShapeType.MOON,
-    'cross': ShapeType.CROSS,
-    'egg': ShapeType.EGG,
-    'roundedx': ShapeType.ROUNDED_X,
-    'pie': ShapeType.PIE,
-    'arc': ShapeType.ARC,
-    'ring': ShapeType.RING,
-    'trapezoid': ShapeType.TRAPEZOID,
-    'horseshoe': ShapeType.HORSESHOE,
-    'text': ShapeType.SQUARE  // Text uses quad
+  // Spatial distribution
+  distribution?: {
+    type: 'point' | 'circle' | 'grid' | 'line';
+    radius?: number;      // For circle distribution
+    spacing?: number;     // For grid distribution
+    angle?: number;       // For line distribution
   };
   
-  // 🚀 Pre-allocated spawn buffers (reused, zero allocation)
-  private readonly maxBatchSize = 100000;
-  private readonly spawnAngles: Float32Array;
-  private readonly spawnSpeeds: Float32Array;
-  private readonly spawnSizes: Float32Array;
+  // Visual appearance
+  visual: {
+    type: 'shape' | 'sprite' | 'text';
+    shape?: ShapeType;
+    texture?: string;     // URL for sprites
+    text?: string;        // Content for text
+  };
   
-  // 🎯 Pre-calculated sin/cos for radial spawn (360 degrees @ 1° increments)
-  private readonly sinTable: Float32Array;
-  private readonly cosTable: Float32Array;
+  // Size configuration
+  size?: {
+    min: number;
+    max: number;
+  } | number;
+  
+  // Color configuration
+  color?: {
+    r: number;
+    g: number;
+    b: number;
+  } | 'random' | 'palette';
+  
+  // Physics behavior
+  physics?: {
+    velocity?: { x: number; y: number } | 'random' | 'radial';
+    speed?: { min: number; max: number } | number;
+    gravity?: boolean;
+    collision?: boolean;
+  };
+  
+  // Animation
+  animation?: {
+    type: 'none' | 'tween' | 'rotate';
+    property?: 'x' | 'y' | 'scale' | 'alpha' | 'rotation';
+    duration?: number;
+    easing?: 'linear' | 'easeInOut' | 'bounce';
+  };
+}
+
+// ============================================================================
+// EntitySpawnService - Main Class
+// ============================================================================
+
+export class EntitySpawnService {
+  // Core dependencies
+  private readonly world: World;
+  private readonly textPool: TextPool;
+  private readonly textureManager: any;  // TextureManager - direct injection
+  private readonly scene: Scene;
+  
+  // Texture cache for sprites
+  private readonly textureCache = new Map<string, number>();
+  
+  // Pre-calculated color palettes
+  private readonly rainbowPalette: Uint8Array;
+  
+  // Pre-allocated computation buffers
+  private readonly maxBatchSize = 100000;
+  private readonly computeBuffer: Float32Array;
+  
+  // Trigonometry lookup tables (360 degrees)
+  private readonly sinLUT: Float32Array;
+  private readonly cosLUT: Float32Array;
   
   constructor(
-    private scene: Scene,
+    scene: Scene,
     world: World,
     textPool: TextPool,
-    animationManager: AnimationManager
+    textureManager: any  // TextureManager - direct injection
   ) {
-    // 🚀 Direct assignment (no ServiceAwareBase)
+    this.scene = scene;
     this.world = world;
     this.textPool = textPool;
-    this.animationManager = animationManager;
+    this.textureManager = textureManager;
     
-    // 🎨 Pre-calculate rainbow color palette (no runtime conversion)
-    this.colorPalette = new Uint8Array(this.colorCount * 3);
-    const colors = [
-      [255, 51, 51],    // Red
-      [255, 153, 51],   // Orange
-      [255, 255, 51],   // Yellow
-      [51, 255, 51],    // Green
-      [51, 153, 255],   // Blue
-      [153, 51, 255],   // Purple
-      [255, 51, 153],   // Pink
-    ];
-    for (let i = 0; i < this.colorCount; i++) {
-      this.colorPalette[i * 3] = colors[i][0];
-      this.colorPalette[i * 3 + 1] = colors[i][1];
-      this.colorPalette[i * 3 + 2] = colors[i][2];
-    }
+    // Initialize rainbow color palette (7 colors × RGB)
+    this.rainbowPalette = new Uint8Array([
+      255, 51, 51,    // Red
+      255, 153, 51,   // Orange
+      255, 255, 51,   // Yellow
+      51, 255, 51,    // Green
+      51, 153, 255,   // Blue
+      153, 51, 255,   // Purple
+      255, 51, 153,   // Pink
+    ]);
     
-    // 🚀 Pre-allocate spawn buffers
-    this.spawnAngles = new Float32Array(this.maxBatchSize);
-    this.spawnSpeeds = new Float32Array(this.maxBatchSize);
-    this.spawnSizes = new Float32Array(this.maxBatchSize);
+    // Pre-allocate computation buffer
+    this.computeBuffer = new Float32Array(this.maxBatchSize * 4);
     
-    // 🎯 Pre-calculate sin/cos tables (360 degrees)
-    this.sinTable = new Float32Array(360);
-    this.cosTable = new Float32Array(360);
+    // Build sin/cos lookup tables
+    this.sinLUT = new Float32Array(360);
+    this.cosLUT = new Float32Array(360);
     for (let deg = 0; deg < 360; deg++) {
       const rad = (deg * Math.PI) / 180;
-      this.sinTable[deg] = Math.sin(rad);
-      this.cosTable[deg] = Math.cos(rad);
+      this.sinLUT[deg] = Math.sin(rad);
+      this.cosLUT[deg] = Math.cos(rad);
     }
   }
   
+  // ============================================================================
+  // Public API
+  // ============================================================================
+  
   /**
-   * Auto-register with EntitySpawner if it exists
+   * Initialize service (call after Scene is ready)
+   * Returns Promise to ensure textures are loaded before spawning
+   */
+  async initialize(): Promise<void> {
+    console.log('[INIT] EntitySpawnService.initialize() - loading textures...');
+    const textureId = await this.loadTexture('/bunny.png');
+    console.log(`✅ Default textures preloaded: /bunny.png → ID ${textureId}`);
+    console.log(`📦 Texture cache now has: ${Array.from(this.textureCache.entries()).map(([url, id]) => `${url}→${id}`).join(', ')}`);
+  }
+  
+  /**
+   * Spawn entities based on configuration
+   */
+  spawn(config: SpawnConfig): EntityId[] {
+    const count = config.count; // No limit - let renderer handle chunking
+    const entities: EntityId[] = [];
+    
+    // Generate spawn positions
+    const positions = this.generatePositions(config, count);
+    
+    // Create entities and apply base configuration
+    for (let i = 0; i < count; i++) {
+      const id = this.world.createEntity(positions[i * 2], positions[i * 2 + 1], 0, 0);
+      entities.push(id);
+    }
+    
+    // Apply visual appearance
+    this.applyVisuals(entities, config);
+    
+    // Apply size
+    this.applySizes(entities, config.size);
+    
+    // Apply color
+    this.applyColors(entities, config.color);
+    
+    // Apply physics
+    if (config.physics) {
+      this.applyPhysics(entities, config.physics, positions, config.position.x, config.position.y);
+    }
+    
+    // Apply animation
+    if (config.animation && config.animation.type !== 'none') {
+      this.applyAnimation(entities, config.animation);
+    }
+    
+    return entities;
+  }
+  
+
+  
+  /**
+   * Register with EntitySpawner UI panel
    */
   registerWithSpawner(spawner: any): void {
-    if (spawner && typeof spawner.registerSpawnCallback === 'function') {
+    if (spawner?.registerSpawnCallback) {
       spawner.registerSpawnCallback((x: number, y: number, config: any) => {
-        this.spawnBatch({ x, y, ...config });
-      });
-    }
-  }
-  
-  /**
-   * 🚀 Convenience method for demos (matches old API)
-   */
-  spawnEntities(count: number, x: number, y: number, config: Partial<SpawnConfig> = {}): EntityId[] {
-    return this.spawnBatch({ count, x, y, ...config } as SpawnConfig);
-  }
-  
-  /**
-   * 🚀 MAIN ENTRY POINT: Spawn entities (batch-optimized)
-   */
-  spawnBatch(config: SpawnConfig): EntityId[] {
-    if (config.visualType === 'text') {
-      return this.spawnTextBatch(config);
-    } else {
-      return this.spawnShapeBatch(config);
-    }
-  }
-  
-  /**
-   * 🚀 OPTIMIZED: Spawn shape entities (zero allocation, batch processing)
-   */
-  private spawnShapeBatch(config: SpawnConfig): EntityId[] {
-    const world = this.world;
-    const count = Math.min(config.count, this.maxBatchSize);
-    
-    // 🎯 Pre-calculate random values in vectorizable loop
-    // 🎯 Spawn radius: entities spread around center point (200px radius for benchmark clustering)
-    const spawnRadius = 200;
-    for (let i = 0; i < count; i++) {
-      this.spawnAngles[i] = Math.random() * Math.PI * 2;
-      this.spawnSpeeds[i] = 150 + Math.random() * 250;
-      this.spawnSizes[i] = 20 + Math.random() * 20; // Range: 20-40 pixels
-    }
-    
-    // 🚀 Get direct references to ECS arrays (zero overhead access)
-    const velocities = world.velocities;
-    const velX = velocities.x;
-    const velY = velocities.y;
-    const sizes = world.getSizes();
-    const colorR = world.getColorR();
-    const colorG = world.getColorG();
-    const colorB = world.getColorB();
-    const shapeTypes = world.getShapeTypes();
-    
-    // 🎨 Get shape type (constant-time lookup)
-    const shapeType = this.shapeTypeLUT[config.visualType];
-    
-    // 🚀 Batch create entities (WASM-friendly zero-copy)
-    const entities: EntityId[] = [];
-    for (let i = 0; i < count; i++) {
-      // 🎯 Spawn position: spread around center point within spawn radius
-      const spawnAngle = this.spawnAngles[i];
-      const spawnDist = Math.random() * spawnRadius;
-      const spawnX = config.x + Math.cos(spawnAngle) * spawnDist;
-      const spawnY = config.y + Math.sin(spawnAngle) * spawnDist;
-      
-      // Create entity (allocates ID, sets default values)
-      const id = world.createEntity(spawnX, spawnY, 0, 0);
-      
-      // 🎯 Calculate velocity using pre-calculated sin/cos
-      const angle = this.spawnAngles[i];
-      const speed = this.spawnSpeeds[i];
-      const angleDeg = Math.floor((angle * 180 / Math.PI)) % 360;
-      velX[id] = this.cosTable[angleDeg] * speed;
-      velY[id] = this.sinTable[angleDeg] * speed;
-      
-      // Set size (pre-calculated)
-      sizes[id] = this.spawnSizes[i];
-      
-      // Set color (pre-calculated palette, zero conversion)
-      const colorIndex = (i % this.colorCount) * 3;
-      colorR[id] = this.colorPalette[colorIndex];
-      colorG[id] = this.colorPalette[colorIndex + 1];
-      colorB[id] = this.colorPalette[colorIndex + 2];
-      
-      // Set shape type (GPU-accelerated SDF rendering)
-      shapeTypes[id] = shapeType;
-      
-      entities.push(id);
-    }
-    
-    // 🚀 Batch apply physics (SIMD-friendly, vectorizable)
-    this.batchApplyPhysics(entities, config.physicsMode);
-    
-    // 🚀 Batch apply animations (if configured)
-    if (config.animationConfig && config.animationConfig.type !== 'none') {
-      this.batchApplyAnimations(entities, config.animationConfig);
-    }
-    
-    return entities;
-  }
-  
-  /**
-   * 🚀 OPTIMIZED: Spawn text entities (minimal allocation)
-   */
-  private spawnTextBatch(config: SpawnConfig): EntityId[] {
-    if (!config.textConfig) {
-      console.error('TextConfig missing for text spawn');
-      return [];
-    }
-    
-    const world = this.world;
-    const count = config.count;
-    const textCfg = config.textConfig;
-    const isStaticMode = textCfg.mode === 'static';
-    
-    // Get scene's text entities map
-    const sceneTextEntities = this.scene.getTextEntities();
-    if (!sceneTextEntities) {
-      console.error('Scene missing getTextEntities() - text rendering disabled');
-      return [];
-    }
-    
-    // 🎨 Build text style once (shared by all entities)
-    const textStyle = this.buildTextStyleOptimized(textCfg);
-    
-    // 🚀 Get direct array references
-    const positions = world.positions;
-    const posX = positions.x;
-    const posY = positions.y;
-    const velocities = world.velocities;
-    const velX = velocities.x;
-    const velY = velocities.y;
-    const sizes = world.getSizes();
-    const colorR = world.getColorR();
-    const colorG = world.getColorG();
-    const colorB = world.getColorB();
-    const rotation = world.getRotation();
-    const textIndices = world.getTextIndices();
-    
-    // 🚀 Pre-calculate layout for static text
-    const cols = isStaticMode ? Math.ceil(Math.sqrt(count)) : 0;
-    const estimatedTextWidth = isStaticMode ? textCfg.content.length * textCfg.size * 0.6 : 0;
-    let baseX = config.x;
-    
-    if (isStaticMode && textCfg.align === 'center') {
-      baseX = config.x + estimatedTextWidth / 2;
-    } else if (isStaticMode && textCfg.align === 'right') {
-      baseX = config.x + estimatedTextWidth;
-    }
-    
-    // 🎯 Spawn radius for dynamic text entities
-    const spawnRadius = 200;
-    
-    // 🚀 Batch create text entities
-    const entities: EntityId[] = [];
-    const textContent = textCfg.content;
-    
-    for (let i = 0; i < count; i++) {
-      // 🎯 Initial spawn position around center
-      const spawnAngle = Math.random() * Math.PI * 2;
-      const spawnDist = Math.random() * spawnRadius;
-      const spawnX = config.x + Math.cos(spawnAngle) * spawnDist;
-      const spawnY = config.y + Math.sin(spawnAngle) * spawnDist;
-      
-      // Create entity
-      const id = world.createEntity(spawnX, spawnY, 0, 0);
-      
-      // Position calculation (static grid or dynamic radial)
-      if (isStaticMode) {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        posX[id] = baseX + col * 150;
-        posY[id] = config.y + row * 60;
-      } else {
-        // Dynamic: radial explosion
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 150 + Math.random() * 250;
-        const angleDeg = Math.floor((angle * 180 / Math.PI)) % 360;
-        velX[id] = this.cosTable[angleDeg] * speed;
-        velY[id] = this.sinTable[angleDeg] * speed;
+        // Convert UI config to SpawnConfig
+        console.log(`[SPAWN] visualType=${config.visualType}, physicsMode=${config.physicsMode}`);
         
-        // Random rotation for dynamic text
-        rotation[id] = Math.floor(Math.random() * 360);
-      }
-      
-      // Hide sprite quad (text renders separately)
-      sizes[id] = 0;
-      
-      // White color for text
-      colorR[id] = 255;
-      colorG[id] = 255;
-      colorB[id] = 255;
-      
-      // Allocate text in pool
-      const text = textCfg.mode === 'dynamic' ? `#${i}` : textContent;
-      const textIndex = this.textPool.allocate(text);
-      textIndices[id] = textIndex;
-      
-      // Mark as static if needed
-      if (isStaticMode) {
-        world.setTextStatic(id, true);
-      }
-      
-      // Store text style in scene map
-      sceneTextEntities.set(id, { text, style: textStyle });
-      
-      // Register animation for dynamic text
-      if (!isStaticMode) {
-        this.scene.registerTextAnimation(id, {
-          rotationSpeed: (Math.random() - 0.5) * 180,
-          pulseSpeed: 1 + Math.random() * 2,
-          pulsePhase: Math.random() * Math.PI * 2
-        });
-      }
-      
-      entities.push(id);
-    }
-    
-    // 🚀 Batch apply physics
-    this.batchApplyPhysics(entities, config.physicsMode);
-    
-    return entities;
-  }
-  
-  /**
-   * 🚀 BATCH APPLY PHYSICS (SIMD-friendly vectorizable loop)
-   * Applies physics settings to multiple entities at once
-   */
-  private batchApplyPhysics(entities: EntityId[], mode: PhysicsMode): void {
-    if (mode === 'none') {
-      // Explicitly disable physics for 'none' mode
-      const world = this.world;
-      const flags = world.entityFlags;
-      const FLAG_PHYSICS = world.PHYSICS_FLAG;
-      for (let i = 0; i < entities.length; i++) {
-        flags[entities[i]] &= ~FLAG_PHYSICS;
-      }
-      return;
-    }
-    
-    const world = this.world;
-    
-    // Enable physics flag (batch operation)
-    const flags = world.entityFlags;
-    const FLAG_PHYSICS = world.PHYSICS_FLAG;
-    for (let i = 0; i < entities.length; i++) {
-      flags[entities[i]] |= FLAG_PHYSICS;
-    }
-    
-    // Apply gravity/collision settings (batch)
-    switch (mode) {
-      case 'gravity':
-        for (let i = 0; i < entities.length; i++) {
-          world.setGravityEnabled(entities[i], true);
-        }
-        break;
-      case 'collision':
-        for (let i = 0; i < entities.length; i++) {
-          world.setCollisionsEnabled(entities[i], true);
-        }
-        break;
-      case 'full':
-        for (let i = 0; i < entities.length; i++) {
-          world.setGravityEnabled(entities[i], true);
-          world.setCollisionsEnabled(entities[i], true);
-        }
-        break;
-    }
-  }
-  
-  /**
-   * 🚀 BATCH APPLY ANIMATIONS (vectorizable)
-   */
-  private batchApplyAnimations(entities: EntityId[], config: AnimationConfig): void {
-    if (config.type !== 'tween') return;
-    
-    const world = this.world;
-    
-    // Map property name to index
-    const propertyMap: Record<string, number> = {
-      x: 0, y: 1, scale: 2, size: 3, alpha: 4
-    };
-    const propertyIndex = propertyMap[config.tweenProperty];
-    if (propertyIndex === undefined) return;
-    
-    // Get easing function
-    const easingFn = this.getEasingFunction(config.tweenEasing);
-    
-    // Create or get tween definition (shared by all entities)
-    const tweenName = `${config.tweenProperty}_${config.tweenDuration}_${config.tweenEasing}`;
-    let tween = this.animationManager.getTween(tweenName);
-    
-    if (!tween) {
-      tween = this.animationManager.createTween({
-        name: tweenName,
-        properties: [propertyIndex],
-        duration: config.tweenDuration,
-        easing: easingFn
+        const spawnConfig: SpawnConfig = {
+          position: { x, y },
+          count: config.count || 100,
+          distribution: { type: 'circle', radius: 200 },
+          visual: {
+            type: config.visualType === 'sprite' ? 'sprite' : 'shape',
+            shape: this.mapVisualTypeToShape(config.visualType || 'circle'),
+            texture: config.visualType === 'sprite' ? (config.textureUrl || '/bunny.png') : undefined,
+          },
+          size: { min: 20, max: 40 },
+          color: 'palette',
+          physics: this.mapPhysicsMode(config.physicsMode || 'none'),
+        };
+        this.spawn(spawnConfig);
       });
     }
+  }
+  
+  // ============================================================================
+  // Position Generation
+  // ============================================================================
+  
+  private generatePositions(config: SpawnConfig, count: number): Float32Array {
+    const distribution = config.distribution || { type: 'point' };
+    const { x, y } = config.position;
+    const buffer = this.computeBuffer;
     
-    // Get array references
-    const posX = world.getX();
-    const posY = world.getY();
-    const scales = world.getScale();
-    const sizes = world.getSizes();
-    const alphas = world.getAlpha();
-    const tweenIds = world.getTweenIds();
-    const tweenTimes = world.getTweenTimes();
-    const tweenActive = world.getTweenActive();
-    const tweenStartValues = world.getTweenStartValues();
-    const tweenEndValues = world.getTweenEndValues();
+    switch (distribution.type) {
+      case 'point':
+        // All entities at same point
+        for (let i = 0; i < count; i++) {
+          buffer[i * 2] = x;
+          buffer[i * 2 + 1] = y;
+        }
+        break;
+        
+      case 'circle':
+        // Random positions within circle
+        const radius = distribution.radius || 200;
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * radius;
+          buffer[i * 2] = x + Math.cos(angle) * dist;
+          buffer[i * 2 + 1] = y + Math.sin(angle) * dist;
+        }
+        break;
+        
+      case 'grid':
+        // Grid layout
+        const spacing = distribution.spacing || 50;
+        const cols = Math.ceil(Math.sqrt(count));
+        for (let i = 0; i < count; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          buffer[i * 2] = x + col * spacing;
+          buffer[i * 2 + 1] = y + row * spacing;
+        }
+        break;
+        
+      case 'line':
+        // Line formation
+        const angle = distribution.angle || 0;
+        const lineSpacing = distribution.spacing || 50;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        for (let i = 0; i < count; i++) {
+          const offset = (i - count / 2) * lineSpacing;
+          buffer[i * 2] = x + cos * offset;
+          buffer[i * 2 + 1] = y + sin * offset;
+        }
+        break;
+    }
     
-    // 🚀 Batch apply tween settings (vectorizable)
+    return buffer;
+  }
+  
+  // ============================================================================
+  // Visual Appearance
+  // ============================================================================
+  
+  private applyVisuals(entities: EntityId[], config: SpawnConfig): void {
+    const { visual } = config;
+    
+    if (visual.type === 'sprite' && visual.texture) {
+      this.applySpriteTexture(entities, visual.texture);
+    } else if (visual.type === 'shape' && visual.shape !== undefined) {
+      this.applyShape(entities, visual.shape);
+    } else if (visual.type === 'text' && visual.text) {
+      this.applyText(entities, visual.text);
+    }
+  }
+  
+  private applySpriteTexture(entities: EntityId[], textureUrl: string): void {
+    const textureId = this.textureCache.get(textureUrl) ?? -1;
+    const shapeTypes = this.world.getShapeTypes();
+    
+    console.log(`[APPLY TEXTURE] url="${textureUrl}", textureId=${textureId}, cached=${this.textureCache.has(textureUrl)}, entities=${entities.length}`);
+    
+    if (textureId >= 0) {
+      for (const id of entities) {
+        this.world.setTexture(id, textureId);
+        shapeTypes[id] = 0; // SPRITE mode
+      }
+      console.log(`✅ Applied texture ${textureId} to ${entities.length} entities`);
+    } else {
+      console.warn(`❌ Texture ${textureUrl} not loaded yet - rendering as squares`);
+      // Render as squares until texture loads
+      for (const id of entities) {
+        shapeTypes[id] = ShapeType.SQUARE;
+      }
+    }
+  }
+  
+  private applyShape(entities: EntityId[], shapeType: ShapeType): void {
+    const shapeTypes = this.world.getShapeTypes();
+    const textureIds = this.world.getTextureIds();
+    
+    for (const id of entities) {
+      shapeTypes[id] = shapeType;
+      textureIds[id] = 0;  // Clear texture ID for shapes
+    }
+  }
+  
+  private applyText(entities: EntityId[], text: string): void {
+    const textIndices = this.world.getTextIndices();
+    const sizes = this.world.getSizes();
+    const sceneTextEntities = this.scene.textEntities;
+    
     for (let i = 0; i < entities.length; i++) {
       const id = entities[i];
+      const content = text.includes('#') ? text.replace('#', String(i)) : text;
+      const textIndex = this.textPool.allocate(content);
+      textIndices[id] = textIndex;
+      sizes[id] = 0; // Hide sprite quad
       
-      // Get start/end values based on property
-      let startValue = 0;
-      let endValue = 0;
-      
-      switch (propertyIndex) {
-        case 0: // x
-          startValue = posX[id];
-          endValue = startValue + (Math.random() - 0.5) * 600;
-          break;
-        case 1: // y
-          startValue = posY[id];
-          endValue = startValue + (Math.random() - 0.5) * 600;
-          break;
-        case 2: // scale
-          startValue = scales[id];
-          endValue = 0.5 + Math.random() * 1.0;
-          break;
-        case 3: // size
-          startValue = sizes[id];
-          endValue = startValue * (0.2 + Math.random() * 2);
-          break;
-        case 4: // alpha
-          startValue = alphas[id];
-          endValue = Math.random() * 0.5;
-          break;
+      if (sceneTextEntities) {
+        sceneTextEntities.set(id, {
+          text: content,
+          style: { font: '24px Arial', color: '#FFFFFF' }
+        });
       }
-      
-      // Apply tween
-      tweenIds[id] = tween.id;
-      tweenTimes[id] = 0;
-      tweenActive[id] = 1;
-      
-      const baseIndex = id * 4;
-      tweenStartValues[baseIndex] = startValue;
-      tweenEndValues[baseIndex] = endValue;
     }
   }
   
-  /**
-   * Build text style (optimized, minimal allocation)
-   */
-  private buildTextStyleOptimized(config: TextConfig): any {
-    // Build font string once
-    const fontParts: string[] = [];
-    if (config.bold) fontParts.push('bold');
-    if (config.italic) fontParts.push('italic');
-    fontParts.push(`${config.size}px`);
-    fontParts.push('Arial');
+  // ============================================================================
+  // Size Configuration
+  // ============================================================================
+  
+  private applySizes(entities: EntityId[], sizeConfig: SpawnConfig['size']): void {
+    const sizes = this.world.getSizes();
     
-    const style: any = {
-      font: fontParts.join(' '),
-      fontSize: config.size,
-      fontFamily: 'Arial',
-      color: '#FFFFFF',
-      align: config.align
+    if (typeof sizeConfig === 'number') {
+      // Fixed size
+      for (const id of entities) {
+        sizes[id] = sizeConfig;
+      }
+    } else if (sizeConfig) {
+      // Random range
+      const { min, max } = sizeConfig;
+      const range = max - min;
+      for (const id of entities) {
+        sizes[id] = min + Math.random() * range;
+      }
+    } else {
+      // Default size range
+      for (const id of entities) {
+        sizes[id] = 20 + Math.random() * 20;
+      }
+    }
+  }
+  
+  // ============================================================================
+  // Color Configuration
+  // ============================================================================
+  
+  private applyColors(entities: EntityId[], colorConfig: SpawnConfig['color']): void {
+    const colorR = this.world.getColorR();
+    const colorG = this.world.getColorG();
+    const colorB = this.world.getColorB();
+    
+    if (!colorConfig || colorConfig === 'palette') {
+      // Rainbow palette
+      const paletteSize = this.rainbowPalette.length / 3;
+      for (let i = 0; i < entities.length; i++) {
+        const id = entities[i];
+        const idx = (i % paletteSize) * 3;
+        colorR[id] = this.rainbowPalette[idx];
+        colorG[id] = this.rainbowPalette[idx + 1];
+        colorB[id] = this.rainbowPalette[idx + 2];
+      }
+    } else if (colorConfig === 'random') {
+      // Random colors
+      for (const id of entities) {
+        colorR[id] = Math.random() * 255;
+        colorG[id] = Math.random() * 255;
+        colorB[id] = Math.random() * 255;
+      }
+    } else {
+      // Fixed color
+      const { r, g, b } = colorConfig;
+      for (const id of entities) {
+        colorR[id] = r;
+        colorG[id] = g;
+        colorB[id] = b;
+      }
+    }
+  }
+  
+  // ============================================================================
+  // Physics Configuration
+  // ============================================================================
+  
+  private applyPhysics(
+    entities: EntityId[],
+    physics: NonNullable<SpawnConfig['physics']>,
+    positions: Float32Array,
+    centerX: number,
+    centerY: number
+  ): void {
+    const velX = this.world.velocities.x;
+    const velY = this.world.velocities.y;
+    
+    // Apply velocity
+    if (physics.velocity === 'random') {
+      // Random velocity
+      const speedConfig = physics.speed || 200;
+      const minSpeed = typeof speedConfig === 'number' ? speedConfig * 0.75 : speedConfig.min;
+      const maxSpeed = typeof speedConfig === 'number' ? speedConfig * 1.25 : speedConfig.max;
+      const speedRange = maxSpeed - minSpeed;
+      
+      for (const id of entities) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = minSpeed + Math.random() * speedRange;
+        const angleDeg = Math.floor((angle * 180 / Math.PI)) % 360;
+        velX[id] = this.cosLUT[angleDeg] * speed;
+        velY[id] = this.sinLUT[angleDeg] * speed;
+      }
+    } else if (physics.velocity === 'radial') {
+      // Radial outward from spawn point
+      const speedConfig = physics.speed || 200;
+      const minSpeed = typeof speedConfig === 'number' ? speedConfig * 0.75 : speedConfig.min;
+      const maxSpeed = typeof speedConfig === 'number' ? speedConfig * 1.25 : speedConfig.max;
+      const speedRange = maxSpeed - minSpeed;
+      
+      for (let i = 0; i < entities.length; i++) {
+        const id = entities[i];
+        const ex = positions[i * 2];
+        const ey = positions[i * 2 + 1];
+        const dx = ex - centerX;
+        const dy = ey - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const speed = minSpeed + Math.random() * speedRange;
+        velX[id] = (dx / dist) * speed;
+        velY[id] = (dy / dist) * speed;
+      }
+    } else if (physics.velocity) {
+      // Fixed velocity
+      const { x: vx, y: vy } = physics.velocity;
+      for (const id of entities) {
+        velX[id] = vx;
+        velY[id] = vy;
+      }
+    }
+    
+    // Apply gravity/collision settings
+    console.log(`[PHYSICS] Applying physics: gravity=${physics.gravity}, collision=${physics.collision}, entities=${entities.length}`);
+    
+    if (physics.gravity) {
+      for (const id of entities) {
+        this.world.setGravityEnabled(id, true);
+      }
+    }
+    
+    if (physics.collision) {
+      for (const id of entities) {
+        this.world.setCollisionsEnabled(id, true);
+      }
+    }
+  }
+  
+  // ============================================================================
+  // Animation Configuration
+  // ============================================================================
+  
+  private applyAnimation(entities: EntityId[], animation: NonNullable<SpawnConfig['animation']>): void {
+    if (animation.type === 'rotate') {
+      const rotation = this.world.getRotation();
+      const textAnimations = this.scene.textAnimations;
+      for (const id of entities) {
+        rotation[id] = Math.random() * 360;
+        if (textAnimations) {
+          textAnimations.set(id, {
+            rotationSpeed: (Math.random() - 0.5) * 180,
+            pulseSpeed: 1 + Math.random() * 2,
+            pulsePhase: Math.random() * Math.PI * 2
+          });
+        }
+      }
+    } else if (animation.type === 'tween') {
+      // Apply tween animation (simplified)
+      const property = animation.property || 'scale';
+      const duration = animation.duration || 1000;
+      
+      // TODO: Implement full tween system
+      console.log(`Tween animation on ${property} for ${duration}ms`);
+    }
+  }
+  
+  // ============================================================================
+  // Texture Management
+  // ============================================================================
+  
+  private async loadTexture(url: string): Promise<number> {
+    if (this.textureCache.has(url)) {
+      return this.textureCache.get(url)!;
+    }
+    
+    if (!this.textureManager) {
+      throw new Error('TextureManager not available - was EntitySpawnService constructed correctly?');
+    }
+    
+    const texture = await this.textureManager.loadTexture(url);
+    this.textureCache.set(url, texture.id);
+    console.log(`✅ Texture loaded and cached: ${url} → ID ${texture.id}`);
+    return texture.id;
+  }
+  
+  // ============================================================================
+  // Helper Methods
+  // ============================================================================
+  
+  private mapVisualTypeToShape(visualType: string): ShapeType {
+    const mapping: Record<string, ShapeType> = {
+      circle: ShapeType.CIRCLE,
+      star5: ShapeType.STAR_5,
+      star6: ShapeType.STAR_6,
+      triangle: ShapeType.TRIANGLE,
+      pentagon: ShapeType.PENTAGON,
+      hexagon: ShapeType.HEXAGON,
+      square: ShapeType.SQUARE,
+      diamond: ShapeType.DIAMOND,
     };
-    
-    // Add effects
-    if (config.outline) {
-      style.strokeColor = '#00FFFF';
-      style.strokeWidth = 4;
-    }
-    
-    if (config.shadow) {
-      style.shadow = {
-        color: 'rgba(255, 0, 0, 1.0)',
-        blur: 6,
-        offsetX: 4,
-        offsetY: 4
-      };
-    }
-    
-    if (config.glow) {
-      style.shadow = {
-        color: 'rgba(255, 255, 0, 1.0)',
-        blur: 20,
-        offsetX: 0,
-        offsetY: 0
-      };
-    }
-    
-    return style;
+    return mapping[visualType] || ShapeType.CIRCLE;
   }
   
-  /**
-   * Get easing function (inlined for performance)
-   */
-  private getEasingFunction(type: string): (t: number) => number {
-    switch (type) {
-      case 'linear':
-        return (t) => t;
-      case 'easeInOut':
-        return (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-      case 'bounce':
-        return (t) => {
-          const n1 = 7.5625;
-          const d1 = 2.75;
-          if (t < 1 / d1) {
-            return n1 * t * t;
-          } else if (t < 2 / d1) {
-            return n1 * (t -= 1.5 / d1) * t + 0.75;
-          } else if (t < 2.5 / d1) {
-            return n1 * (t -= 2.25 / d1) * t + 0.9375;
-          } else {
-            return n1 * (t -= 2.625 / d1) * t + 0.984375;
-          }
-        };
+  private mapPhysicsMode(mode: string): SpawnConfig['physics'] {
+    // 🐰 BUNNYMARK STANDARD: Use shared velocity configuration
+    switch (mode) {
+      case 'none':
+        return { velocity: 'random', speed: BUNNYMARK_CONFIG.velocity, gravity: false, collision: false };
+      case 'gravity':
+        return { velocity: 'random', speed: BUNNYMARK_CONFIG.velocity, gravity: true, collision: false };
+      case 'collision':
+        return { velocity: 'random', speed: BUNNYMARK_CONFIG.velocity, gravity: false, collision: true };
+      case 'full':
       default:
-        return (t) => t;
+        return { velocity: 'random', speed: BUNNYMARK_CONFIG.velocity, gravity: true, collision: true };
     }
   }
 }

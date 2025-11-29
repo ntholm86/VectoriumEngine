@@ -26,7 +26,7 @@ export class WebGLBatchRenderer {
   // State tracking
   private vertexCount = 0;
   private drawCallCount = 0;
-  private maxBatchSize = 65000;
+  private maxBatchSize = 65000; // Optimal batch size - renderer processes multiple batches
   private currentShaderProgram: WebGLProgram | null = null;
   private clearColor: [number, number, number, number] = [0, 0, 0, 1];
   
@@ -39,8 +39,8 @@ export class WebGLBatchRenderer {
   private cachedCanvasWidth: number = 0;
   private cachedCanvasHeight: number = 0;
   
-  // 🚀 Pre-allocated sort buffer for sprite batching
-  private sortBuffer: Uint32Array = new Uint32Array(65000);
+  // 🚀 Pre-allocated sort buffer for sprite batching (2M capacity)
+  private sortBuffer: Uint32Array = new Uint32Array(2000000);
   
   // 🚀 Advanced WebGL State Caching
   private boundVertexBuffer: WebGLBuffer | null = null;
@@ -134,8 +134,11 @@ export class WebGLBatchRenderer {
     const useUint32Indices = useWebGL2;
     this.indexType = useUint32Indices ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
     
+    console.log(`[RENDERER] Initializing with WebGL${useWebGL2 ? '2' : '1'}, maxBatchSize=${this.maxBatchSize}`);
+    
     // Limit batch size for Uint16
     if (!useUint32Indices && this.maxBatchSize > 16383) {
+      console.log(`[RENDERER] Limiting batch size to 16383 for WebGL1 Uint16 indices`);
       this.maxBatchSize = 16383;
     }
     
@@ -1068,6 +1071,8 @@ void main() {
   ): void {
     if (count === 0) return;
     
+    console.log(`[RENDERER] drawBulkSpritesIndexed called: count=${count}, indices.length=${indices.length}`);
+    
     const gl = this.gl;
     const viewportCenterX = gl.canvas.width * 0.5;
     const viewportCenterY = gl.canvas.height * 0.5;
@@ -1102,11 +1107,7 @@ void main() {
       sortedIndices[j + 1] = idx;
     }
     
-    // Allocate sprite vertex buffer
-    if (!this.batchVertices) {
-      this.batchVertices = new Float32Array(this.maxBatchSize * 4 * 5);
-      this.batchVerticesU8 = new Uint8Array(this.batchVertices.buffer);
-    }
+    // Batch vertices buffer already allocated in constructor
     
     // Render in texture batches
     let batchStart = 0;
@@ -1121,7 +1122,7 @@ void main() {
         batchEnd++;
       }
       
-      // Bind texture
+      // Bind texture once for all sub-batches
       if (textureManager && currentTextureId > 0) {
         textureManager.bindTexture(currentTextureId, 0);
       }
@@ -1131,118 +1132,135 @@ void main() {
         this.perfMonitor?.recordBatchBreak('texture');
       }
       
-      // Build vertex data for this texture batch
-      let vertexCount = 0;
-      const maxVertices = Math.min(this.maxBatchSize * 4, (batchEnd - batchStart) * 4);
+      console.log(`[RENDERER] Texture batch: ${batchStart} to ${batchEnd} (${batchEnd - batchStart} entities, texture ${currentTextureId}), maxBatchSize=${this.maxBatchSize}`);
       
-      for (let i = batchStart; i < batchEnd && vertexCount < maxVertices; i++) {
-        const entityIdx = sortedIndices[i];
-        
-        if ((flags[entityIdx] & FLAG_VISIBLE) === 0) continue;
-        
-        const x = posX[entityIdx];
-        const y = posY[entityIdx];
-        const size = sizes[entityIdx];
-        const hw = size * 0.5;
-        const rotDeg = rotation[entityIdx];
-        
-        const cos = this.cosCache[rotDeg];
-        const sin = this.sinCache[rotDeg];
-        
-        const screenX = (x - cameraX) * cameraZoom + viewportCenterX;
-        const screenY = (y - cameraY) * cameraZoom + viewportCenterY;
-        const screenHw = hw * cameraZoom;
-        
-        // UV coordinates (normalized to 0-1)
-        const u0 = uvU0[entityIdx] / 65535.0;
-        const v0 = uvV0[entityIdx] / 65535.0;
-        const u1 = uvU1[entityIdx] / 65535.0;
-        const v1 = uvV1[entityIdx] / 65535.0;
-        
-        // Color
-        const r = colorR[entityIdx];
-        const g = colorG[entityIdx];
-        const b = colorB[entityIdx];
-        const a = Math.floor(alphas[entityIdx] * 255);
-        
-        const floatOffset = vertexCount * 5;
-        const baseByteOffset = vertexCount * 20;
-        
-        // Top-left vertex
-        const x0 = screenX - screenHw * cos - screenHw * sin;
-        const y0 = screenY - screenHw * sin + screenHw * cos;
-        this.batchVertices[floatOffset] = x0;
-        this.batchVertices[floatOffset + 1] = y0;
-        this.batchVertices[floatOffset + 2] = u0;
-        this.batchVertices[floatOffset + 3] = v0;
-        this.batchVerticesU8[baseByteOffset + 16] = r;
-        this.batchVerticesU8[baseByteOffset + 17] = g;
-        this.batchVerticesU8[baseByteOffset + 18] = b;
-        this.batchVerticesU8[baseByteOffset + 19] = a;
-        
-        // Top-right vertex
-        const x1 = screenX + screenHw * cos - screenHw * sin;
-        const y1 = screenY + screenHw * sin + screenHw * cos;
-        this.batchVertices[floatOffset + 5] = x1;
-        this.batchVertices[floatOffset + 6] = y1;
-        this.batchVertices[floatOffset + 7] = u1;
-        this.batchVertices[floatOffset + 8] = v0;
-        this.batchVerticesU8[baseByteOffset + 36] = r;
-        this.batchVerticesU8[baseByteOffset + 37] = g;
-        this.batchVerticesU8[baseByteOffset + 38] = b;
-        this.batchVerticesU8[baseByteOffset + 39] = a;
-        
-        // Bottom-right vertex
-        const x2 = screenX + screenHw * cos + screenHw * sin;
-        const y2 = screenY + screenHw * sin - screenHw * cos;
-        this.batchVertices[floatOffset + 10] = x2;
-        this.batchVertices[floatOffset + 11] = y2;
-        this.batchVertices[floatOffset + 12] = u1;
-        this.batchVertices[floatOffset + 13] = v1;
-        this.batchVerticesU8[baseByteOffset + 56] = r;
-        this.batchVerticesU8[baseByteOffset + 57] = g;
-        this.batchVerticesU8[baseByteOffset + 58] = b;
-        this.batchVerticesU8[baseByteOffset + 59] = a;
-        
-        // Bottom-left vertex
-        const x3 = screenX - screenHw * cos + screenHw * sin;
-        const y3 = screenY - screenHw * sin - screenHw * cos;
-        this.batchVertices[floatOffset + 15] = x3;
-        this.batchVertices[floatOffset + 16] = y3;
-        this.batchVertices[floatOffset + 17] = u0;
-        this.batchVertices[floatOffset + 18] = v1;
-        this.batchVerticesU8[baseByteOffset + 76] = r;
-        this.batchVerticesU8[baseByteOffset + 77] = g;
-        this.batchVerticesU8[baseByteOffset + 78] = b;
-        this.batchVerticesU8[baseByteOffset + 79] = a;
-        
-        vertexCount += 4;
-      }
+      // 🚀 FIX: Process large texture batches in 65K chunks
+      console.log(`[RENDERER] Starting chunk loop: batchStart=${batchStart}, batchEnd=${batchEnd}, maxBatchSize=${this.maxBatchSize}`);
       
-      // Upload and draw this batch
-      if (vertexCount > 0) {
-        this.cachedBindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.batchVertices.subarray(0, vertexCount * 5));
+      for (let chunkStart = batchStart; chunkStart < batchEnd; chunkStart += this.maxBatchSize) {
+        const chunkEnd = Math.min(chunkStart + this.maxBatchSize, batchEnd);
         
-        const spriteCount = vertexCount >> 2;
-        const indexCount = spriteCount * 6;
+        console.log(`[RENDERER] Chunk loop iteration: chunkStart=${chunkStart}, chunkEnd=${chunkEnd}, condition=${chunkStart < batchEnd}`);
         
-        this.cachedBindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        gl.drawElements(gl.TRIANGLES, indexCount, this.indexType, 0);
+        // Build vertex data for this chunk
+        let vertexCount = 0;
+        let entitiesProcessed = 0;
         
-        if (this.perfMonitor) {
-          this.perfMonitor.recordVertices(vertexCount);
-          this.perfMonitor.recordIndices(indexCount);
-          this.perfMonitor.recordBufferUpload(vertexCount * 20);
-          this.perfMonitor.recordBatch(spriteCount);
-          this.perfMonitor.recordBatchComplete(spriteCount);
+        for (let i = chunkStart; i < chunkEnd; i++) {
+          entitiesProcessed++;
+          const entityIdx = sortedIndices[i];
+          
+          if ((flags[entityIdx] & FLAG_VISIBLE) === 0) continue;
+          
+          const x = posX[entityIdx];
+          const y = posY[entityIdx];
+          const size = sizes[entityIdx];
+          const hw = size * 0.5;
+          const rotDeg = rotation[entityIdx];
+          
+          const cos = this.cosCache[rotDeg];
+          const sin = this.sinCache[rotDeg];
+          
+          const screenX = (x - cameraX) * cameraZoom + viewportCenterX;
+          const screenY = (y - cameraY) * cameraZoom + viewportCenterY;
+          const screenHw = hw * cameraZoom;
+          
+          // UV coordinates (normalized to 0-1)
+          const u0 = uvU0[entityIdx] / 65535.0;
+          const v0 = uvV0[entityIdx] / 65535.0;
+          const u1 = uvU1[entityIdx] / 65535.0;
+          const v1 = uvV1[entityIdx] / 65535.0;
+          
+          // Color
+          const r = colorR[entityIdx];
+          const g = colorG[entityIdx];
+          const b = colorB[entityIdx];
+          const a = Math.floor(alphas[entityIdx] * 255);
+          
+          const floatOffset = vertexCount * 5;
+          const baseByteOffset = vertexCount * 20;
+          
+          // Top-left vertex
+          const x0 = screenX - screenHw * cos - screenHw * sin;
+          const y0 = screenY - screenHw * sin + screenHw * cos;
+          this.batchVertices[floatOffset] = x0;
+          this.batchVertices[floatOffset + 1] = y0;
+          this.batchVertices[floatOffset + 2] = u0;
+          this.batchVertices[floatOffset + 3] = v0;
+          this.batchVerticesU8[baseByteOffset + 16] = r;
+          this.batchVerticesU8[baseByteOffset + 17] = g;
+          this.batchVerticesU8[baseByteOffset + 18] = b;
+          this.batchVerticesU8[baseByteOffset + 19] = a;
+          
+          // Top-right vertex
+          const x1 = screenX + screenHw * cos - screenHw * sin;
+          const y1 = screenY + screenHw * sin + screenHw * cos;
+          this.batchVertices[floatOffset + 5] = x1;
+          this.batchVertices[floatOffset + 6] = y1;
+          this.batchVertices[floatOffset + 7] = u1;
+          this.batchVertices[floatOffset + 8] = v0;
+          this.batchVerticesU8[baseByteOffset + 36] = r;
+          this.batchVerticesU8[baseByteOffset + 37] = g;
+          this.batchVerticesU8[baseByteOffset + 38] = b;
+          this.batchVerticesU8[baseByteOffset + 39] = a;
+          
+          // Bottom-right vertex
+          const x2 = screenX + screenHw * cos + screenHw * sin;
+          const y2 = screenY + screenHw * sin - screenHw * cos;
+          this.batchVertices[floatOffset + 10] = x2;
+          this.batchVertices[floatOffset + 11] = y2;
+          this.batchVertices[floatOffset + 12] = u1;
+          this.batchVertices[floatOffset + 13] = v1;
+          this.batchVerticesU8[baseByteOffset + 56] = r;
+          this.batchVerticesU8[baseByteOffset + 57] = g;
+          this.batchVerticesU8[baseByteOffset + 58] = b;
+          this.batchVerticesU8[baseByteOffset + 59] = a;
+          
+          // Bottom-left vertex
+          const x3 = screenX - screenHw * cos + screenHw * sin;
+          const y3 = screenY - screenHw * sin - screenHw * cos;
+          this.batchVertices[floatOffset + 15] = x3;
+          this.batchVertices[floatOffset + 16] = y3;
+          this.batchVertices[floatOffset + 17] = u0;
+          this.batchVertices[floatOffset + 18] = v1;
+          this.batchVerticesU8[baseByteOffset + 76] = r;
+          this.batchVerticesU8[baseByteOffset + 77] = g;
+          this.batchVerticesU8[baseByteOffset + 78] = b;
+          this.batchVerticesU8[baseByteOffset + 79] = a;
+          
+          vertexCount += 4;
         }
         
-        this.drawCallCount++;
-      }
+        // Upload and draw this chunk
+        if (vertexCount > 0) {
+          this.cachedBindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+          gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.batchVertices.subarray(0, vertexCount * 5));
+          
+          const spriteCount = vertexCount >> 2;
+          const indexCount = spriteCount * 6;
+          
+          console.log(`[RENDERER] Drawing chunk: ${spriteCount} sprites, ${indexCount} indices (processed ${entitiesProcessed} entities, vertexCount=${vertexCount})`);
+          
+          this.cachedBindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+          gl.drawElements(gl.TRIANGLES, indexCount, this.indexType, 0);
+          
+          if (this.perfMonitor) {
+            this.perfMonitor.recordVertices(vertexCount);
+            this.perfMonitor.recordIndices(indexCount);
+            this.perfMonitor.recordBufferUpload(vertexCount * 20);
+            this.perfMonitor.recordBatch(spriteCount);
+            this.perfMonitor.recordBatchComplete(spriteCount);
+          }
+          
+          this.drawCallCount++;
+          console.log(`[RENDERER] Chunk complete. Next chunkStart will be: ${chunkStart + this.maxBatchSize}`);
+        }
+      } // End chunk loop (closes the for loop started at line ~1144)
       
-      batchStart = batchEnd;
-    }
+    console.log(`[RENDERER] All chunks processed for texture ${currentTextureId}`);
+      
+    batchStart = batchEnd;
+  } // End texture batch loop (closes the while loop started at line ~1119)
     
     // Disable texture mode
     gl.uniform1i(hasTextureLoc, 0);

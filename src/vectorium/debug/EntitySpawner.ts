@@ -7,6 +7,7 @@
 import { Scene } from '../core/Engine';
 import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
 import type { InputManager } from '../input/InputManager';
+import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { isSpawnableScene } from '../core/ISpawnableScene';
 
 export class EntitySpawner extends UIPanel {
@@ -32,8 +33,9 @@ export class EntitySpawner extends UIPanel {
   private textGlow: boolean = false;
   private spawnCallbacks: Map<string, () => void> = new Map();
   private onSpawnCallback: ((x: number, y: number, config: any) => void) | null = null;
+  private performanceMonitor: PerformanceMonitor | null = null;
   
-  constructor(scene: Scene, inputManager: InputManager) {
+  constructor(scene: Scene, inputManager: InputManager, performanceMonitor?: PerformanceMonitor) {
     const config: UIPanelConfig = {
       id: 'entity-spawner',
       title: '🎮 SPAWN ENTITIES',
@@ -43,6 +45,8 @@ export class EntitySpawner extends UIPanel {
       collapsible: true
     };
     super(config, inputManager);
+    
+    this.performanceMonitor = performanceMonitor || null;
     
     // 🚀 Auto-register callbacks if scene implements ISpawnableScene
     if (isSpawnableScene(scene)) {
@@ -360,6 +364,12 @@ export class EntitySpawner extends UIPanel {
         <button id="spawn1M" class="vectorium-btn full-width danger-solid">1M ☢️</button>
       </div>
       
+      <div class="ui-section-header">🏁 BENCHMARK TESTS</div>
+      <div class="btn-grid-1col">
+        <button id="benchmarkBunny" class="vectorium-btn full-width special">Bunnymark (Progressive)</button>
+        <button id="benchmarkStress" class="vectorium-btn full-width danger">Stress Test (Max FPS)</button>
+      </div>
+      
       <div class="ui-btn-group">
         <button id="remove1K" class="vectorium-btn danger">-1K</button>
         <button id="clearAll" class="vectorium-btn danger">Clear All</button>
@@ -479,6 +489,10 @@ export class EntitySpawner extends UIPanel {
     this.on('spawn500K', 'click', () => { this.setClickSpawnCount(500000); this.activeButton = 'spawn500K'; });
     this.on('spawn1M', 'click', () => { this.setClickSpawnCount(1000000); this.activeButton = 'spawn1M'; });
     
+    // Benchmark buttons
+    this.on('benchmarkBunny', 'click', () => { this.runBunnymarkBenchmark(); });
+    this.on('benchmarkStress', 'click', () => { this.runStressBenchmark(); });
+    
     this.on('remove1K', 'click', () => { this.triggerCallback('remove1K'); });
     this.on('clearAll', 'click', () => {
       if (confirm('Clear all entities?')) {
@@ -547,5 +561,119 @@ export class EntitySpawner extends UIPanel {
         tweenAnimSection.classList.add('hidden');
       }
     }
+  }
+
+  /**
+   * Run Bunnymark Standard benchmark
+   * Follows industry standard: progressive spawn 800 bunnies per batch until <60 FPS
+   * Canvas: 800x600, Gravity: ON, Bounce: ON, Collision: OFF
+   */
+  private async runBunnymarkBenchmark(): Promise<void> {
+    console.log('🐰 Starting Bunnymark Standard Benchmark');
+    console.log('📋 Configuration: 800x600 canvas, gravity + bounce, NO collision');
+    console.log('📊 Progressive spawn: 800 bunnies per batch until FPS < 60');
+    
+    // Clear all entities first
+    this.triggerCallback('clearAll');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Configure for Bunnymark Standard
+    this.visualType = 'sprite';
+    this.physicsMode = 'gravity'; // Gravity ON, Collision OFF
+    this.textureUrl = '/bunny.png';
+    
+    const SPAWN_INCREMENT = 800; // Industry standard: 800 bunnies per batch
+    const TARGET_FPS = 60;
+    const CANVAS_WIDTH = 800;
+    const CANVAS_HEIGHT = 600;
+    
+    let totalSpawned = 0;
+    let isRunning = true;
+    
+    const spawnWave = async () => {
+      if (!isRunning) return;
+      
+      // Spawn batch at random positions across canvas
+      const centerX = CANVAS_WIDTH / 2;
+      const centerY = CANVAS_HEIGHT / 2;
+      
+      if (this.onSpawnCallback) {
+        const config = { 
+          ...this.getSpawnConfig(), 
+          count: SPAWN_INCREMENT 
+        };
+        this.onSpawnCallback(centerX, centerY, config);
+      }
+      
+      totalSpawned += SPAWN_INCREMENT;
+      console.log(`🐰 Spawned ${SPAWN_INCREMENT} bunnies → Total: ${totalSpawned.toLocaleString()}`);
+      
+      // Wait 250ms for FPS to stabilize, then check
+      await new Promise(resolve => setTimeout(resolve, 250));
+      
+      const currentFPS = this.performanceMonitor?.getMetrics().fps || 60;
+      console.log(`   📊 FPS: ${currentFPS.toFixed(1)}`);
+      
+      // Continue if FPS is acceptable and not at limit
+      if (currentFPS >= TARGET_FPS && totalSpawned < 500000) {
+        setTimeout(() => spawnWave(), 250); // Spawn next batch after 250ms
+      } else {
+        console.log('');
+        console.log('✅ BUNNYMARK STANDARD COMPLETE!');
+        console.log(`🏆 Final Score: ${totalSpawned.toLocaleString()} bunnies @ ${currentFPS.toFixed(1)} FPS`);
+        console.log('');
+        isRunning = false;
+      }
+    };
+    
+    // Start first wave
+    setTimeout(() => spawnWave(), 500);
+  }
+
+  /**
+   * Run stress test - spawn maximum entities and measure FPS
+   */
+  private async runStressBenchmark(): Promise<void> {
+    console.log('💥 Starting Stress Test');
+    console.log('📊 Press M to open Performance Monitor');
+    
+    // Auto-configure for stress test
+    this.visualType = 'circle';
+    this.physicsMode = 'full';
+    
+    const testCounts = [1000, 5000, 10000, 25000, 50000, 100000];
+    
+    for (const count of testCounts) {
+      console.log(`⚡ Testing ${count.toLocaleString()} entities...`);
+      
+      // Clear and wait
+      this.triggerCallback('clearAll');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Spawn entities
+      for (let i = 0; i < count; i++) {
+        const x = Math.random() * 800;
+        const y = Math.random() * 600;
+        
+        if (this.onSpawnCallback) {
+          this.onSpawnCallback(x, y, this.getSpawnConfig());
+        }
+      }
+      
+      // Wait for physics to settle
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      const fps = this.performanceMonitor?.getMetrics().fps || 0;
+      console.log(`📊 ${count.toLocaleString()} entities: ${fps.toFixed(1)} FPS`);
+      
+      if (fps < 30) {
+        console.log('⚠️ FPS dropped below 30, stopping test');
+        break;
+      }
+    }
+    
+    console.log('');
+    console.log('✅ STRESS TEST COMPLETE!');
+    console.log('');
   }
 }

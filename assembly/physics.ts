@@ -423,70 +423,6 @@ export function applyDamping(airDamping: f32, groundDamping: f32, groundHeight: 
 }
 
 /**
- * 🚀 SIMD HELPER: Process 4 collision checks in parallel using v128
- * Returns bitmask of which lanes had collisions (0b0000 to 0b1111)
- */
-@inline
-function checkCollisionsSIMD(
-  xi: f32, yi: f32, ri: f32,
-  vxi: f32, vyi: f32,
-  cellIdx: i32
-): i32 {
-  // Load 4 neighbors from cell-local arrays (aligned)
-  const xj4 = v128.load(changetype<usize>(cellPosX.dataStart) + (cellIdx << 2));
-  const yj4 = v128.load(changetype<usize>(cellPosY.dataStart) + (cellIdx << 2));
-  const rj4 = v128.load(changetype<usize>(cellRadius.dataStart) + (cellIdx << 2));
-  
-  // Broadcast source entity data to all 4 lanes
-  const xi4 = f32x4.splat(xi);
-  const yi4 = f32x4.splat(yi);
-  const ri4 = f32x4.splat(ri);
-  const rsum4 = f32x4.add(ri4, rj4);
-  
-  // Calculate deltas
-  const dx4 = f32x4.sub(xj4, xi4);
-  const dy4 = f32x4.sub(yj4, yi4);
-  
-  // AABB prefilter (branchless)
-  const absDx4 = f32x4.abs(dx4);
-  const absDy4 = f32x4.abs(dy4);
-  
-  // Reject if either axis exceeds radius sum
-  const aabbX = f32x4.le(absDx4, rsum4);  // dx <= rsum
-  const aabbY = f32x4.le(absDy4, rsum4);  // dy <= rsum
-  const aabbMask = v128.and(aabbX, aabbY);
-  
-  // Velocity-approach filter
-  const vxj4 = v128.load(changetype<usize>(velocityX.dataStart) + (cellIdx << 2));
-  const vyj4 = v128.load(changetype<usize>(velocityY.dataStart) + (cellIdx << 2));
-  const vxi4 = f32x4.splat(vxi);
-  const vyi4 = f32x4.splat(vyi);
-  
-  const dvx4 = f32x4.sub(vxj4, vxi4);
-  const dvy4 = f32x4.sub(vyj4, vyi4);
-  
-  // Dot product: approach = dvx*dx + dvy*dy
-  const approach4 = f32x4.add(f32x4.mul(dvx4, dx4), f32x4.mul(dvy4, dy4));
-  const approachMask = f32x4.le(approach4, f32x4.splat(0.0));  // approach <= 0
-  
-  // Squared distance check (no sqrt!)
-  const distSq4 = f32x4.add(f32x4.mul(dx4, dx4), f32x4.mul(dy4, dy4));
-  const rsumSq4 = f32x4.mul(rsum4, rsum4);
-  const minDist4 = f32x4.splat(0.0001);
-  
-  const collMask1 = f32x4.lt(distSq4, rsumSq4);    // distSq < rsumSq
-  const collMask2 = f32x4.gt(distSq4, minDist4);   // distSq > 0.0001
-  
-  // Combine all masks
-  let finalMask = v128.and(aabbMask, approachMask);
-  finalMask = v128.and(finalMask, collMask1);
-  finalMask = v128.and(finalMask, collMask2);
-  
-  // Convert to bitmask (0-15)
-  return i32x4.bitmask(finalMask);
-}
-
-/**
  * 🚀 ULTRA-OPTIMIZED: Circle-circle collision detection with multiple filters
  * 
  * Optimization layers:
@@ -532,35 +468,98 @@ function detectCollisionsInternal(): i32 {
     const simdCount = neighborCount & ~3;  // Round down to multiple of 4
     
     for (let n = 0; n < simdCount && collisionCount < maxCollisionPairs; n += 4) {
-      const cellIdx: i32 = querySpatialHashResult[n];
+      const cellIdx0: i32 = querySpatialHashResult[n];
+      const cellIdx1: i32 = querySpatialHashResult[n + 1];
+      const cellIdx2: i32 = querySpatialHashResult[n + 2];
+      const cellIdx3: i32 = querySpatialHashResult[n + 3];
       
-      // Check if we can safely load 4 neighbors (aligned and in bounds)
-      if (cellIdx + 4 <= cellIndices.length) {
-        // Process 4 neighbors in parallel
-        const collisionMask = checkCollisionsSIMD(xi, yi, ri, vxi, vyi, cellIdx);
-        
-        // Check each lane that had a collision
-        for (let lane = 0; lane < 4; lane++) {
-          if ((collisionMask & (1 << lane)) != 0) {
-            const idx = cellIdx + lane;
-            const j: i32 = cellIndices[idx];
+      // Load data for 4 neighbors
+      const xj0 = cellPosX[cellIdx0];
+      const yj0 = cellPosY[cellIdx0];
+      const rj0 = cellRadius[cellIdx0];
+      const vxj0 = velocityX[cellIndices[cellIdx0]];
+      const vyj0 = velocityY[cellIndices[cellIdx0]];
+      
+      const xj1 = cellPosX[cellIdx1];
+      const yj1 = cellPosY[cellIdx1];
+      const rj1 = cellRadius[cellIdx1];
+      const vxj1 = velocityX[cellIndices[cellIdx1]];
+      const vyj1 = velocityY[cellIndices[cellIdx1]];
+      
+      const xj2 = cellPosX[cellIdx2];
+      const yj2 = cellPosY[cellIdx2];
+      const rj2 = cellRadius[cellIdx2];
+      const vxj2 = velocityX[cellIndices[cellIdx2]];
+      const vyj2 = velocityY[cellIndices[cellIdx2]];
+      
+      const xj3 = cellPosX[cellIdx3];
+      const yj3 = cellPosY[cellIdx3];
+      const rj3 = cellRadius[cellIdx3];
+      const vxj3 = velocityX[cellIndices[cellIdx3]];
+      const vyj3 = velocityY[cellIndices[cellIdx3]];
+      
+      // Create v128 vectors
+      const xj4 = f32x4(xj0, xj1, xj2, xj3);
+      const yj4 = f32x4(yj0, yj1, yj2, yj3);
+      const rj4 = f32x4(rj0, rj1, rj2, rj3);
+      const vxj4 = f32x4(vxj0, vxj1, vxj2, vxj3);
+      const vyj4 = f32x4(vyj0, vyj1, vyj2, vyj3);
+      
+      // Broadcast source entity data
+      const xi4 = f32x4.splat(xi);
+      const yi4 = f32x4.splat(yi);
+      const ri4 = f32x4.splat(ri);
+      const vxi4 = f32x4.splat(vxi);
+      const vyi4 = f32x4.splat(vyi);
+      
+      // Calculate deltas
+      const dx4 = f32x4.sub(xj4, xi4);
+      const dy4 = f32x4.sub(yj4, yi4);
+      const rsum4 = f32x4.add(ri4, rj4);
+      
+      // AABB prefilter
+      const absDx4 = f32x4.abs(dx4);
+      const absDy4 = f32x4.abs(dy4);
+      const aabbX = f32x4.le(absDx4, rsum4);
+      const aabbY = f32x4.le(absDy4, rsum4);
+      const aabbMask = v128.and(aabbX, aabbY);
+      
+      // Velocity-approach filter
+      const dvx4 = f32x4.sub(vxj4, vxi4);
+      const dvy4 = f32x4.sub(vyj4, vyi4);
+      const approach4 = f32x4.add(f32x4.mul(dvx4, dx4), f32x4.mul(dvy4, dy4));
+      const approachMask = f32x4.le(approach4, f32x4.splat(0.0));
+      
+      // Squared distance check
+      const distSq4 = f32x4.add(f32x4.mul(dx4, dx4), f32x4.mul(dy4, dy4));
+      const rsumSq4 = f32x4.mul(rsum4, rsum4);
+      const collMask1 = f32x4.lt(distSq4, rsumSq4);
+      const collMask2 = f32x4.gt(distSq4, f32x4.splat(0.0001));
+      
+      // Combine all masks
+      let finalMask = v128.and(aabbMask, approachMask);
+      finalMask = v128.and(finalMask, collMask1);
+      finalMask = v128.and(finalMask, collMask2);
+      
+      const collisionMask = i32x4.bitmask(finalMask);
+      
+      // Check each lane that had a collision
+      for (let lane = 0; lane < 4; lane++) {
+        if ((collisionMask & (1 << lane)) != 0) {
+          const cellIdx = querySpatialHashResult[n + lane];
+          const j: i32 = cellIndices[cellIdx];
+          
+          // Avoid duplicate pairs and self-collision
+          if (j > i && collisionCount < maxCollisionPairs) {
+            // Collision detected!
+            wakeEntity(i);
+            wakeEntity(j);
             
-            // Avoid duplicate pairs and self-collision
-            if (j > i && collisionCount < maxCollisionPairs) {
-              // Collision detected!
-              wakeEntity(i);
-              wakeEntity(j);
-              
-              collisionPairsBuffer[collisionCount * 2] = i;
-              collisionPairsBuffer[collisionCount * 2 + 1] = j;
-              collisionCount++;
-            }
+            collisionPairsBuffer[collisionCount * 2] = i;
+            collisionPairsBuffer[collisionCount * 2 + 1] = j;
+            collisionCount++;
           }
         }
-      } else {
-        // Fallback to scalar for this group
-        n = simdCount;  // Skip to remainder
-        break;
       }
     }
     
@@ -907,7 +906,7 @@ export function updatePhysicsComplete(
   
   // PHASE 5: Boundary Constraints (SIMD-optimized, all entities checked)
   // Boundaries can wake sleeping entities
-  applyBoundaryConstraints(boundsWidth, boundsHeight, 0.3);
+  applyBoundaryConstraints(boundsWidth, boundsHeight, 0.95); // High restitution for bouncy behavior
   
   return totalCollisions;
 }
@@ -1372,7 +1371,7 @@ export function updateFrame(
     }
   }
   
-  applyBoundaryConstraints(boundsWidth, boundsHeight, 0.3);
+  applyBoundaryConstraints(boundsWidth, boundsHeight, 0.95); // High restitution for bouncy behavior
   
   // PHASE 2: Animation Update (SIMD-optimized)
   const simdCount = entityCount & ~3;
@@ -1391,8 +1390,8 @@ export function updateFrame(
   // PHASE 3: Frustum Culling (writes to visibleIndicesBuffer)
   const visibleCount = cullEntities(cameraX, cameraY, worldWidth, worldHeight, cullingMargin);
   
-  // Pack both counts into return value (visible count in upper 16 bits, collisions in lower 16 bits)
-  return (visibleCount << 16) | (totalCollisions & 0xFFFF);
+  // Return full 32-bit visible count (no packing limit)
+  return visibleCount;
 }
 
 /**
