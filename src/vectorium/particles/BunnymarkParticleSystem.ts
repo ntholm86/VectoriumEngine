@@ -147,7 +147,7 @@ export class BunnymarkParticleSystem {
     const unrollEnd = count - 3;
     
     while (i < unrollEnd) {
-      // Process sprite 0
+      // Sprite 0 - process inline
       let vy0 = velY[i] + gravity;
       let px0 = posX[i] + velX[i] * dt;
       let py0 = posY[i] + vy0 * dt;
@@ -160,7 +160,7 @@ export class BunnymarkParticleSystem {
       
       posX[i] = px0; posY[i] = py0; velX[i] = vx0; velY[i] = vy0;
       
-      // Process sprite 1
+      // Sprite 1 - process inline
       let vy1 = velY[i + 1] + gravity;
       let px1 = posX[i + 1] + velX[i + 1] * dt;
       let py1 = posY[i + 1] + vy1 * dt;
@@ -173,7 +173,7 @@ export class BunnymarkParticleSystem {
       
       posX[i + 1] = px1; posY[i + 1] = py1; velX[i + 1] = vx1; velY[i + 1] = vy1;
       
-      // Process sprite 2
+      // Sprite 2 - process inline
       let vy2 = velY[i + 2] + gravity;
       let px2 = posX[i + 2] + velX[i + 2] * dt;
       let py2 = posY[i + 2] + vy2 * dt;
@@ -186,7 +186,7 @@ export class BunnymarkParticleSystem {
       
       posX[i + 2] = px2; posY[i + 2] = py2; velX[i + 2] = vx2; velY[i + 2] = vy2;
       
-      // Process sprite 3
+      // Sprite 3 - process inline
       let vy3 = velY[i + 3] + gravity;
       let px3 = posX[i + 3] + velX[i + 3] * dt;
       let py3 = posY[i + 3] + vy3 * dt;

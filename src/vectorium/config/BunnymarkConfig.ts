@@ -17,7 +17,7 @@ export const BUNNYMARK_CONFIG = {
     max: 600   // Maximum spawn velocity
   },
   progressive: true,
-  spawnIncrement: 5000, // Add 800 bunnies per batch
+  spawnIncrement: 10000, // Add 800 bunnies per batch
   spawnInterval: 100, // Milliseconds between batches
   targetFPS: 60
 } as const;

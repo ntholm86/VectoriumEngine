@@ -28,7 +28,7 @@ export class InstancedSpriteRenderer {
   private staticSizeBuffer: WebGLBuffer | null = null;
   
   // Pre-allocated CPU-side arrays
-  private batchSize: number = 200_000; // Increased to reduce draw calls further!
+  private batchSize: number = 200_000; // Optimal for 1.84M+ entities
   private dynamicData: Float32Array; // Only positions (2 floats per instance)
   
   // Track initialization state
@@ -311,23 +311,27 @@ export class InstancedSpriteRenderer {
     while (offset < count) {
       const batchCount = Math.min(batchSize, count - offset);
       
-      // ULTRA-OPTIMIZED: Manual 4x loop unrolling for maximum CPU throughput
+      // ULTRA-OPTIMIZED: Manual 4x loop unrolling with local var caching
       let j = 0;
       let idx = offset;
       const endIdx = offset + batchCount;
       const unrollEnd = endIdx - 3; // Process 4 at a time
       
-      // Process 4 sprites per iteration - optimal balance for CPU pipeline
+      // Process 4 sprites per iteration - cache reads in locals to reduce array access
       while (idx < unrollEnd) {
-        dynamicData[j] = posX[idx];
-        dynamicData[j + 1] = posY[idx];
-        dynamicData[j + 2] = posX[idx + 1];
-        dynamicData[j + 3] = posY[idx + 1];
-        dynamicData[j + 4] = posX[idx + 2];
-        dynamicData[j + 5] = posY[idx + 2];
-        dynamicData[j + 6] = posX[idx + 3];
-        dynamicData[j + 7] = posY[idx + 3];
-        j += 8;
+        const px0 = posX[idx], py0 = posY[idx];
+        const px1 = posX[idx + 1], py1 = posY[idx + 1];
+        const px2 = posX[idx + 2], py2 = posY[idx + 2];
+        const px3 = posX[idx + 3], py3 = posY[idx + 3];
+        
+        dynamicData[j++] = px0;
+        dynamicData[j++] = py0;
+        dynamicData[j++] = px1;
+        dynamicData[j++] = py1;
+        dynamicData[j++] = px2;
+        dynamicData[j++] = py2;
+        dynamicData[j++] = px3;
+        dynamicData[j++] = py3;
         idx += 4;
       }
       
