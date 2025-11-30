@@ -28,7 +28,7 @@ export class InstancedSpriteRenderer {
   private staticSizeBuffer: WebGLBuffer | null = null;
   
   // Pre-allocated CPU-side arrays
-  private batchSize: number = 200_000; // Increased from 100K - fewer draw calls!
+  private batchSize: number = 200_000; // Increased to reduce draw calls further!
   private dynamicData: Float32Array; // Only positions (2 floats per instance)
   
   // Track initialization state
@@ -311,13 +311,13 @@ export class InstancedSpriteRenderer {
     while (offset < count) {
       const batchCount = Math.min(batchSize, count - offset);
       
-      // ULTRA-OPTIMIZED: Manual 4x loop unrolling for better CPU cache/pipeline
+      // ULTRA-OPTIMIZED: Manual 4x loop unrolling for maximum CPU throughput
       let j = 0;
       let idx = offset;
       const endIdx = offset + batchCount;
       const unrollEnd = endIdx - 3; // Process 4 at a time
       
-      // Process 4 sprites per iteration
+      // Process 4 sprites per iteration - optimal balance for CPU pipeline
       while (idx < unrollEnd) {
         dynamicData[j] = posX[idx];
         dynamicData[j + 1] = posY[idx];
