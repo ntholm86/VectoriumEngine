@@ -2,12 +2,6 @@
  * Scene Builder - Simplified scene creation without class inheritance
  * 
  * Usage:
- * const scene = new SceneBuilder('demo')
- *   .withCapacity(2000000)
- *   .onLoad(async () => { console.log('Scene loaded!'); })
- *   .onUpdate((dt) => { /* custom update logic * / })
- *   .onRender((renderer, textRenderer) => { /* custom rendering * / })
- *   .build();
  */
 
 import { Scene } from './Scene';

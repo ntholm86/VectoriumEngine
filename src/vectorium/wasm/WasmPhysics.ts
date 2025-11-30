@@ -46,7 +46,7 @@ export class WasmPhysics {
    * 🚀 Initialize WASM physics module
    * Non-blocking: Falls back to JS if WASM fails to load
    */
-  async initialize(maxEntities: number = 2000000): Promise<boolean> {
+  async initialize(maxEntities: number = 3000000): Promise<boolean> {
     console.log(`🚀 WASM Physics Engine: Initializing with capacity ${maxEntities}...`);
     
     try {

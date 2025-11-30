@@ -73,7 +73,7 @@ export class Scene {
     pulsePhase: number;
   }>();
 
-  constructor(name: string, maxEntities = 2000000, worldBoundsMultiplier = 1.0) {
+  constructor(name: string, maxEntities = 3000000, worldBoundsMultiplier = 1.0) {
     this.name = name;
     this.world = new World(maxEntities);
     

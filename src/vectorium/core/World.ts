@@ -107,7 +107,7 @@ export class World {
   readonly ANIM_SPIN = 3;
   readonly ANIM_FADE = 4;
   
-  constructor(maxEntities: number = 2000000) {
+  constructor(maxEntities: number = 3000000) {
     this.maxEntities = maxEntities;
     this.wasmPhysics = new WasmPhysics();
     

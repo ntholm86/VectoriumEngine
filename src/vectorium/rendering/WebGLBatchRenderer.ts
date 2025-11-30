@@ -44,7 +44,7 @@ export class WebGLBatchRenderer {
   private cachedCanvasHeight: number = 0;
   
   // 🚀 Pre-allocated sort buffer for sprite batching (2M capacity)
-  private sortBuffer: Uint32Array = new Uint32Array(2000000);
+  private sortBuffer: Uint32Array = new Uint32Array(3000000);
   
   // 🚀 Advanced WebGL State Caching
   private boundVertexBuffer: WebGLBuffer | null = null;

@@ -55,7 +55,7 @@ class ParticleBunnymarkScene extends Scene {
     
     // Create optimized particle system
     const particleConfig: BunnymarkParticleConfig = {
-      maxParticles: 2000000, // 2M max capacity
+      maxParticles: 3000000, // 2M max capacity
       canvasWidth: BUNNYMARK_CONFIG.canvas.width,
       canvasHeight: BUNNYMARK_CONFIG.canvas.height,
       gravity: BUNNYMARK_CONFIG.physics.gravity ? 980 : 0,
@@ -69,29 +69,45 @@ class ParticleBunnymarkScene extends Scene {
     
     // Run progressive benchmark
     const runProgressiveTest = async () => {
+      let spawnDelay = BUNNYMARK_CONFIG.spawnInterval;
+      
       while (this.isRunning) {
-        // Spawn a batch
-        await this.spawnBunnyBatch();
-        this.totalSpawned += BUNNYMARK_CONFIG.spawnIncrement;
-        
-        // Wait for spawn interval
-        await new Promise(resolve => setTimeout(resolve, BUNNYMARK_CONFIG.spawnInterval));
-        
-        // Check FPS
+        // Check performance BEFORE spawning (measure stable state)
         const metrics = performanceMonitor.getMetrics();
         const avgFPS = metrics.fps;
+        const frameTime = metrics.frameTime;
         
-        console.log(`🐰 Spawned ${BUNNYMARK_CONFIG.spawnIncrement} bunnies → Total: ${this.totalSpawned.toLocaleString()} @ ${avgFPS.toFixed(1)} FPS`);
+        console.log(`📊 Before spawn: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);
         
-        // Stop spawning if FPS drops below target or hit limit
-        if (avgFPS < BUNNYMARK_CONFIG.targetFPS || this.totalSpawned >= 2000000) {
+        // Stop spawning if frame time exceeds budget or hit limit
+        if (frameTime > 17 || this.totalSpawned >= 2500000) {
           console.log('');
           console.log('✅ PARTICLE BUNNYMARK COMPLETE!');
-          console.log(`🏆 Final Score: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS`);
+          console.log(`🏆 Final Score: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);
           console.log('💡 Using ParticleSystem (like PixiJS ParticleContainer)');
           console.log('');
           break;
         }
+        
+        // Adaptive spawning: slow down as we approach frame budget limit
+        if (frameTime > 15.5) { // Over 15.5ms - slow way down
+          spawnDelay = 500;
+        } else if (frameTime > 15) { // Over 15ms - slow down significantly
+          spawnDelay = 300;
+        } else if (frameTime > 14.5) { // Over 14.5ms - slow down
+          spawnDelay = 200;
+        } else {
+          spawnDelay = BUNNYMARK_CONFIG.spawnInterval; // Normal speed
+        }
+        
+        // Spawn a batch
+        await this.spawnBunnyBatch();
+        this.totalSpawned += BUNNYMARK_CONFIG.spawnIncrement;
+        
+        console.log(`🐰 Spawned ${BUNNYMARK_CONFIG.spawnIncrement} bunnies → delay: ${spawnDelay}ms`);
+        
+        // Wait for adaptive spawn interval (let system stabilize)
+        await new Promise(resolve => setTimeout(resolve, spawnDelay));
       }
     };
     
