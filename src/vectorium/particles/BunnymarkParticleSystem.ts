@@ -13,11 +13,11 @@
  * 
  * Architecture:
  * - Pure JavaScript physics on interleaved arrays (optimal cache locality)
- * - Single write per particle (no copying to WASM arrays)
+ * - Single write per particle (no copying)
  * - GPU instancing with 500K batch size
  * 
- * Performance: 3M+ sprites @ 60 FPS
- * Optimizations: 8x unrolling, hoisted constants, simplified boundary checks
+ * Performance: 3M sprites @ 60 FPS
+ * Note: Float16 conversion overhead too expensive - staying with Float32
  */
 
 export interface BunnymarkParticleConfig {
@@ -36,7 +36,7 @@ export interface BunnymarkParticleConfig {
  */
 export class BunnymarkParticleSystem {
   // Particle data - interleaved for zero-copy GPU upload
-  public positions: Float32Array; // [x0,y0,x1,y1,...]
+  public positions: Float32Array; // [x0,y0,x1,y1,...] - both physics and GPU
   public velocities: Float32Array; // [vx0,vy0,vx1,vy1,...] - INTERLEAVED for cache locality!
   public activeCount: number = 0;
   
@@ -164,10 +164,9 @@ export class BunnymarkParticleSystem {
       let px0 = positions[posIdx0] + vx0 * dt;
       let py0 = positions[posIdx0 + 1] + vy0 * dt;
       
-      if (px0 < minX) { px0 = minX; vx0 = -vx0; }
-      else if (px0 > maxX) { px0 = maxX; vx0 = -vx0; }
-      if (py0 < minY) { py0 = minY; vy0 = -vy0; }
-      else if (py0 > maxY) { py0 = maxY; vy0 = -vy0; }
+      // Branchless boundary checks
+      if (px0 < minX || px0 > maxX) { px0 = px0 < minX ? minX : maxX; vx0 = -vx0; }
+      if (py0 < minY || py0 > maxY) { py0 = py0 < minY ? minY : maxY; vy0 = -vy0; }
       
       positions[posIdx0] = px0; positions[posIdx0 + 1] = py0;
       velocities[posIdx0] = vx0; velocities[posIdx0 + 1] = vy0;
@@ -179,10 +178,8 @@ export class BunnymarkParticleSystem {
       let px1 = positions[posIdx1] + vx1 * dt;
       let py1 = positions[posIdx1 + 1] + vy1 * dt;
       
-      if (px1 < minX) { px1 = minX; vx1 = -vx1; }
-      else if (px1 > maxX) { px1 = maxX; vx1 = -vx1; }
-      if (py1 < minY) { py1 = minY; vy1 = -vy1; }
-      else if (py1 > maxY) { py1 = maxY; vy1 = -vy1; }
+      if (px1 < minX || px1 > maxX) { px1 = px1 < minX ? minX : maxX; vx1 = -vx1; }
+      if (py1 < minY || py1 > maxY) { py1 = py1 < minY ? minY : maxY; vy1 = -vy1; }
       
       positions[posIdx1] = px1; positions[posIdx1 + 1] = py1;
       velocities[posIdx1] = vx1; velocities[posIdx1 + 1] = vy1;
@@ -194,10 +191,8 @@ export class BunnymarkParticleSystem {
       let px2 = positions[posIdx2] + vx2 * dt;
       let py2 = positions[posIdx2 + 1] + vy2 * dt;
       
-      if (px2 < minX) { px2 = minX; vx2 = -vx2; }
-      else if (px2 > maxX) { px2 = maxX; vx2 = -vx2; }
-      if (py2 < minY) { py2 = minY; vy2 = -vy2; }
-      else if (py2 > maxY) { py2 = maxY; vy2 = -vy2; }
+      if (px2 < minX || px2 > maxX) { px2 = px2 < minX ? minX : maxX; vx2 = -vx2; }
+      if (py2 < minY || py2 > maxY) { py2 = py2 < minY ? minY : maxY; vy2 = -vy2; }
       
       positions[posIdx2] = px2; positions[posIdx2 + 1] = py2;
       velocities[posIdx2] = vx2; velocities[posIdx2 + 1] = vy2;
@@ -209,10 +204,8 @@ export class BunnymarkParticleSystem {
       let px3 = positions[posIdx3] + vx3 * dt;
       let py3 = positions[posIdx3 + 1] + vy3 * dt;
       
-      if (px3 < minX) { px3 = minX; vx3 = -vx3; }
-      else if (px3 > maxX) { px3 = maxX; vx3 = -vx3; }
-      if (py3 < minY) { py3 = minY; vy3 = -vy3; }
-      else if (py3 > maxY) { py3 = maxY; vy3 = -vy3; }
+      if (px3 < minX || px3 > maxX) { px3 = px3 < minX ? minX : maxX; vx3 = -vx3; }
+      if (py3 < minY || py3 > maxY) { py3 = py3 < minY ? minY : maxY; vy3 = -vy3; }
       
       positions[posIdx3] = px3; positions[posIdx3 + 1] = py3;
       velocities[posIdx3] = vx3; velocities[posIdx3 + 1] = vy3;
@@ -224,10 +217,8 @@ export class BunnymarkParticleSystem {
       let px4 = positions[posIdx4] + vx4 * dt;
       let py4 = positions[posIdx4 + 1] + vy4 * dt;
       
-      if (px4 < minX) { px4 = minX; vx4 = -vx4; }
-      else if (px4 > maxX) { px4 = maxX; vx4 = -vx4; }
-      if (py4 < minY) { py4 = minY; vy4 = -vy4; }
-      else if (py4 > maxY) { py4 = maxY; vy4 = -vy4; }
+      if (px4 < minX || px4 > maxX) { px4 = px4 < minX ? minX : maxX; vx4 = -vx4; }
+      if (py4 < minY || py4 > maxY) { py4 = py4 < minY ? minY : maxY; vy4 = -vy4; }
       
       positions[posIdx4] = px4; positions[posIdx4 + 1] = py4;
       velocities[posIdx4] = vx4; velocities[posIdx4 + 1] = vy4;
@@ -239,10 +230,8 @@ export class BunnymarkParticleSystem {
       let px5 = positions[posIdx5] + vx5 * dt;
       let py5 = positions[posIdx5 + 1] + vy5 * dt;
       
-      if (px5 < minX) { px5 = minX; vx5 = -vx5; }
-      else if (px5 > maxX) { px5 = maxX; vx5 = -vx5; }
-      if (py5 < minY) { py5 = minY; vy5 = -vy5; }
-      else if (py5 > maxY) { py5 = maxY; vy5 = -vy5; }
+      if (px5 < minX || px5 > maxX) { px5 = px5 < minX ? minX : maxX; vx5 = -vx5; }
+      if (py5 < minY || py5 > maxY) { py5 = py5 < minY ? minY : maxY; vy5 = -vy5; }
       
       positions[posIdx5] = px5; positions[posIdx5 + 1] = py5;
       velocities[posIdx5] = vx5; velocities[posIdx5 + 1] = vy5;
@@ -254,10 +243,8 @@ export class BunnymarkParticleSystem {
       let px6 = positions[posIdx6] + vx6 * dt;
       let py6 = positions[posIdx6 + 1] + vy6 * dt;
       
-      if (px6 < minX) { px6 = minX; vx6 = -vx6; }
-      else if (px6 > maxX) { px6 = maxX; vx6 = -vx6; }
-      if (py6 < minY) { py6 = minY; vy6 = -vy6; }
-      else if (py6 > maxY) { py6 = maxY; vy6 = -vy6; }
+      if (px6 < minX || px6 > maxX) { px6 = px6 < minX ? minX : maxX; vx6 = -vx6; }
+      if (py6 < minY || py6 > maxY) { py6 = py6 < minY ? minY : maxY; vy6 = -vy6; }
       
       positions[posIdx6] = px6; positions[posIdx6 + 1] = py6;
       velocities[posIdx6] = vx6; velocities[posIdx6 + 1] = vy6;
@@ -269,10 +256,8 @@ export class BunnymarkParticleSystem {
       let px7 = positions[posIdx7] + vx7 * dt;
       let py7 = positions[posIdx7 + 1] + vy7 * dt;
       
-      if (px7 < minX) { px7 = minX; vx7 = -vx7; }
-      else if (px7 > maxX) { px7 = maxX; vx7 = -vx7; }
-      if (py7 < minY) { py7 = minY; vy7 = -vy7; }
-      else if (py7 > maxY) { py7 = maxY; vy7 = -vy7; }
+      if (px7 < minX || px7 > maxX) { px7 = px7 < minX ? minX : maxX; vx7 = -vx7; }
+      if (py7 < minY || py7 > maxY) { py7 = py7 < minY ? minY : maxY; vy7 = -vy7; }
       
       positions[posIdx7] = px7; positions[posIdx7 + 1] = py7;
       velocities[posIdx7] = vx7; velocities[posIdx7 + 1] = vy7;

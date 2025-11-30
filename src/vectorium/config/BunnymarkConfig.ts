@@ -19,5 +19,5 @@ export const BUNNYMARK_CONFIG = {
   progressive: true,
   spawnIncrement: 10000, // Add 800 bunnies per batch
   spawnInterval: 100, // Milliseconds between batches
-  targetFPS: 50 // Stop spawning at 50 FPS (spawning adds overhead, actual perf is higher)
+  targetFPS: 55 // Stop spawning at 55 FPS (spawning adds overhead, actual perf is higher)
 } as const;
