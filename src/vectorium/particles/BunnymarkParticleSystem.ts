@@ -31,9 +31,8 @@ export interface BunnymarkParticleConfig {
  * Renders sprites with textures, handles physics and bouncing
  */
 export class BunnymarkParticleSystem {
-  // Particle data (SoA - Structure of Arrays for cache efficiency)
-  public posX: Float32Array;
-  public posY: Float32Array;
+  // Particle data (interleaved positions for zero-copy upload)
+  public positions: Float32Array; // [x0, y0, x1, y1, x2, y2, ...]
   public velX: Float32Array;
   public velY: Float32Array;
   public activeCount: number = 0;
@@ -41,6 +40,7 @@ export class BunnymarkParticleSystem {
   private config: BunnymarkParticleConfig;
   private halfWidth: number;
   private halfHeight: number;
+  private cachedTexture: WebGLTexture | null = null;
   
   // Pre-allocated render arrays (ZERO allocations per frame!)
   private rotation: Uint16Array;
@@ -63,8 +63,7 @@ export class BunnymarkParticleSystem {
     
     // Pre-allocate arrays (zero allocation during runtime)
     const max = config.maxParticles;
-    this.posX = new Float32Array(max);
-    this.posY = new Float32Array(max);
+    this.positions = new Float32Array(max * 2); // Interleaved: [x0, y0, x1, y1, ...]
     this.velX = new Float32Array(max);
     this.velY = new Float32Array(max);
     
@@ -110,12 +109,13 @@ export class BunnymarkParticleSystem {
     
     for (let i = 0; i < toSpawn; i++) {
       const idx = this.activeCount++;
+      const posIdx = idx * 2; // Interleaved positions index
       
       // Random position in circle distribution
       const angle = Math.random() * Math.PI * 2;
       const radius = Math.random() * 200;
-      this.posX[idx] = centerX + Math.cos(angle) * radius;
-      this.posY[idx] = centerY + Math.sin(angle) * radius;
+      this.positions[posIdx] = centerX + Math.cos(angle) * radius;
+      this.positions[posIdx + 1] = centerY + Math.sin(angle) * radius;
       
       // Random velocity
       const vAngle = Math.random() * Math.PI * 2;
@@ -136,21 +136,21 @@ export class BunnymarkParticleSystem {
     const halfW = this.halfWidth;
     const halfH = this.halfHeight;
     
-    const posX = this.posX;
-    const posY = this.posY;
+    const pos = this.positions;
     const velX = this.velX;
     const velY = this.velY;
     const count = this.activeCount;
     
     // Process 4 sprites per iteration for better CPU pipelining
     let i = 0;
+    let j = 0; // Index into positions array (2 per sprite)
     const unrollEnd = count - 3;
     
     while (i < unrollEnd) {
       // Sprite 0 - process inline
       let vy0 = velY[i] + gravity;
-      let px0 = posX[i] + velX[i] * dt;
-      let py0 = posY[i] + vy0 * dt;
+      let px0 = pos[j] + velX[i] * dt;
+      let py0 = pos[j + 1] + vy0 * dt;
       let vx0 = velX[i];
       
       if (px0 - halfW < 0) { px0 = halfW; vx0 = -vx0; }
@@ -158,12 +158,12 @@ export class BunnymarkParticleSystem {
       if (py0 - halfH < 0) { py0 = halfH; vy0 = -vy0; }
       else if (py0 + halfH > canvasHeight) { py0 = canvasHeight - halfH; vy0 = -vy0; }
       
-      posX[i] = px0; posY[i] = py0; velX[i] = vx0; velY[i] = vy0;
+      pos[j] = px0; pos[j + 1] = py0; velX[i] = vx0; velY[i] = vy0;
       
       // Sprite 1 - process inline
       let vy1 = velY[i + 1] + gravity;
-      let px1 = posX[i + 1] + velX[i + 1] * dt;
-      let py1 = posY[i + 1] + vy1 * dt;
+      let px1 = pos[j + 2] + velX[i + 1] * dt;
+      let py1 = pos[j + 3] + vy1 * dt;
       let vx1 = velX[i + 1];
       
       if (px1 - halfW < 0) { px1 = halfW; vx1 = -vx1; }
@@ -171,12 +171,12 @@ export class BunnymarkParticleSystem {
       if (py1 - halfH < 0) { py1 = halfH; vy1 = -vy1; }
       else if (py1 + halfH > canvasHeight) { py1 = canvasHeight - halfH; vy1 = -vy1; }
       
-      posX[i + 1] = px1; posY[i + 1] = py1; velX[i + 1] = vx1; velY[i + 1] = vy1;
+      pos[j + 2] = px1; pos[j + 3] = py1; velX[i + 1] = vx1; velY[i + 1] = vy1;
       
       // Sprite 2 - process inline
       let vy2 = velY[i + 2] + gravity;
-      let px2 = posX[i + 2] + velX[i + 2] * dt;
-      let py2 = posY[i + 2] + vy2 * dt;
+      let px2 = pos[j + 4] + velX[i + 2] * dt;
+      let py2 = pos[j + 5] + vy2 * dt;
       let vx2 = velX[i + 2];
       
       if (px2 - halfW < 0) { px2 = halfW; vx2 = -vx2; }
@@ -184,12 +184,12 @@ export class BunnymarkParticleSystem {
       if (py2 - halfH < 0) { py2 = halfH; vy2 = -vy2; }
       else if (py2 + halfH > canvasHeight) { py2 = canvasHeight - halfH; vy2 = -vy2; }
       
-      posX[i + 2] = px2; posY[i + 2] = py2; velX[i + 2] = vx2; velY[i + 2] = vy2;
+      pos[j + 4] = px2; pos[j + 5] = py2; velX[i + 2] = vx2; velY[i + 2] = vy2;
       
       // Sprite 3 - process inline
       let vy3 = velY[i + 3] + gravity;
-      let px3 = posX[i + 3] + velX[i + 3] * dt;
-      let py3 = posY[i + 3] + vy3 * dt;
+      let px3 = pos[j + 6] + velX[i + 3] * dt;
+      let py3 = pos[j + 7] + vy3 * dt;
       let vx3 = velX[i + 3];
       
       if (px3 - halfW < 0) { px3 = halfW; vx3 = -vx3; }
@@ -197,16 +197,17 @@ export class BunnymarkParticleSystem {
       if (py3 - halfH < 0) { py3 = halfH; vy3 = -vy3; }
       else if (py3 + halfH > canvasHeight) { py3 = canvasHeight - halfH; vy3 = -vy3; }
       
-      posX[i + 3] = px3; posY[i + 3] = py3; velX[i + 3] = vx3; velY[i + 3] = vy3;
+      pos[j + 6] = px3; pos[j + 7] = py3; velX[i + 3] = vx3; velY[i + 3] = vy3;
       
       i += 4;
+      j += 8; // 4 sprites * 2 floats each
     }
     
     // Handle remainder
     while (i < count) {
       let vy = velY[i] + gravity;
-      let px = posX[i] + velX[i] * dt;
-      let py = posY[i] + vy * dt;
+      let px = pos[j] + velX[i] * dt;
+      let py = pos[j + 1] + vy * dt;
       let vx = velX[i];
       
       if (px - halfW < 0) { px = halfW; vx = -vx; }
@@ -214,8 +215,9 @@ export class BunnymarkParticleSystem {
       if (py - halfH < 0) { py = halfH; vy = -vy; }
       else if (py + halfH > canvasHeight) { py = canvasHeight - halfH; vy = -vy; }
       
-      posX[i] = px; posY[i] = py; velX[i] = vx; velY[i] = vy;
+      pos[j] = px; pos[j + 1] = py; velX[i] = vx; velY[i] = vy;
       i++;
+      j += 2;
     }
   }
   
@@ -226,11 +228,18 @@ export class BunnymarkParticleSystem {
     const count = this.activeCount;
     if (count === 0) return;
     
+    // Get and cache the bunny texture (extract glTexture from Texture object)
+    if (!this.cachedTexture && textureManager) {
+      const texture = textureManager.getTexture('/bunny.png');
+      if (texture) {
+        this.cachedTexture = texture.glTexture;
+      }
+    }
+    
     // Use instanced rendering for massive sprite counts
-    if (typeof renderer.drawInstancedSprites === 'function') {
+    if (typeof renderer.drawInstancedSprites === 'function' && this.cachedTexture) {
       renderer.drawInstancedSprites(
-        this.posX,
-        this.posY,
+        this.positions,
         this.sizes,
         this.colorR,
         this.colorG,
@@ -241,7 +250,9 @@ export class BunnymarkParticleSystem {
         this.uvU1,
         this.uvV1,
         count,
-        textureManager
+        this.cachedTexture,
+        this.config.canvasWidth,
+        this.config.canvasHeight
       );
     } else {
       console.warn('Instanced sprite rendering not available');

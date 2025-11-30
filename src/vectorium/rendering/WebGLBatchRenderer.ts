@@ -1353,8 +1353,7 @@ void main() {
    * because it uploads 1 quad geometry and draws it N times with per-instance data
    */
   drawInstancedSprites(
-    posX: Float32Array,
-    posY: Float32Array,
+    positions: Float32Array, // Interleaved: [x0, y0, x1, y1, ...]
     sizes: Float32Array,
     colorR: Uint8Array,
     colorG: Uint8Array,
@@ -1365,32 +1364,24 @@ void main() {
     uvU1: Uint16Array,
     uvV1: Uint16Array,
     count: number,
-    textureManager: any
+    texture: WebGLTexture,
+    canvasWidth: number,
+    canvasHeight: number
   ): void {
     if (!this.instancedRenderer) {
       console.warn('Instanced rendering not available (WebGL2 required)');
       return;
     }
     
-    // Get texture from manager
-    const bunnyTexture = textureManager.getTexture('/bunny.png');
-    if (!bunnyTexture) {
-      console.warn('Texture not found');
-      return;
-    }
-    
-    const gl = this.gl as WebGL2RenderingContext;
-    const texture = bunnyTexture.glTexture;
-    
     // Draw using instanced renderer
-    this.instancedRenderer.draw(
-      posX, posY, sizes,
+    this.instancedRenderer.drawInstancedSprites(
+      positions, sizes,
       colorR, colorG, colorB, alphas,
       uvU0, uvV0, uvU1, uvV1,
       count,
       texture,
-      gl.canvas.width,
-      gl.canvas.height
+      canvasWidth,
+      canvasHeight
     );
     
     this.drawCallCount++;

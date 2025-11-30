@@ -27,9 +27,8 @@ export class InstancedSpriteRenderer {
   private staticUVBuffer: WebGLBuffer | null = null;
   private staticSizeBuffer: WebGLBuffer | null = null;
   
-  // Pre-allocated CPU-side arrays
+  // Batch size for optimal GPU processing
   private batchSize: number = 200_000; // Optimal for 1.84M+ entities
-  private dynamicData: Float32Array; // Only positions (2 floats per instance)
   
   // Track initialization state
   private staticDataInitialized: boolean = false;
@@ -98,9 +97,6 @@ export class InstancedSpriteRenderer {
   
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
-    
-    // Pre-allocate DYNAMIC data array (only positions!)
-    this.dynamicData = new Float32Array(this.batchSize * 2);
     
     this.initShaders();
     this.initGeometry();
@@ -176,7 +172,7 @@ export class InstancedSpriteRenderer {
     // Create dynamic buffer and pre-allocate GPU memory
     this.dynamicBuffer = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.dynamicBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, this.dynamicData, gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, this.batchSize * 2 * 4, gl.STREAM_DRAW); // batchSize × 2 floats × 4 bytes
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(1, 1);
@@ -255,9 +251,8 @@ export class InstancedSpriteRenderer {
   /**
    * Draw instanced sprites (ONLY uploads positions - 82% bandwidth reduction!)
    */
-  draw(
-    posX: Float32Array,
-    posY: Float32Array,
+  drawInstancedSprites(
+    positions: Float32Array, // Interleaved: [x0, y0, x1, y1, ...]
     sizes: Float32Array,
     colorR: Uint8Array,
     colorG: Uint8Array,
@@ -302,7 +297,6 @@ export class InstancedSpriteRenderer {
     gl.bindVertexArray(this.vao);
     
     const batchSize = this.batchSize;
-    const dynamicData = this.dynamicData;
     
     // Bind dynamic buffer once (outside batch loop)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.dynamicBuffer);
@@ -311,43 +305,14 @@ export class InstancedSpriteRenderer {
     while (offset < count) {
       const batchCount = Math.min(batchSize, count - offset);
       
-      // ULTRA-OPTIMIZED: Manual 4x loop unrolling with local var caching
-      let j = 0;
-      let idx = offset;
-      const endIdx = offset + batchCount;
-      const unrollEnd = endIdx - 3; // Process 4 at a time
-      
-      // Process 4 sprites per iteration - cache reads in locals to reduce array access
-      while (idx < unrollEnd) {
-        const px0 = posX[idx], py0 = posY[idx];
-        const px1 = posX[idx + 1], py1 = posY[idx + 1];
-        const px2 = posX[idx + 2], py2 = posY[idx + 2];
-        const px3 = posX[idx + 3], py3 = posY[idx + 3];
-        
-        dynamicData[j++] = px0;
-        dynamicData[j++] = py0;
-        dynamicData[j++] = px1;
-        dynamicData[j++] = py1;
-        dynamicData[j++] = px2;
-        dynamicData[j++] = py2;
-        dynamicData[j++] = px3;
-        dynamicData[j++] = py3;
-        idx += 4;
-      }
-      
-      // Handle remainder
-      while (idx < endIdx) {
-        dynamicData[j++] = posX[idx];
-        dynamicData[j++] = posY[idx];
-        idx++;
-      }
-      
-      // Use bufferSubData for faster partial buffer updates
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, dynamicData, 0, batchCount * 2);
+      // ZERO-COPY: Upload positions directly from source array
+      const startIdx = offset * 2; // Each sprite has 2 floats (x, y)
+      const floatCount = batchCount * 2;
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions, startIdx, floatCount);
       
       // Track buffer upload metrics
       if (this.perfMonitor) {
-        const uploadBytes = batchCount * 2 * 4; // count × 2 floats × 4 bytes per float
+        const uploadBytes = floatCount * 4; // floats × 4 bytes per float
         this.perfMonitor.recordBufferUpload(uploadBytes);
       }
       
