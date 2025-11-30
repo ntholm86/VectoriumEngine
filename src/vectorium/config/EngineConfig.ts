@@ -16,7 +16,7 @@ export const ENGINE_CONFIG = {
    * Default: 3M entities (balance between memory and performance)
    * Memory impact: ~180MB for entity arrays at 3M capacity
    */
-  maxEntities: 5_000_000,
+  maxEntities: 8_000_000,
   
   /**
    * Default batch size for instanced rendering
