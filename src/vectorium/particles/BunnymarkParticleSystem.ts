@@ -164,18 +164,17 @@ export class BunnymarkParticleSystem {
       let px0 = positions[posIdx0] + vx0 * dt;
       let py0 = positions[posIdx0 + 1] + vy0 * dt;
       
-      // Direct velocity flip (avoid ternary branches)
+      // Only write velocity if it changed
       if (px0 < minX || px0 > maxX) {
         px0 = Math.max(minX, Math.min(maxX, px0));
-        vx0 = -vx0;
+        velocities[posIdx0] = -vx0;
       }
       if (py0 < minY || py0 > maxY) {
         py0 = Math.max(minY, Math.min(maxY, py0));
-        vy0 = -vy0;
+        velocities[posIdx0 + 1] = -vy0;
       }
       
       positions[posIdx0] = px0; positions[posIdx0 + 1] = py0;
-      velocities[posIdx0] = vx0; velocities[posIdx0 + 1] = vy0;
       
       // Sprite 1
       let posIdx1 = (i + 1) * 2;
@@ -186,15 +185,14 @@ export class BunnymarkParticleSystem {
       
       if (px1 < minX || px1 > maxX) {
         px1 = Math.max(minX, Math.min(maxX, px1));
-        vx1 = -vx1;
+        velocities[posIdx1] = -vx1;
       }
       if (py1 < minY || py1 > maxY) {
         py1 = Math.max(minY, Math.min(maxY, py1));
-        vy1 = -vy1;
+        velocities[posIdx1 + 1] = -vy1;
       }
       
       positions[posIdx1] = px1; positions[posIdx1 + 1] = py1;
-      velocities[posIdx1] = vx1; velocities[posIdx1 + 1] = vy1;
       
       // Sprite 2
       let posIdx2 = (i + 2) * 2;
@@ -205,15 +203,14 @@ export class BunnymarkParticleSystem {
       
       if (px2 < minX || px2 > maxX) {
         px2 = Math.max(minX, Math.min(maxX, px2));
-        vx2 = -vx2;
+        velocities[posIdx2] = -vx2;
       }
       if (py2 < minY || py2 > maxY) {
         py2 = Math.max(minY, Math.min(maxY, py2));
-        vy2 = -vy2;
+        velocities[posIdx2 + 1] = -vy2;
       }
       
       positions[posIdx2] = px2; positions[posIdx2 + 1] = py2;
-      velocities[posIdx2] = vx2; velocities[posIdx2 + 1] = vy2;
       
       // Sprite 3
       let posIdx3 = (i + 3) * 2;
