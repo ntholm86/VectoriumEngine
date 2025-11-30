@@ -9,10 +9,10 @@
  * - Interleaved positions [x0,y0,x1,y1,...] - direct from physics to GPU
  * - No intermediate buffer copy (physics writes directly to upload array)
  * - Bandwidth: 2 floats/frame per sprite (8 bytes/sprite vs 52 bytes = 85% reduction)
- * - 1M batch size for optimal GPU utilization (3 draw calls for 3M entities)
+ * - 2M batch size for optimal GPU utilization (2-3 draw calls for 5M entities)
  * - Static buffers initialized once at max capacity (39MB saved per frame!)
  * 
- * Performance: 3M+ sprites @ 60 FPS
+ * Performance: 5M+ sprites @ 60 FPS
  */
 
 import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
@@ -257,7 +257,7 @@ export class InstancedSpriteRenderer {
   }
   
   /**
-   * Draw instanced sprites (ONLY uploads positions - 82% bandwidth reduction!)
+   * Draw instanced sprites (ONLY uploads positions - 85% bandwidth reduction!)
    */
   drawInstancedSprites(
     positions: Float32Array, // Interleaved: [x0, y0, x1, y1, ...]

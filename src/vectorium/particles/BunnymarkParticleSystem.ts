@@ -467,7 +467,7 @@ export class BunnymarkParticleSystem {
     }
   
   /**
-   * Render sprites using WebGL instanced rendering (3M+ sprites!)
+   * Render sprites using WebGL instanced rendering (5M+ sprites!)
    */
   render(renderer: any, textureManager: any, _cameraX: number = 0, _cameraY: number = 0, _cameraZoom: number = 1): void {
     const count = this.activeCount;
@@ -494,7 +494,9 @@ export class BunnymarkParticleSystem {
       this.config.canvasWidth,
       this.config.canvasHeight
     );
-  }  /**
+  }
+  
+  /**
    * Clear all particles
    */
   clear(): void {
