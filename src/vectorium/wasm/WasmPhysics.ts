@@ -14,6 +14,7 @@
 
 import { SpatialHash } from '../physics/SpatialHash';
 import { WasmPhysicsBridge } from './WasmPhysicsBridge';
+import { ENGINE_CONFIG } from '../config/EngineConfig';
 
 export class WasmPhysics {
   private spatialHash: SpatialHash;
@@ -46,7 +47,7 @@ export class WasmPhysics {
    * 🚀 Initialize WASM physics module
    * Non-blocking: Falls back to JS if WASM fails to load
    */
-  async initialize(maxEntities: number = 3000000): Promise<boolean> {
+  async initialize(maxEntities: number = ENGINE_CONFIG.maxEntities): Promise<boolean> {
     console.log(`🚀 WASM Physics Engine: Initializing with capacity ${maxEntities}...`);
     
     try {

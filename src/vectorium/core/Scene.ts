@@ -18,6 +18,7 @@ import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
 import { DisplayObject } from '../display/DisplayObject';
 import { Sprite } from '../display/Sprite';
+import { ENGINE_CONFIG } from '../config/EngineConfig';
 
 /**
  * Scene - Container for display objects (PixiJS-inspired)
@@ -73,7 +74,7 @@ export class Scene {
     pulsePhase: number;
   }>();
 
-  constructor(name: string, maxEntities = 3000000, worldBoundsMultiplier = 1.0) {
+  constructor(name: string, maxEntities = ENGINE_CONFIG.maxEntities, worldBoundsMultiplier = 1.0) {
     this.name = name;
     this.world = new World(maxEntities);
     

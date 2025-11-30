@@ -10,6 +10,7 @@ import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
 import type { Vectorium } from './vectorium/core/Engine';
 import { BUNNYMARK_CONFIG } from './vectorium/config/BunnymarkConfig';
+import { ENGINE_CONFIG } from './vectorium/config/EngineConfig';
 import { BunnymarkParticleSystem, BunnymarkParticleConfig } from './vectorium/particles/BunnymarkParticleSystem';
 
 class ParticleBunnymarkScene extends Scene {
@@ -55,7 +56,7 @@ class ParticleBunnymarkScene extends Scene {
     
     // Create optimized particle system
     const particleConfig: BunnymarkParticleConfig = {
-      maxParticles: 3000000, // 2M max capacity
+      maxParticles: ENGINE_CONFIG.maxEntities,
       canvasWidth: BUNNYMARK_CONFIG.canvas.width,
       canvasHeight: BUNNYMARK_CONFIG.canvas.height,
       gravity: BUNNYMARK_CONFIG.physics.gravity ? 980 : 0,

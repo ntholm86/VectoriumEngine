@@ -6,6 +6,7 @@
 
 import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { InstancedSpriteRenderer } from './InstancedSpriteRenderer';
+import { ENGINE_CONFIG } from '../config/EngineConfig';
 
 export class WebGLBatchRenderer {
   private gl: WebGLRenderingContext | WebGL2RenderingContext;
@@ -43,8 +44,8 @@ export class WebGLBatchRenderer {
   private cachedCanvasWidth: number = 0;
   private cachedCanvasHeight: number = 0;
   
-  // 🚀 Pre-allocated sort buffer for sprite batching (2M capacity)
-  private sortBuffer: Uint32Array = new Uint32Array(3000000);
+  // 🚀 Pre-allocated sort buffer for sprite batching (uses ENGINE_CONFIG.maxEntities)
+  private sortBuffer: Uint32Array = new Uint32Array(ENGINE_CONFIG.maxEntities);
   
   // 🚀 Advanced WebGL State Caching
   private boundVertexBuffer: WebGLBuffer | null = null;
