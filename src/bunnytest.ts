@@ -65,6 +65,15 @@ class ParticleBunnymarkScene extends Scene {
     };
     
     this.particleSystem = new BunnymarkParticleSystem(particleConfig);
+    
+    // Initialize WASM SIMD physics
+    const wasmSuccess = await this.particleSystem.initializeWasm();
+    if (wasmSuccess) {
+      console.log('🚀 WASM SIMD + optimized interleave - expect 3M+ entities!');
+    } else {
+      console.log('⚠️ JavaScript fallback - expect 2.5M entities');
+    }
+    
     this.isRunning = true;
     
     // Run progressive benchmark

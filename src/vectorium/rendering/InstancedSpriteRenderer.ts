@@ -33,7 +33,7 @@ export class InstancedSpriteRenderer {
   private staticSizeBuffer: WebGLBuffer | null = null;
   
   // Batch size for optimal GPU processing
-  private batchSize: number = 250_000; // Increased from 200K for higher entity counts
+  private batchSize: number = 500_000; // Larger batches = fewer draw calls = better performance
   
   // Temporary interleaved buffer for SoA → interleaved conversion
   private interleavedBuffer: Float32Array | null = null;
@@ -279,8 +279,9 @@ export class InstancedSpriteRenderer {
     
     const gl = this.gl;
     
-    // Initialize static data on first draw or if count changed
-    if (!this.staticDataInitialized || count !== this.initializedCount) {
+    // Initialize static data on first draw or if count increased significantly
+    // CRITICAL: Don't reinitialize on every small change - huge performance killer!
+    if (!this.staticDataInitialized || count > this.initializedCount) {
       this.initializeStaticData(sizes, colorR, colorG, colorB, alphas, uvU0, uvV0, uvU1, uvV1, count);
     }
     
@@ -357,8 +358,9 @@ export class InstancedSpriteRenderer {
     
     const gl = this.gl;
     
-    // Initialize static data on first draw or if count changed
-    if (!this.staticDataInitialized || count !== this.initializedCount) {
+    // Initialize static data on first draw or if count increased significantly
+    // CRITICAL: Don't reinitialize on every small change - huge performance killer!
+    if (!this.staticDataInitialized || count > this.initializedCount) {
       this.initializeStaticData(sizes, colorR, colorG, colorB, alphas, uvU0, uvV0, uvU1, uvV1, count);
     }
     
