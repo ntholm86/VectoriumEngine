@@ -69,7 +69,7 @@ class ParticleBunnymarkScene extends Scene {
     
     // Run progressive benchmark
     const runProgressiveTest = async () => {
-      let spawnDelay = BUNNYMARK_CONFIG.spawnInterval;
+      let spawnDelay: number = BUNNYMARK_CONFIG.spawnInterval;
       
       while (this.isRunning) {
         // Check performance BEFORE spawning (measure stable state)
@@ -80,7 +80,7 @@ class ParticleBunnymarkScene extends Scene {
         console.log(`📊 Before spawn: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);
         
         // Stop spawning if frame time exceeds budget or hit limit
-        if (frameTime > 17 || this.totalSpawned >= 2500000) {
+        if (frameTime > 17 || this.totalSpawned >= 5500000) {
           console.log('');
           console.log('✅ PARTICLE BUNNYMARK COMPLETE!');
           console.log(`🏆 Final Score: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);

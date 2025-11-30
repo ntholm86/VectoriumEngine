@@ -1386,6 +1386,45 @@ void main() {
     
     this.drawCallCount++;
   }
+  
+  /**
+   * Draw instanced sprites from separate posX/posY arrays (WASM SoA format)
+   */
+  drawInstancedSpritesSeparate(
+    posX: Float32Array,
+    posY: Float32Array,
+    sizes: Float32Array,
+    colorR: Uint8Array,
+    colorG: Uint8Array,
+    colorB: Uint8Array,
+    alphas: Float32Array,
+    uvU0: Uint16Array,
+    uvV0: Uint16Array,
+    uvU1: Uint16Array,
+    uvV1: Uint16Array,
+    count: number,
+    texture: WebGLTexture,
+    canvasWidth: number,
+    canvasHeight: number
+  ): void {
+    if (!this.instancedRenderer) {
+      console.warn('Instanced rendering not available (WebGL2 required)');
+      return;
+    }
+    
+    // Draw using instanced renderer (interleaves on upload)
+    this.instancedRenderer.drawInstancedSpritesSeparate(
+      posX, posY, sizes,
+      colorR, colorG, colorB, alphas,
+      uvU0, uvV0, uvU1, uvV1,
+      count,
+      texture,
+      canvasWidth,
+      canvasHeight
+    );
+    
+    this.drawCallCount++;
+  }
 
   destroy(): void {
     const gl = this.gl;
