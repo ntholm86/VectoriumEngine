@@ -152,9 +152,9 @@ export class BunnymarkParticleSystem {
     const positions = this.positions;
     const velocities = this.velocities;
     
-    // Process 8 sprites per iteration for better CPU pipelining (doubled from 4x)
+    // Process 16 sprites per iteration for maximum CPU pipelining
     let i = 0;
-    const unrollEnd = count - 7;
+    const unrollEnd = count - 15;
 
     while (i < unrollEnd) {
       // Sprite 0
@@ -310,7 +310,159 @@ export class BunnymarkParticleSystem {
       positions[posIdx7] = px7; positions[posIdx7 + 1] = py7;
       velocities[posIdx7] = vx7; velocities[posIdx7 + 1] = vy7;
       
-      i += 8;
+      // Sprite 8
+      let posIdx8 = (i + 8) * 2;
+      let vx8 = velocities[posIdx8];
+      let vy8 = velocities[posIdx8 + 1] + gravity;
+      let px8 = positions[posIdx8] + vx8 * dt;
+      let py8 = positions[posIdx8 + 1] + vy8 * dt;
+      
+      if (px8 < minX || px8 > maxX) {
+        px8 = Math.max(minX, Math.min(maxX, px8));
+        vx8 = -vx8;
+      }
+      if (py8 < minY || py8 > maxY) {
+        py8 = Math.max(minY, Math.min(maxY, py8));
+        vy8 = -vy8;
+      }
+      
+      positions[posIdx8] = px8; positions[posIdx8 + 1] = py8;
+      velocities[posIdx8] = vx8; velocities[posIdx8 + 1] = vy8;
+      
+      // Sprite 9
+      let posIdx9 = (i + 9) * 2;
+      let vx9 = velocities[posIdx9];
+      let vy9 = velocities[posIdx9 + 1] + gravity;
+      let px9 = positions[posIdx9] + vx9 * dt;
+      let py9 = positions[posIdx9 + 1] + vy9 * dt;
+      
+      if (px9 < minX || px9 > maxX) {
+        px9 = Math.max(minX, Math.min(maxX, px9));
+        vx9 = -vx9;
+      }
+      if (py9 < minY || py9 > maxY) {
+        py9 = Math.max(minY, Math.min(maxY, py9));
+        vy9 = -vy9;
+      }
+      
+      positions[posIdx9] = px9; positions[posIdx9 + 1] = py9;
+      velocities[posIdx9] = vx9; velocities[posIdx9 + 1] = vy9;
+      
+      // Sprite 10
+      let posIdx10 = (i + 10) * 2;
+      let vx10 = velocities[posIdx10];
+      let vy10 = velocities[posIdx10 + 1] + gravity;
+      let px10 = positions[posIdx10] + vx10 * dt;
+      let py10 = positions[posIdx10 + 1] + vy10 * dt;
+      
+      if (px10 < minX || px10 > maxX) {
+        px10 = Math.max(minX, Math.min(maxX, px10));
+        vx10 = -vx10;
+      }
+      if (py10 < minY || py10 > maxY) {
+        py10 = Math.max(minY, Math.min(maxY, py10));
+        vy10 = -vy10;
+      }
+      
+      positions[posIdx10] = px10; positions[posIdx10 + 1] = py10;
+      velocities[posIdx10] = vx10; velocities[posIdx10 + 1] = vy10;
+      
+      // Sprite 11
+      let posIdx11 = (i + 11) * 2;
+      let vx11 = velocities[posIdx11];
+      let vy11 = velocities[posIdx11 + 1] + gravity;
+      let px11 = positions[posIdx11] + vx11 * dt;
+      let py11 = positions[posIdx11 + 1] + vy11 * dt;
+      
+      if (px11 < minX || px11 > maxX) {
+        px11 = Math.max(minX, Math.min(maxX, px11));
+        vx11 = -vx11;
+      }
+      if (py11 < minY || py11 > maxY) {
+        py11 = Math.max(minY, Math.min(maxY, py11));
+        vy11 = -vy11;
+      }
+      
+      positions[posIdx11] = px11; positions[posIdx11 + 1] = py11;
+      velocities[posIdx11] = vx11; velocities[posIdx11 + 1] = vy11;
+      
+      // Sprite 12
+      let posIdx12 = (i + 12) * 2;
+      let vx12 = velocities[posIdx12];
+      let vy12 = velocities[posIdx12 + 1] + gravity;
+      let px12 = positions[posIdx12] + vx12 * dt;
+      let py12 = positions[posIdx12 + 1] + vy12 * dt;
+      
+      if (px12 < minX || px12 > maxX) {
+        px12 = Math.max(minX, Math.min(maxX, px12));
+        vx12 = -vx12;
+      }
+      if (py12 < minY || py12 > maxY) {
+        py12 = Math.max(minY, Math.min(maxY, py12));
+        vy12 = -vy12;
+      }
+      
+      positions[posIdx12] = px12; positions[posIdx12 + 1] = py12;
+      velocities[posIdx12] = vx12; velocities[posIdx12 + 1] = vy12;
+      
+      // Sprite 13
+      let posIdx13 = (i + 13) * 2;
+      let vx13 = velocities[posIdx13];
+      let vy13 = velocities[posIdx13 + 1] + gravity;
+      let px13 = positions[posIdx13] + vx13 * dt;
+      let py13 = positions[posIdx13 + 1] + vy13 * dt;
+      
+      if (px13 < minX || px13 > maxX) {
+        px13 = Math.max(minX, Math.min(maxX, px13));
+        vx13 = -vx13;
+      }
+      if (py13 < minY || py13 > maxY) {
+        py13 = Math.max(minY, Math.min(maxY, py13));
+        vy13 = -vy13;
+      }
+      
+      positions[posIdx13] = px13; positions[posIdx13 + 1] = py13;
+      velocities[posIdx13] = vx13; velocities[posIdx13 + 1] = vy13;
+      
+      // Sprite 14
+      let posIdx14 = (i + 14) * 2;
+      let vx14 = velocities[posIdx14];
+      let vy14 = velocities[posIdx14 + 1] + gravity;
+      let px14 = positions[posIdx14] + vx14 * dt;
+      let py14 = positions[posIdx14 + 1] + vy14 * dt;
+      
+      if (px14 < minX || px14 > maxX) {
+        px14 = Math.max(minX, Math.min(maxX, px14));
+        vx14 = -vx14;
+      }
+      if (py14 < minY || py14 > maxY) {
+        py14 = Math.max(minY, Math.min(maxY, py14));
+        vy14 = -vy14;
+      }
+      
+      positions[posIdx14] = px14; positions[posIdx14 + 1] = py14;
+      velocities[posIdx14] = vx14; velocities[posIdx14 + 1] = vy14;
+      
+      // Sprite 15
+      let posIdx15 = (i + 15) * 2;
+      let vx15 = velocities[posIdx15];
+      let vy15 = velocities[posIdx15 + 1] + gravity;
+      let px15 = positions[posIdx15] + vx15 * dt;
+      let py15 = positions[posIdx15 + 1] + vy15 * dt;
+      
+      if (px15 < minX || px15 > maxX) {
+        px15 = Math.max(minX, Math.min(maxX, px15));
+        vx15 = -vx15;
+      }
+      if (py15 < minY || py15 > maxY) {
+        py15 = Math.max(minY, Math.min(maxY, py15));
+        vy15 = -vy15;
+      }
+      
+      positions[posIdx15] = px15; positions[posIdx15 + 1] = py15;
+      velocities[posIdx15] = vx15; velocities[posIdx15 + 1] = vy15;
+      
+      i += 16;
       }
       
       // Handle remainder
