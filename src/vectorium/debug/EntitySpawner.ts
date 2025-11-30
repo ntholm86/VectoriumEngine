@@ -33,10 +33,8 @@ export class EntitySpawner extends UIPanel {
   private textGlow: boolean = false;
   private spawnCallbacks: Map<string, () => void> = new Map();
   private onSpawnCallback: ((x: number, y: number, config: any) => void) | null = null;
-  private performanceMonitor: PerformanceMonitor | null = null;
-  private scene: Scene;
   
-  constructor(scene: Scene, inputManager: InputManager, performanceMonitor?: PerformanceMonitor) {
+  constructor(scene: Scene, inputManager: InputManager, _performanceMonitor?: PerformanceMonitor) {
     const config: UIPanelConfig = {
       id: 'entity-spawner',
       title: '🎮 SPAWN ENTITIES',
@@ -46,9 +44,6 @@ export class EntitySpawner extends UIPanel {
       collapsible: true
     };
     super(config, inputManager);
-    
-    this.scene = scene;
-    this.performanceMonitor = performanceMonitor || null;
     
     // 🚀 Auto-register callbacks if scene implements ISpawnableScene
     if (isSpawnableScene(scene)) {
@@ -366,18 +361,13 @@ export class EntitySpawner extends UIPanel {
         <button id="spawn1M" class="vectorium-btn full-width danger-solid">1M ☢️</button>
       </div>
       
-      <div class="ui-section-header">🏁 BENCHMARK TESTS</div>
-      <div class="btn-grid-1col">
-        <button id="benchmarkBunny" class="vectorium-btn full-width special">Bunnymark (Progressive)</button>
-        <button id="benchmarkStress" class="vectorium-btn full-width danger">Stress Test (Max FPS)</button>
-      </div>
-      
       <div class="ui-btn-group">
         <button id="remove1K" class="vectorium-btn danger">-1K</button>
         <button id="clearAll" class="vectorium-btn danger">Clear All</button>
       </div>
       
       <div class="ui-hint">P: Profiler | C: Config | E: Spawner</div>
+      <div class="ui-hint">💡 See simple-bunnymark.html for DisplayObject API</div>
     `;
   }
 
@@ -492,8 +482,7 @@ export class EntitySpawner extends UIPanel {
     this.on('spawn1M', 'click', () => { this.setClickSpawnCount(1000000); this.activeButton = 'spawn1M'; });
     
     // Benchmark buttons
-    this.on('benchmarkBunny', 'click', () => { this.runBunnymarkBenchmark(); });
-    this.on('benchmarkStress', 'click', () => { this.runStressBenchmark(); });
+    // Removed: Old benchmark buttons deleted
     
     this.on('remove1K', 'click', () => { this.triggerCallback('remove1K'); });
     this.on('clearAll', 'click', () => {
@@ -563,69 +552,5 @@ export class EntitySpawner extends UIPanel {
         tweenAnimSection.classList.add('hidden');
       }
     }
-  }
-
-  /**
-   * Run Bunnymark Standard benchmark
-   * Triggers the scene's benchmark instead of managing it here
-   */
-  private async runBunnymarkBenchmark(): Promise<void> {
-    // Clear all entities first
-    this.triggerCallback('clearAll');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Trigger the scene's benchmark
-    if (this.scene && typeof (this.scene as any).startBenchmark === 'function') {
-      (this.scene as any).startBenchmark();
-    } else {
-      console.error('Scene does not have startBenchmark method');
-    }
-  }
-
-  /**
-   * Run stress test - spawn maximum entities and measure FPS
-   */
-  private async runStressBenchmark(): Promise<void> {
-    console.log('💥 Starting Stress Test');
-    console.log('📊 Press M to open Performance Monitor');
-    
-    // Auto-configure for stress test
-    this.visualType = 'circle';
-    this.physicsMode = 'full';
-    
-    const testCounts = [1000, 5000, 10000, 25000, 50000, 100000];
-    
-    for (const count of testCounts) {
-      console.log(`⚡ Testing ${count.toLocaleString()} entities...`);
-      
-      // Clear and wait
-      this.triggerCallback('clearAll');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Spawn entities
-      for (let i = 0; i < count; i++) {
-        const x = Math.random() * 800;
-        const y = Math.random() * 600;
-        
-        if (this.onSpawnCallback) {
-          this.onSpawnCallback(x, y, this.getSpawnConfig());
-        }
-      }
-      
-      // Wait for physics to settle
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      const fps = this.performanceMonitor?.getMetrics().fps || 0;
-      console.log(`📊 ${count.toLocaleString()} entities: ${fps.toFixed(1)} FPS`);
-      
-      if (fps < 30) {
-        console.log('⚠️ FPS dropped below 30, stopping test');
-        break;
-      }
-    }
-    
-    console.log('');
-    console.log('✅ STRESS TEST COMPLETE!');
-    console.log('');
   }
 }

@@ -7,6 +7,9 @@
 export { Vectorium, Scene } from './vectorium/core/Engine';
 export type { Entity } from './vectorium/core/Engine';
 
+// 🎨 Display Objects (PixiJS-inspired API)
+export { DisplayObject, Sprite, Graphics } from './vectorium/display';
+
 // 🚀 State Machine System
 export { StateMachine } from './vectorium/core/StateMachine';
 

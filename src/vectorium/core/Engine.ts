@@ -10,12 +10,10 @@ import { TextRenderer } from '../rendering/TextRenderer';
 import { TextPool } from './TextPool';
 import { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { BufferPool } from '../memory/Pooling';
-import { Camera } from './Camera';
 import { Viewport } from './Viewport';
 import { Scene } from './Scene';
 import { DebugPanel } from '../debug/DebugPanel';
 import { EntitySpawner } from '../debug/EntitySpawner';
-import { CameraControls } from '../debug/CameraControls';
 import { UIStyleLoader } from '../ui/UIStyleLoader';
 import { UIPanelManager } from '../ui/UIPanelManager';
 import { DebugToolRegistry } from '../debug/DebugToolRegistry';
@@ -24,7 +22,8 @@ import { AnimationManager } from '../animation/AnimationManager';
 import { AnimationSystem } from '../animation/AnimationSystem';
 import { InputManager } from '../input/InputManager';
 import { ParticleSystemManager } from '../particles/ParticleSystem';
-import { EntitySpawnService } from '../entities/EntitySpawnService';
+// OLD: EntitySpawnService removed - use DisplayObject API
+// import { EntitySpawnService } from '../entities/EntitySpawnService';
 
 // Re-export for convenience
 export { Viewport, Scene };
@@ -182,18 +181,6 @@ export class Vectorium {
     this.runtimeConfig.on('quality.enableAdaptiveQuality', (enabled) => {
       this.performanceMonitor.setAdaptiveQuality(enabled);
     });
-    
-    // Subscribe to camera changes
-    this.runtimeConfig.on('camera', (camera) => {
-      const cam = this.getCamera();
-      if (cam) {
-        cam.setZoom(camera.zoom);
-        cam.setZoomRange(camera.minZoom, camera.maxZoom);
-        // Note: setSmooth and setFollowSettings removed in optimized Camera
-        // Update position manually or use tweens for smooth movement
-        cam.setCullingMargin(camera.cullingMargin);
-      }
-    });
   }
   
   private initializeDebugTools(): void {
@@ -207,6 +194,10 @@ export class Vectorium {
     // Initialize scene viewport with engine's canvas dimensions
     // This ensures Scene has correct dimensions from the start, not just after loadScene()
     scene.setCanvasDimensions(this.config.width, this.config.height);
+    
+    // Set texture manager for DisplayObject API
+    (scene as any)._setTextureManager(this.textureManager);
+    
     this.scenes.set(name, scene);
   }
 
@@ -265,19 +256,10 @@ export class Vectorium {
     // 🚀 Now call scene.load()
     await this.currentScene.load();
     
-    // 🚀 Always instantiate EntitySpawnService (core service) - SYNCHRONOUSLY
-    const spawnService = new EntitySpawnService(
-      this.currentScene,
-      this.currentScene.world,
-      this.textPool,
-      this.textureManager  // ← Direct injection, not via renderer
-    );
-    (this.currentScene as any).spawnService = spawnService;
+    // OLD: EntitySpawnService removed - use DisplayObject API instead
+    // const spawnService = new EntitySpawnService(...);
+    // Now use: scene.add(Sprite.from('/texture.png', scene.world))
     (this.currentScene as any).performanceMonitor = this.performanceMonitor;
-    
-    // Initialize after Scene is ready (preloads textures) - AWAIT to ensure textures loaded
-    await spawnService.initialize();
-    console.log('✅ EntitySpawnService initialized with textures loaded');
     
     // 🚀 Register debug panels with UIPanelManager
     if (this.config.enableDebugTools) {
@@ -292,15 +274,10 @@ export class Vectorium {
       const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager, this.performanceMonitor);
       this.panelManager.register('spawner', entitySpawner);
       
-      // Wire spawn service with UI panel (guaranteed to exist now)
-      spawnService.registerWithSpawner(entitySpawner);
+      // OLD: EntitySpawnService integration removed
+      // spawnService.registerWithSpawner(entitySpawner);
       
-      // Register Camera Controls (Press V)
-      const camera = this.getCamera();
-      if (camera) {
-        const cameraControls = new CameraControls(camera, this.runtimeConfig, this.inputManager);
-        this.panelManager.register('camera', cameraControls);
-      }
+      // Camera Controls removed (Camera class deleted)
       
       console.log('Debug panels registered: ' + this.panelManager.list().join(', '));
     }
@@ -357,11 +334,12 @@ export class Vectorium {
       
       // 🚀 Phase 1: Update InputManager with camera transform
       // Note: Spatial hash is already populated by physics update
-      if (this.inputManager) {
-        const camera = this.getCamera();
-        if (camera) {
-          this.inputManager.updateCamera(camera.x, camera.y, camera.getZoom());
-        }
+      if (this.inputManager && this.currentScene) {
+        this.inputManager.updateCamera(
+          this.currentScene.cameraX,
+          this.currentScene.cameraY,
+          this.currentScene.cameraZoom
+        );
         this.inputManager.update(dt);
       }
       
@@ -537,12 +515,7 @@ export class Vectorium {
     return this.renderer;
   }
 
-  /**
-   * Get the current scene's camera
-   */
-  getCamera(): Camera | null {
-    return this.currentScene ? this.currentScene.getCamera() : null;
-  }
+  // Camera removed - use scene.cameraX, scene.cameraY, scene.cameraZoom directly
   
   // 🚀 Phase 1: New System Getters
   
@@ -677,11 +650,13 @@ export class Vectorium {
    * Combines canvas scaling and camera transformation
    */
   getWorldCoordinates(clientX: number, clientY: number): { x: number; y: number } | null {
-    const camera = this.getCamera();
-    if (!camera) return null;
+    if (!this.currentScene) return null;
     
     const canvasCoords = this.getCanvasCoordinates(clientX, clientY);
-    return camera.screenToWorld(canvasCoords.x, canvasCoords.y);
+    // Simple screen to world transform (no Camera class)
+    const worldX = canvasCoords.x - this.canvas.width / 2 + this.currentScene.cameraX;
+    const worldY = canvasCoords.y - this.canvas.height / 2 + this.currentScene.cameraY;
+    return { x: worldX, y: worldY };
   }
 
   /**

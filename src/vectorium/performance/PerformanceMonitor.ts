@@ -947,36 +947,57 @@ export class PerformanceMonitor extends UIPanel {
   protected createContent(): string {
     return `
       <div class="profiler-content">
-        <!-- Full-width performance header -->
-        <div class="profiler-full-width">
-          <div class="section-header">📊 PERFORMANCE</div>
-          <div class="ui-section">
-            <div class="ui-row">
-              <span class="ui-label">Quality</span>
-              <span class="ui-value" data-metric="quality">HIGH</span>
-            </div>
-            <div class="ui-row">
-              <span class="ui-label">Score</span>
-              <span class="ui-value" data-metric="score">100</span>
-            </div>
-            <div class="ui-row">
-              <span class="ui-label">Bottleneck</span>
-              <span class="ui-value" data-metric="bottleneck">BALANCED</span>
-            </div>
-            <div class="ui-row">
-              <span class="ui-label">Frame Budget</span>
-              <span class="ui-value" data-metric="framebudget">0.0/16.67ms</span>
-            </div>
-            <div class="frame-budget-bar">
-              <div class="frame-budget-fill" data-metric="framebudgetbar" style="width: 0%"></div>
-            </div>
+        <div class="section-header">📊 PERFORMANCE</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">FPS</span>
+            <span class="ui-value" data-metric="fps" style="font-size: 24px; font-weight: bold; color: #00ff00;">60.0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Entities</span>
+            <span class="ui-value" data-metric="active" style="font-size: 20px; font-weight: bold; color: #00ccff;">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Frame Time</span>
+            <span class="ui-value" data-metric="frame">16.67ms</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Frame Budget</span>
+            <span class="ui-value" data-metric="framebudget">0.0/16.67ms</span>
+          </div>
+          <div class="frame-budget-bar">
+            <div class="frame-budget-fill" data-metric="framebudgetbar" style="width: 0%"></div>
           </div>
         </div>
 
-        <!-- Two-column grid layout -->
-        <div class="profiler-grid">
-          <!-- LEFT COLUMN -->
-          <div class="profiler-column">
+        <div class="section-header">⚙️ ECS METRICS</div>
+        <div class="ui-section">
+              <div class="ui-row">
+                <span class="ui-label">Active</span>
+                <span class="ui-value" data-metric="active">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">├─ Shapes</span>
+                <span class="ui-value" data-metric="shapes">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">└─ Text</span>
+                <span class="ui-value" data-metric="textentities">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Particles</span>
+                <span class="ui-value" data-metric="particles">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Rendered</span>
+                <span class="ui-value" data-metric="rendered">0</span>
+              </div>
+              <div class="ui-row">
+                <span class="ui-label">Culled</span>
+                <span class="ui-value" data-metric="culled">0</span>
+              </div>
+            </div>
+
             <div class="section-header">🎯 FRAME TIMING</div>
             <div class="ui-section">
               <div class="ui-row">
@@ -988,48 +1009,12 @@ export class PerformanceMonitor extends UIPanel {
                 <span class="ui-value" data-metric="fpsavg">60.0</span>
               </div>
               <div class="ui-row">
-                <span class="ui-label">Frame Time</span>
-                <span class="ui-value" data-metric="frame">16.67ms</span>
-              </div>
-              <div class="ui-row">
                 <span class="ui-label">Min/Max</span>
                 <span class="ui-value" data-metric="minmax">16/17ms</span>
               </div>
               <div class="ui-row">
                 <span class="ui-label">Variance</span>
                 <span class="ui-value" data-metric="variance">±0.5ms</span>
-              </div>
-            </div>
-
-            <div class="section-header">⚙️ UPDATE/RENDER</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Update Total</span>
-                <span class="ui-value" data-metric="updatetotal">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">├─ Physics</span>
-                <span class="ui-value" data-metric="updatephysics">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">├─ Animation</span>
-                <span class="ui-value" data-metric="updateanimation">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">└─ Sync</span>
-                <span class="ui-value" data-metric="updateentitysync">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Render Total</span>
-                <span class="ui-value" data-metric="rendertotal">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">├─ Batch</span>
-                <span class="ui-value" data-metric="renderbatch">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">└─ Custom</span>
-                <span class="ui-value" data-metric="rendercustom">0.00ms</span>
               </div>
             </div>
 
@@ -1055,10 +1040,6 @@ export class PerformanceMonitor extends UIPanel {
                 <span class="ui-label">Triangles</span>
                 <span class="ui-value" data-metric="triangles">0K</span>
               </div>
-              <div class="ui-row">
-                <span class="ui-label">Draw Calls</span>
-                <span class="ui-value" id="prof-drawcalls">0</span>
-              </div>
               <div class="ui-stat">
                 <span class="ui-label">Batch Eff</span>
                 <span class="ui-value" data-metric="batch">0%</span>
@@ -1066,26 +1047,6 @@ export class PerformanceMonitor extends UIPanel {
               <div class="ui-row">
                 <span class="ui-label">Upload</span>
                 <span class="ui-value" data-metric="upload">0MB</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">States</span>
-                <span class="ui-value" data-metric="states">1</span>
-              </div>
-            </div>
-
-            <div class="section-header">⚡ GPU TIMING</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Draw Time</span>
-                <span class="ui-value" data-metric="gputimedraw">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Text Time</span>
-                <span class="ui-value" data-metric="gputimetext">0.00ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">CPU Fallback</span>
-                <span class="ui-value" data-metric="gputimefallback">No</span>
               </div>
             </div>
 
@@ -1107,90 +1068,6 @@ export class PerformanceMonitor extends UIPanel {
                 <span class="ui-label">Speedup</span>
                 <span class="ui-value" data-metric="instancingspeedup">N/A</span>
               </div>
-            </div>
-
-            <div class="section-header">📦 BATCH ANALYSIS</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Total Batches</span>
-                <span class="ui-value" data-metric="batchcount">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Texture Swaps</span>
-                <span class="ui-value" data-metric="batchtexture">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Shader Swaps</span>
-                <span class="ui-value" data-metric="batchshader">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Buffer Full</span>
-                <span class="ui-value" data-metric="batchbuffer">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">State Changes</span>
-                <span class="ui-value" data-metric="batchstate">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Avg Sprites</span>
-                <span class="ui-value" data-metric="batchavgsprites">0</span>
-              </div>
-            </div>
-
-            <div class="section-header">🎨 RENDER STATS</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Fill Rate</span>
-                <span class="ui-value" data-metric="fillrate">0.0x</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Overdraw</span>
-                <span class="ui-value" data-metric="overdraw">0%</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Pixels/Frame</span>
-                <span class="ui-value" data-metric="pixelsframe">0M</span>
-              </div>
-            </div>
-
-            <div class="section-header">🎮 GPU UTILIZATION</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Utilization</span>
-                <span class="ui-value" data-metric="gpuutilization">0%</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Bottleneck</span>
-                <span class="ui-value" data-metric="gpubottleneck">No</span>
-              </div>
-            </div>
-
-            <div class="section-header">⚙️ ECS METRICS</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Active</span>
-                <span class="ui-value" data-metric="active">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">├─ Shapes</span>
-                <span class="ui-value" data-metric="shapes">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">└─ Text</span>
-                <span class="ui-value" data-metric="textentities">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Particles</span>
-                <span class="ui-value" data-metric="particles">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Rendered</span>
-                <span class="ui-value" data-metric="rendered">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Culled</span>
-                <span class="ui-value" data-metric="culled">0</span>
-              </div>
               <div class="ui-row">
                 <span class="ui-label">Culling Eff</span>
                 <span class="ui-value" data-metric="cullingeff">0%</span>
@@ -1200,12 +1077,9 @@ export class PerformanceMonitor extends UIPanel {
                 <span class="ui-value" data-metric="timeperentity">0μs</span>
               </div>
             </div>
-          </div>
 
-          <!-- RIGHT COLUMN -->
-          <div class="profiler-column">
-            <div class="section-header">⚛️ PHYSICS</div>
-            <div class="ui-section">
+        <div class="section-header">⚛️ PHYSICS</div>
+        <div class="ui-section">
               <div class="ui-row">
                 <span class="ui-label">Total Time</span>
                 <span class="ui-value" data-metric="physicstime">0.00ms</span>
@@ -1313,139 +1187,26 @@ export class PerformanceMonitor extends UIPanel {
               </div>
             </div>
 
-            <div class="section-header">🧠 MEMORY TRACKING</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Allocated Objs</span>
-                <span class="ui-value" data-metric="allocatedobjects">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Allocated Bytes</span>
-                <span class="ui-value" data-metric="allocatedbytes">0KB</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Potential Leaks</span>
-                <span class="ui-value" data-metric="potentialleaks">0</span>
-              </div>
-            </div>
-
-            <div class="section-header">🎮 INPUT & RESPONSIVENESS</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Input Lag</span>
-                <span class="ui-value" data-metric="inputlag">0.0ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">P95 Lag</span>
-                <span class="ui-value" data-metric="inputlagp95">0.0ms</span>
-              </div>
-            </div>
-
-            <div class="section-header">📊 FRAME SPIKES</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Minor (16-20ms)</span>
-                <span class="ui-value" data-metric="minorspikes">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Major (20-33ms)</span>
-                <span class="ui-value" data-metric="majorspikes">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Severe (>33ms)</span>
-                <span class="ui-value" data-metric="severespikes">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Total Spikes</span>
-                <span class="ui-value" data-metric="totalspikes">0</span>
-              </div>
-            </div>
-
-            <div class="section-header">📦 ASSETS</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Loaded</span>
-                <span class="ui-value" data-metric="assetsloaded">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Failed</span>
-                <span class="ui-value" data-metric="assetsfailed">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Cache Hit Rate</span>
-                <span class="ui-value" data-metric="cachehitrate">0%</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Avg Load Time</span>
-                <span class="ui-value" data-metric="avgloadtime">0.0ms</span>
-              </div>
-            </div>
-
-            <div class="section-header">⚙️ FUNCTION PROFILE</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Total Calls</span>
-                <span class="ui-value" data-metric="functioncalls">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Unique Funcs</span>
-                <span class="ui-value" data-metric="uniquefuncs">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Hottest Func</span>
-                <span class="ui-value" data-metric="hottestfunc">—</span>
-              </div>
-            </div>
-
-            <div class="section-header">📱 PLATFORM</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Battery</span>
-                <span class="ui-value" data-metric="battery">—</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Charging</span>
-                <span class="ui-value" data-metric="charging">—</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Vsync Misses</span>
-                <span class="ui-value" data-metric="vsyncmisses">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Refresh Rate</span>
-                <span class="ui-value" data-metric="refreshrate">60Hz</span>
-              </div>
-            </div>
-
-            <div class="section-header">⚠️ DIAGNOSTICS</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Long Tasks</span>
-                <span class="ui-value" data-metric="longtasks">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Longest Task</span>
-                <span class="ui-value" data-metric="longesttask">0.0ms</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">DOM Elements</span>
-                <span class="ui-value" data-metric="domelements">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">DOM Growth</span>
-                <span class="ui-value" data-metric="domgrowth">0/s</span>
-              </div>
-            </div>
+        <div class="section-header">🧠 MEMORY TRACKING</div>
+        <div class="ui-section">
+          <div class="ui-row">
+            <span class="ui-label">Allocated Objs</span>
+            <span class="ui-value" data-metric="allocatedobjects">0</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Allocated Bytes</span>
+            <span class="ui-value" data-metric="allocatedbytes">0KB</span>
+          </div>
+          <div class="ui-row">
+            <span class="ui-label">Potential Leaks</span>
+            <span class="ui-value" data-metric="potentialleaks">0</span>
           </div>
         </div>
 
-        <!-- Full-width actions -->
-        <div class="profiler-full-width">
-          <div class="section-header">⚙️ ACTIONS</div>
-          <div class="ui-section">
-            <button class="vectorium-btn full-width" data-action="measure">📊 Measure (2s)</button>
-            <button class="vectorium-btn full-width" data-action="export">💾 Export Metrics</button>
-          </div>
+        <div class="section-header">⚙️ ACTIONS</div>
+        <div class="ui-section">
+          <button class="vectorium-btn full-width" data-action="measure">📊 Measure (2s)</button>
+          <button class="vectorium-btn full-width" data-action="export">💾 Export Metrics</button>
         </div>
       </div>
     `;

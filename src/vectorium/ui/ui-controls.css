@@ -27,7 +27,7 @@
   /* Typography */
   --ui-font-family: 'Roboto', monospace;
   --ui-font-tiny: 8px;
-  --ui-font-base: 13px;
+  --ui-font-base: 11px;
   --ui-font-title: 13px;
   --ui-letter-spacing-sm: 0.3px;
   --ui-letter-spacing-md: 0.5px;
@@ -88,7 +88,7 @@
 }
 
 .performance-monitor {
-  max-width: 420px;
+  max-width: 220px;
 }
 
 .vectorium-panel.hidden {
@@ -233,24 +233,9 @@
   color: var(--ui-highlight);
 }
 
-/* Two-column grid layout for performance monitor */
+/* Single-column layout for performance monitor */
 .profiler-content {
   display: block;
-}
-
-.profiler-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--ui-gap-lg);
-}
-
-.profiler-column {
-  display: flex;
-  flex-direction: column;
-}
-
-.profiler-full-width {
-  grid-column: 1 / -1;
 }
 
 /* ============================================

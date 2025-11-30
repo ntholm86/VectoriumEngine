@@ -542,6 +542,9 @@ export class World {
   getRestitution(): Float32Array { return this.restitution; }
   getGravityEnabled(): Uint8Array { return this.enableGravity; }
   getCollisionsEnabled(): Uint8Array { return this.enableCollisions; }
+  getVelocityX(): Float32Array { return this.velocityX; }
+  getVelocityY(): Float32Array { return this.velocityY; }
+  getEnableGravity(): Uint8Array { return this.enableGravity; }
   
   /**
    * 🎨 Shape & Text component access

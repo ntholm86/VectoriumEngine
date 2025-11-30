@@ -2,6 +2,24 @@
  * 🚀 ULTRA-OPTIMIZED Vectorium Camera
  * 2D camera with frustum culling - rebuilt for pure performance
  * 
+ * 📐 COORDINATE SYSTEM (IMPORTANT!):
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * Camera (x, y) represents the CENTER of what the camera is looking at in world space.
+ * 
+ * Example with 800×600 canvas:
+ * - Camera at (400, 300) shows world center at screen center
+ * - Camera at (0, 0) shows world origin at screen center (most of world off-screen)
+ * - Camera at (800, 600) shows world (800,600) at screen center
+ * 
+ * Renderer formula: screenPos = (worldPos - cameraPos) + canvasCenter
+ * 
+ * To show world coordinates (wx, wy) at screen center:
+ *   camera.centerOn(wx, wy)  // Sets camera.x = wx, camera.y = wy
+ * 
+ * To show world coordinates (wx, wy) at top-left of screen:
+ *   camera.setPosition(wx + canvasWidth/2, wy + canvasHeight/2)
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 
  * PERFORMANCE ENHANCEMENTS:
  * ✅ Removed smooth movement (use tweens if needed)
  * ✅ Removed follow system (manually update position each frame)
@@ -33,10 +51,11 @@ export interface CameraBounds {
 
 export class Camera {
   // Core properties (direct access, no getters)
-  x: number = 0;
-  y: number = 0;
-  width: number;
-  height: number;
+  // NOTE: x, y represent the CENTER of the camera's view in world coordinates
+  x: number = 0;  // World X coordinate at screen center
+  y: number = 0;  // World Y coordinate at screen center
+  width: number;  // Canvas width in pixels
+  height: number; // Canvas height in pixels
   
   // Culling margin (render entities slightly outside viewport)
   private cullingMargin: number = 50;
@@ -143,6 +162,12 @@ export class Camera {
 
   /**
    * Set camera position (instant, no smoothing)
+   * 
+   * NOTE: Camera (x,y) is the CENTER of the view.
+   * To show world point (wx, wy) at screen center, call setPosition(wx, wy)
+   * 
+   * @param x - World X coordinate to show at screen center
+   * @param y - World Y coordinate to show at screen center
    */
   setPosition(x: number, y: number): void {
     this.x = x;
@@ -150,7 +175,29 @@ export class Camera {
   }
 
   /**
-   * Move camera by delta
+   * Center camera on a world position (RECOMMENDED METHOD)
+   * 
+   * This is the clearest way to position the camera - it explicitly
+   * centers the view on the given world coordinates.
+   * 
+   * Example:
+   *   camera.centerOn(400, 300)  // Show world (400,300) at screen center
+   * 
+   * This is identical to setPosition() but more explicit about intent.
+   * 
+   * @param worldX - World X coordinate to center on
+   * @param worldY - World Y coordinate to center on
+   */
+  centerOn(worldX: number, worldY: number): void {
+    this.x = worldX;
+    this.y = worldY;
+  }
+  
+  /**
+   * Move camera by delta (relative movement)
+   * 
+   * @param dx - Pixels to move right (negative = left)
+   * @param dy - Pixels to move down (negative = up)
    */
   move(dx: number, dy: number): void {
     this.x += dx;
@@ -173,13 +220,7 @@ export class Camera {
     this.cullingMargin = margin;
   }
 
-  /**
-   * Center camera on a point
-   */
-  centerOn(x: number, y: number): void {
-    this.x = x - this.worldWidth * 0.5;
-    this.y = y - this.worldHeight * 0.5;
-  }
+
   
   // ========================================
   // ZOOM SYSTEM

@@ -13,14 +13,16 @@
  */
 
 import { World, EntityId } from './World';
-import { Camera } from './Camera';
 import { Viewport } from './Viewport';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
-import type { EntityBurstFactory } from '../entities/factories';
+import { DisplayObject } from '../display/DisplayObject';
+import { Sprite } from '../display/Sprite';
 
 /**
- * Ultra-lean Scene class - Pure performance, no bloat
+ * Scene - Container for display objects (PixiJS-inspired)
+ * 
+ * NEW API: Use add(sprite) instead of world.createEntity()
  */
 export class Scene {
   name: string;
@@ -29,9 +31,15 @@ export class Scene {
   // Core ECS World
   public world: World;
   
-  // Viewport & Camera
+  // 🎨 NEW: Display object management (PixiJS-style)
+  public children: DisplayObject[] = [];
+  private _textureManager: any = null; // Set by Engine
+  
+  // Viewport & Camera (simplified - no Camera class)
   private viewport: Viewport;
-  private camera: Camera;
+  public cameraX: number = 0;  // Camera X position (world coordinates)
+  public cameraY: number = 0;  // Camera Y position (world coordinates)
+  public cameraZoom: number = 1;  // Camera zoom level
   private cullingEnabled = true;
   
   // 🚀 PRE-ALLOCATED BUFFERS (reused every frame)
@@ -74,17 +82,61 @@ export class Scene {
     // Engine.registerScene() or Engine.loadScene() will call setCanvasDimensions() to set actual size
     this.viewport = new Viewport(1920, 1080, worldBoundsMultiplier);
     
-    // Initialize camera at origin (top-left of world)
-    // Camera x,y represents top-left corner of view, not center
-    this.camera = new Camera(
-      this.viewport.width, 
-      this.viewport.height,
-      { x: 0, y: 0, zoom: 1 }
-    );
+    // Initialize camera at world origin (0, 0)
+    this.cameraX = 0;
+    this.cameraY = 0;
+    this.cameraZoom = 1;
     
     // 🚀 Allocate buffers once (ZERO allocations per frame!)
     this.visibleIndices = new Uint32Array(maxEntities);
     this.scaledSizes = new Float32Array(maxEntities);
+  }
+  
+  // ============================================================================
+  // DisplayObject API (PixiJS-style)
+  // ============================================================================
+  
+  /**
+   * Add display object to scene
+   */
+  add(child: DisplayObject): void {
+    this.children.push(child);
+    
+    // If it's a Sprite, load texture
+    if (child instanceof Sprite && this._textureManager) {
+      const textureUrl = (child as any)._getTextureUrl();
+      this._textureManager.loadTexture(textureUrl).then((texture: any) => {
+        (child as any)._setTextureId(texture.id);
+      });
+    }
+  }
+  
+  /**
+   * Remove display object from scene
+   */
+  remove(child: DisplayObject): void {
+    const index = this.children.indexOf(child);
+    if (index !== -1) {
+      this.children.splice(index, 1);
+      child.destroy();
+    }
+  }
+  
+  /**
+   * Remove all display objects
+   */
+  removeAll(): void {
+    for (const child of this.children) {
+      child.destroy();
+    }
+    this.children = [];
+  }
+  
+  /**
+   * Set texture manager (called by Engine)
+   */
+  _setTextureManager(textureManager: any): void {
+    this._textureManager = textureManager;
   }
 
   async load(): Promise<void> {
@@ -104,9 +156,7 @@ export class Scene {
   update(dt: number): void {
     const startTime = performance.now();
     
-    // Phase 1: Camera update (smooth movement, shake, bounds)
-    // Must happen BEFORE unified update so camera position is fresh
-    this.camera.update(dt);
+    // Phase 1: Camera update (removed - camera is now just x,y,zoom properties)
     
     // Phase 2: UNIFIED WASM UPDATE (Physics + Animations + Culling)
     // 🚀 PERFORMANCE: Single JS↔WASM transition instead of 3 separate calls
@@ -122,8 +172,8 @@ export class Scene {
       dt,
       this.viewport.worldWidth,
       this.viewport.worldHeight,
-      this.camera.x,
-      this.camera.y,
+      this.cameraX,
+      this.cameraY,
       worldWidth,
       worldHeight,
       cullingMargin,
@@ -258,7 +308,7 @@ export class Scene {
           this.world.getUVU0(), this.world.getUVV0(),
           this.world.getUVU1(), this.world.getUVV1(),
           flags, this.visibleIndices, totalCount, this.world.FLAG_VISIBLE,
-          this.camera.x, this.camera.y, this.camera.getZoom(),
+          this.cameraX, this.cameraY, this.cameraZoom,
           textureManager
         );
         
@@ -272,7 +322,7 @@ export class Scene {
         posX, posY, rotation, this.scaledSizes,
         colorR, colorG, colorB, alphas, shapeTypes,
         flags, this.visibleIndices, totalCount, this.world.FLAG_VISIBLE,
-        this.camera.x, this.camera.y, this.camera.getZoom()
+        this.cameraX, this.cameraY, this.cameraZoom
       );
       
       this.culledCount = 0;
@@ -280,14 +330,9 @@ export class Scene {
       return;
     }
     
-    // 🚀 FRUSTUM CULLING + INDEXED RENDERING
-    const visibleCount = this.camera.cullEntities(
-      posX,
-      posY,
-      this.scaledSizes,
-      totalCount,
-      this.visibleIndices
-    );
+    // 🚀 FRUSTUM CULLING + INDEXED RENDERING (simplified - render all for now)
+    const visibleCount = totalCount; // No culling without Camera class
+    this.visibleIndices.set(new Uint32Array(totalCount).map((_, i) => i));
     
     // 🚀 TEXTURED SPRITE RENDERING: Use when entities have textures
     if (hasTextures && typeof (renderer as any).drawBulkSpritesIndexed === 'function') {
@@ -299,7 +344,7 @@ export class Scene {
         this.world.getUVU0(), this.world.getUVV0(),
         this.world.getUVU1(), this.world.getUVV1(),
         flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
-        this.camera.x, this.camera.y, this.camera.getZoom(),
+        this.cameraX, this.cameraY, this.cameraZoom,
         textureManager
       );
       
@@ -314,7 +359,7 @@ export class Scene {
       posX, posY, rotation, this.scaledSizes,
       colorR, colorG, colorB, alphas, shapeTypes,
       flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
-      this.camera.x, this.camera.y, this.camera.getZoom()
+      this.cameraX, this.cameraY, this.cameraZoom
     );
     
     this.culledCount = totalCount - visibleCount;
@@ -326,11 +371,8 @@ export class Scene {
   // ============================================================================
   
   /**
-   * Get camera for manual control
+   * Camera removed - use scene.cameraX, scene.cameraY, scene.cameraZoom directly
    */
-  getCamera(): Camera {
-    return this.camera;
-  }
   
   /**
    * Get world instance
@@ -359,8 +401,10 @@ export class Scene {
   setCanvasDimensions(width: number, height: number): void {
     const worldScale = this.viewport.worldScale;
     this.viewport = new Viewport(width, height, worldScale);
-    this.camera.resize(width, height);
-    this.camera.setPosition(width / 2, height / 2);
+    // Camera is just simple properties now (no Camera class)
+    this.cameraX = 0;
+    this.cameraY = 0;
+    this.cameraZoom = 1;
   }
   
   /**
@@ -399,9 +443,10 @@ export class Scene {
   
   /**
    * Spawn burst of entities using burst factory
+   * OLD API - use DisplayObject API instead
    */
   spawnBurst(
-    burstFactory: EntityBurstFactory,
+    burstFactory: any,
     x: number,
     y: number,
     count: number,

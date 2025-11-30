@@ -82,6 +82,7 @@ class WasmDemoScene extends Scene {
           texture: '/bunny.png'
         },
         size: BUNNYMARK_CONFIG.entity.width,
+        color: { r: 255, g: 255, b: 255 }, // White (no tint) like PixiJS bunnymark
         physics: {
           velocity: 'random',
           speed: BUNNYMARK_CONFIG.velocity,
