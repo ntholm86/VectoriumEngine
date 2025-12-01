@@ -84,7 +84,7 @@ class ParticleBunnymarkScene extends Scene {
         console.log(`📊 Before spawn: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);
         
         // Stop spawning if frame time exceeds budget or hit limit
-        if (frameTime > 17 || this.totalSpawned >= 5500000) {
+        if (frameTime > 17 || this.totalSpawned >= 8000000) {
           console.log('');
           console.log('✅ PARTICLE BUNNYMARK COMPLETE!');
           console.log(`🏆 Final Score: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);
@@ -95,10 +95,6 @@ class ParticleBunnymarkScene extends Scene {
         
         // Adaptive spawning: slow down as we approach frame budget limit
         if (frameTime > 15.5) { // Over 15.5ms - slow way down
-          spawnDelay = 500;
-        } else if (frameTime > 15) { // Over 15ms - slow down significantly
-          spawnDelay = 300;
-        } else if (frameTime > 14.5) { // Over 14.5ms - slow down
           spawnDelay = 200;
         } else {
           spawnDelay = BUNNYMARK_CONFIG.spawnInterval; // Normal speed
