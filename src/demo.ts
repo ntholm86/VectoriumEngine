@@ -5,7 +5,7 @@
 
 import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
-import { EngineConfig } from './vectorium/config/VectoriumConfig';
+import { EngineConfig } from './vectorium/config/EngineConfig';
 
 class WasmDemoScene extends Scene {
   private isRunning = false;

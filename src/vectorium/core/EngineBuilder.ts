@@ -15,7 +15,7 @@
  */
 
 import { Vectorium, Scene } from './Engine';
-import { EngineConfig } from '../config/VectoriumConfig';
+import { EngineConfig } from '../config/EngineConfig';
 
 export class VectoriumBuilder {
   private config: EngineConfig;

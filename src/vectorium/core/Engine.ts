@@ -4,8 +4,7 @@
  */
 
 import { FeatureDetector } from './FeatureDetector';
-import { EngineConfig } from '../config/VectoriumConfig';
-import { ENGINE_CONFIG } from '../config/EngineConfig';
+import { EngineConfig, ENGINE_CONFIG } from '../config/EngineConfig';
 import { RuntimeConfig } from './RuntimeConfig';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';

@@ -23,7 +23,8 @@ export { FeatureDetector } from './vectorium/core/FeatureDetector';
 export type { BrowserCapabilities } from './vectorium/core/FeatureDetector';
 
 // Configuration
-export { EngineConfig } from './vectorium/config/VectoriumConfig';
+export { EngineConfig } from './vectorium/config/EngineConfig';
+export { BUNNYMARK_CONFIG } from './vectorium/config/BunnymarkConfig';
 export { RuntimeConfig } from './vectorium/core/RuntimeConfig';
 export type { RenderingSettings, PhysicsSettings, DebugSettings, QualitySettings as RuntimeQualitySettings, AnimationSettings } from './vectorium/core/RuntimeConfig';
 export { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';

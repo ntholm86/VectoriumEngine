@@ -8,7 +8,7 @@
 
 import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
-import { EngineConfig } from './vectorium/config/VectoriumConfig';
+import { EngineConfig } from './vectorium/config/EngineConfig';
 import { BunnymarkParticleSystem, BunnymarkParticleConfig } from './vectorium/particles/BunnymarkParticleSystem';
 
 class ParticleBunnymarkScene extends Scene {
@@ -17,16 +17,8 @@ class ParticleBunnymarkScene extends Scene {
   private totalSpawned = 0;
   
   async load(): Promise<void> {
-    console.log('🐰 Particle Container Bunnymark (Ultra Mode)');
-    console.log('📋 Using BunnymarkParticleSystem for 1M+ sprites');
-    console.log('💡 Press F to start benchmark (Progressive)');
-    
     // Preload bunny texture
     await this.engine.textureManager.loadTexture('/bunny.png');
-    console.log('✅ Bunny texture preloaded');
-    
-    // Camera is now simple properties (no Camera class)
-    console.log(`📷 Camera at (${this.cameraX}, ${this.cameraY})`);
   }
   
   /**
@@ -38,8 +30,6 @@ class ParticleBunnymarkScene extends Scene {
     const spawnIncrement = 10000;
     const spawnInterval = 100;
     const targetFPS = 60;
-    
-    console.log(`📊 Starting Particle Bunnymark: ${spawnIncrement} bunnies every ${spawnInterval}ms until FPS < ${targetFPS}`);
     
     if (!this.performanceMonitor || !this.engine) {
       console.error('Missing required services');
@@ -59,8 +49,6 @@ class ParticleBunnymarkScene extends Scene {
     
     this.particleSystem = new BunnymarkParticleSystem(particleConfig);
     
-    console.log('🚀 Pure JavaScript physics with 16x loop unrolling - expect 5M+ entities!');
-    
     this.isRunning = true;
     
     // Run progressive benchmark
@@ -73,15 +61,10 @@ class ParticleBunnymarkScene extends Scene {
         const avgFPS = metrics.fps;
         const frameTime = metrics.frameTime;
         
-        console.log(`📊 Before spawn: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);
-        
         // Stop spawning if frame time exceeds budget or hit limit
         if (frameTime > 17 || this.totalSpawned >= 8000000) {
-          console.log('');
-          console.log('✅ PARTICLE BUNNYMARK COMPLETE!');
-          console.log(`🏆 Final Score: ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS (${frameTime.toFixed(2)}ms)`);
-          console.log('💡 Using ParticleSystem (like PixiJS ParticleContainer)');
-          console.log('');
+          console.log('✅ BUNNYMARK COMPLETE!');
+          console.log(`🏆 ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS`);
           break;
         }
         
@@ -95,8 +78,6 @@ class ParticleBunnymarkScene extends Scene {
         // Spawn a batch
         await this.spawnBunnyBatch();
         this.totalSpawned += spawnIncrement;
-        
-        console.log(`🐰 Spawned ${spawnIncrement} bunnies → delay: ${spawnDelay}ms`);
         
         // Wait for adaptive spawn interval (let system stabilize)
         await new Promise(resolve => setTimeout(resolve, spawnDelay));
@@ -114,12 +95,6 @@ class ParticleBunnymarkScene extends Scene {
     // Spawn at upper left corner
     const spawnX = 80;
     const spawnY = 80;
-    
-    // Debug first spawn
-    if (this.totalSpawned === 0) {
-      console.log(`🎯 Spawning at upper left (${spawnX}, ${spawnY})`);
-      console.log(`   Camera at (${this.cameraX}, ${this.cameraY})`);
-    }
     
     // Burst spawn particles
     this.particleSystem.burst(spawnIncrement, spawnX, spawnY);
@@ -156,9 +131,13 @@ class ParticleBunnymarkScene extends Scene {
 }
 
 function initParticleDemo() {
-  // Create config with bunnymark preset
-  const config = new EngineConfig().applyBunnymark();
-  config.enableDebugTools = true; // Enable debug panels
+  // Create config
+  const config = new EngineConfig();
+  config.width = 800;
+  config.height = 600;
+  config.maxEntities = 8_000_000;
+  config.instancedBatchSize = 2_000_000;
+  config.enableDebugTools = true;
   
   // Create scene
   const scene = new ParticleBunnymarkScene('particle-bunnymark');
@@ -171,7 +150,6 @@ function initParticleDemo() {
   // Start engine
   engine.loadScene('particle-bunnymark').then(() => {
     engine.start();
-    console.log('🎮 Particle Bunnymark Demo running!');
     
     // Add keyboard listener for starting benchmark
     document.addEventListener('keydown', (e) => {

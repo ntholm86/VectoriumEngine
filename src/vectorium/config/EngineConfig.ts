@@ -1,38 +1,45 @@
 /**
- * 🎮 VECTORIUM ENGINE CONFIGURATION
- * Centralized configuration for engine-wide settings
+ * 🎮 Engine Configuration
  */
+export class EngineConfig {
+  canvas?: HTMLCanvasElement;
+  width = 1280;
+  height = 720;
+  backgroundColor = '#000000';
+  preferWebGL2 = true;
+  maxTextureSize = 2048;
+  useImageBitmap = true;
+  enableAdaptiveQuality = true;
+  initialQuality: 'ultra' | 'high' | 'medium' | 'low' | 'potato' = 'high';
+  targetFPS = 60;
+  useWorkers = false;
+  maxEntities = 8_000_000;
+  instancedBatchSize = 1_000_000;
+  maxBatchSize = 65_000;
+  debugMode = false;
+  enableDebugTools = false;
+  exposeGlobals = false;
+
+  /** Enable debug mode with tools */
+  debug(): this {
+    this.debugMode = true;
+    this.enableDebugTools = true;
+    this.exposeGlobals = true;
+    return this;
+  }
+
+  /** Optimize for mobile devices */
+  mobile(): this {
+    this.initialQuality = 'medium';
+    this.maxTextureSize = 1024;
+    this.targetFPS = 30;
+    this.maxEntities = 1_000_000;
+    return this;
+  }
+}
 
 export const ENGINE_CONFIG = {
-  /**
-   * Maximum entity capacity for the engine
-   * This determines memory allocation for:
-   * - World entity arrays (positions, velocities, etc.)
-   * - Scene visible indices and scaled sizes
-   * - WASM physics buffers
-   * - Renderer sort buffer
-   * - Instanced sprite renderer static buffers
-   * 
-   * Default: 3M entities (balance between memory and performance)
-   * Memory impact: ~180MB for entity arrays at 3M capacity
-   */
   maxEntities: 8_000_000,
-  
-  /**
-   * Default batch size for instanced rendering
-   * Higher = fewer draw calls but more memory per batch
-   * Lower = more draw calls but less memory
-   * 
-   * Default: 1M (optimal for 3M total entities = 3 draw calls)
-   */
   instancedBatchSize: 1_000_000,
-  
-  /**
-   * Maximum sprite batch size for regular batching
-   * WebGL ES 2.0 limit: 65535 (Uint16 indices)
-   * WebGL 2.0 limit: Much higher (Uint32), but 65K is optimal
-   */
   maxBatchSize: 65_000,
 } as const;
-
-export type EngineConfig = typeof ENGINE_CONFIG;
