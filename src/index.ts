@@ -25,8 +25,6 @@ export type { BrowserCapabilities } from './vectorium/core/FeatureDetector';
 // Configuration
 export { EngineConfig } from './vectorium/config/EngineConfig';
 export { BUNNYMARK_CONFIG } from './vectorium/config/BunnymarkConfig';
-export { RuntimeConfig } from './vectorium/core/RuntimeConfig';
-export type { RenderingSettings, PhysicsSettings, DebugSettings, QualitySettings as RuntimeQualitySettings, AnimationSettings } from './vectorium/core/RuntimeConfig';
 export { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';
 // Sprite type removed (not implemented)
 
@@ -43,9 +41,6 @@ export { PerformanceBenchmark, BENCHMARK_SUITES } from './vectorium/performance/
 export type { BenchmarkConfig, BenchmarkResult, BenchmarkSuite } from './vectorium/performance/PerformanceBenchmark';
 export { PerformanceAnalyzer } from './vectorium/performance/PerformanceAnalyzer';
 export type { OptimizationOpportunity, AnalysisReport } from './vectorium/performance/PerformanceAnalyzer';
-
-// Debug Tools
-export { DebugPanel } from './vectorium/debug/DebugPanel';
 
 // Particle System
 export { ParticleSystemManager, ParticleEmitter } from './vectorium/particles/ParticleSystem';

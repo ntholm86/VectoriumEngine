@@ -5,7 +5,6 @@
 
 import { FeatureDetector } from './FeatureDetector';
 import { EngineConfig, ENGINE_CONFIG } from '../config/EngineConfig';
-import { RuntimeConfig } from './RuntimeConfig';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
 import { TextPool } from './TextPool';
@@ -13,7 +12,6 @@ import { PerformanceMonitor } from '../performance/PerformanceMonitor';
 import { BufferPool } from '../memory/Pooling';
 import { Viewport } from './Viewport';
 import { Scene } from './Scene';
-import { DebugPanel } from '../debug/DebugPanel';
 import { EntitySpawner } from '../debug/EntitySpawner';
 import { UIStyleLoader } from '../ui/UIStyleLoader';
 import { UIPanelManager } from '../ui/UIPanelManager';
@@ -42,7 +40,6 @@ export class Vectorium {
   readonly textPool: TextPool;
   readonly performanceMonitor: PerformanceMonitor;
   readonly bufferPool: BufferPool;
-  readonly runtimeConfig: RuntimeConfig;
   readonly textureManager: TextureManager;
   readonly animationManager: AnimationManager;
   readonly particleManager: ParticleSystemManager;
@@ -60,9 +57,6 @@ export class Vectorium {
     this.config = config;
     this.featureDetector = new FeatureDetector();
     
-    // Use RuntimeConfig defaults as fallback
-    this.runtimeConfig = new RuntimeConfig();
-    
     this.canvas = this.config.canvas!;
     this.canvas.width = this.config.width;
     this.canvas.height = this.config.height;
@@ -71,11 +65,6 @@ export class Vectorium {
     (ENGINE_CONFIG as any).maxEntities = this.config.maxEntities;
     (ENGINE_CONFIG as any).instancedBatchSize = this.config.instancedBatchSize;
     (ENGINE_CONFIG as any).maxBatchSize = this.config.maxBatchSize;
-    
-    // Sync RuntimeConfig resolution to match actual canvas dimensions
-    this.runtimeConfig.setRendering({ 
-      resolution: { width: this.config.width, height: this.config.height } 
-    });
     
     // Initialize renderer
     const useWebGL2 = this.config.preferWebGL2 && this.featureDetector.capabilities.hasWebGL2;
@@ -117,9 +106,6 @@ export class Vectorium {
     // 🚀 Initialize debug tool registry
     this.debugRegistry = new DebugToolRegistry(this, { enableConsoleAPI: true });
     
-    // Setup runtime config change handler
-    this.setupRuntimeConfig();
-    
     // Initialize debug tools if enabled
     if (this.config.enableDebugTools) {
       this.initializeDebugTools();
@@ -140,36 +126,6 @@ export class Vectorium {
     this.onKey('Space', (e) => {
       e.preventDefault(); // Prevent page scroll
       this.togglePause();
-    });
-  }
-  
-  private setupRuntimeConfig(): void {
-    // Subscribe to resolution changes
-    this.runtimeConfig.on('rendering.resolution', (resolution) => {
-      if (resolution.width !== this.canvas.width || resolution.height !== this.canvas.height) {
-        this.resize(resolution.width, resolution.height);
-      }
-    });
-    
-    // Subscribe to batch size changes
-    this.runtimeConfig.on('rendering', (rendering) => {
-      this.renderer.setBatchSize(rendering.batchSize);
-      this.renderer.setClearColor(rendering.clearColor[0], rendering.clearColor[1], rendering.clearColor[2], rendering.clearColor[3]);
-      if (this.currentScene) {
-        this.currentScene.setCullingEnabled(rendering.enableFrustumCulling);
-      }
-    });
-    
-    // Subscribe to physics changes
-    this.runtimeConfig.on('physics', (physics) => {
-      if (this.currentScene) {
-        this.currentScene.setWorldBoundsMultiplier(physics.boundsMultiplier);
-      }
-    });
-    
-    // Subscribe to quality changes
-    this.runtimeConfig.on('quality.enableAdaptiveQuality', (enabled) => {
-      this.performanceMonitor.setAdaptiveQuality(enabled);
     });
   }
   
@@ -262,29 +218,17 @@ export class Vectorium {
       // Register PerformanceMonitor (Press P)
       this.panelManager.register('performance', this.performanceMonitor);
       
-      // Register Debug Panel (Press C)
-      const debugPanel = new DebugPanel(this.runtimeConfig, this.inputManager);
-      this.panelManager.register('debug', debugPanel);
-      
       // Register Entity Spawner UI Panel (Press E) - pass performance monitor for benchmarks
       const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager, this.performanceMonitor);
       this.panelManager.register('spawner', entitySpawner);
       
-      // OLD: EntitySpawnService integration removed
-      // spawnService.registerWithSpawner(entitySpawner);
-      
-      // Camera Controls removed (Camera class deleted)
-      
       console.log('Debug panels registered: ' + this.panelManager.list().join(', '));
     }
     
-    // Apply initial runtime config values
-    const cfg = this.runtimeConfig;
-    this.renderer.setBatchSize(cfg.rendering.batchSize);
-    this.renderer.setClearColor(cfg.rendering.clearColor[0], cfg.rendering.clearColor[1], cfg.rendering.clearColor[2], cfg.rendering.clearColor[3]);
+    // Apply initial config values
     if (this.currentScene) {
-      this.currentScene.setCullingEnabled(cfg.rendering.enableFrustumCulling);
-      this.currentScene.setWorldBoundsMultiplier(cfg.physics.boundsMultiplier);
+      this.currentScene.setCullingEnabled(true);
+      this.currentScene.setWorldBoundsMultiplier(1.2);
     }
     
     // 🚀 Notify behaviors of activation
@@ -391,16 +335,7 @@ export class Vectorium {
   };
 
   private renderDebugInfo(): void {
-    // TODO: Reimplement debug rendering using unified text pipeline
-    // For now, debug info is disabled since TextRenderer was removed
-    // Debug panel still shows FPS and metrics in the UI
-    
-    // Draw background for debug overlay
-    this.renderer.drawRect(5, 5, 240, 120, { r: 0, g: 0, b: 0 }, 0.7);
-    
-    // Debug text will be reimplemented using WebGLBatchRenderer.drawBulkText()
-    // when we add helper methods for simple text rendering
-    // console.log(`FPS: ${Math.round(metrics.fps)} | Frame: ${metrics.frameTime.toFixed(2)}ms`);
+    // Debug info removed - use DebugPanel for metrics
   }
 
   resize(width: number, height: number): void {

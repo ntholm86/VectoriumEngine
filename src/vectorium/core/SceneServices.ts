@@ -15,7 +15,6 @@ import type { AnimationManager } from '../animation/AnimationManager';
 import type { AnimationSystem } from '../animation/AnimationSystem';
 import type { InputManager } from '../input/InputManager';
 import type { TextureManager } from '../rendering/TextureManager';
-import type { RuntimeConfig } from './RuntimeConfig';
 import type { World } from './World';
 import type { Camera } from './Camera';
 import type { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
@@ -39,7 +38,6 @@ export interface SceneServices {
   readonly animationSystem: AnimationSystem;
   readonly inputManager: InputManager;
   readonly textureManager: TextureManager;
-  readonly runtimeConfig: RuntimeConfig;
 }
 
 /**
@@ -60,7 +58,6 @@ export class SceneServicesContainer implements SceneServices {
   private _animationSystem: AnimationSystem | null = null;
   private _inputManager: InputManager | null = null;
   private _textureManager: TextureManager | null = null;
-  private _runtimeConfig: RuntimeConfig | null = null;
   
   get world(): World {
     if (!this._world) throw new Error('World not initialized');
@@ -112,11 +109,6 @@ export class SceneServicesContainer implements SceneServices {
     return this._textureManager;
   }
   
-  get runtimeConfig(): RuntimeConfig {
-    if (!this._runtimeConfig) throw new Error('RuntimeConfig not initialized');
-    return this._runtimeConfig;
-  }
-  
   /**
    * Initialize all services at once
    * Called by Engine during scene loading
@@ -132,7 +124,6 @@ export class SceneServicesContainer implements SceneServices {
     animationSystem: AnimationSystem;
     inputManager: InputManager;
     textureManager: TextureManager;
-    runtimeConfig: RuntimeConfig;
   }): void {
     this._world = services.world;
     this._camera = services.camera;
@@ -144,7 +135,6 @@ export class SceneServicesContainer implements SceneServices {
     this._animationSystem = services.animationSystem;
     this._inputManager = services.inputManager;
     this._textureManager = services.textureManager;
-    this._runtimeConfig = services.runtimeConfig;
   }
   
   /**
@@ -160,7 +150,6 @@ export class SceneServicesContainer implements SceneServices {
            this._animationManager !== null &&
            this._animationSystem !== null &&
            this._inputManager !== null &&
-           this._textureManager !== null &&
-           this._runtimeConfig !== null;
+           this._textureManager !== null;
   }
 }

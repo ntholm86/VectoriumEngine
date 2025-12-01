@@ -31,7 +31,6 @@ import type { AnimationManager } from '../animation/AnimationManager';
 import type { AnimationSystem } from '../animation/AnimationSystem';
 import type { InputManager } from '../input/InputManager';
 import type { TextureManager } from '../rendering/TextureManager';
-import type { RuntimeConfig } from './RuntimeConfig';
 
 /**
  * Base class for any class that needs access to engine services
@@ -93,10 +92,5 @@ export abstract class ServiceAwareBase {
   /** Texture loading and caching */
   protected get textureManager(): TextureManager {
     return this.services.textureManager;
-  }
-  
-  /** Engine configuration */
-  protected get runtimeConfig(): RuntimeConfig {
-    return this.services.runtimeConfig;
   }
 }
