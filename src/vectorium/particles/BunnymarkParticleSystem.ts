@@ -103,17 +103,17 @@ export class BunnymarkParticleSystem {
       const idx = this.activeCount++;
       const posIdx = idx * 2;
       
-      // Random position in circle distribution
+      // Random position in small cluster at spawn point
       const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * 200;
+      const radius = Math.random() * 50;
       const px = centerX + Math.cos(angle) * radius;
       const py = centerY + Math.sin(angle) * radius;
       
-      // Random velocity
-      const vAngle = Math.random() * Math.PI * 2;
-      const vSpeed = min + Math.random() * range;
-      const vx = Math.cos(vAngle) * vSpeed;
-      const vy = Math.sin(vAngle) * vSpeed;
+      // Random velocity - only rightward and downward (no upward)
+      // X velocity: positive (rightward)
+      const vx = min + Math.random() * range;
+      // Y velocity: positive (downward), no negative allowed
+      const vy = Math.abs(min + Math.random() * range);
       
       // Write to interleaved arrays (single write, better cache locality)
       this.positions[posIdx] = px;

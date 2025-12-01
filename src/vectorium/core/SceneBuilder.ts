@@ -14,8 +14,8 @@ type RenderHandler = (renderer: WebGLBatchRenderer, textRenderer: TextRenderer, 
 
 export class SceneBuilder {
   private name: string;
-  private capacity: number = 100000;
-  private worldBoundsMultiplier: number = 1.0;
+  private capacity = 100000 as number;
+  private worldBoundsMultiplier = 1.0 as number;
   private loadHandler?: LoadHandler;
   private updateHandler?: UpdateHandler;
   private renderHandler?: RenderHandler;

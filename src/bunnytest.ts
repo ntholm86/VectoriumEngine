@@ -95,7 +95,7 @@ class ParticleBunnymarkScene extends Scene {
         
         // Adaptive spawning: slow down as we approach frame budget limit
         if (frameTime > 15.5) { // Over 15.5ms - slow way down
-          spawnDelay = 200;
+          spawnDelay = 0;
         } else {
           spawnDelay = BUNNYMARK_CONFIG.spawnInterval; // Normal speed
         }
@@ -117,18 +117,18 @@ class ParticleBunnymarkScene extends Scene {
   private async spawnBunnyBatch(): Promise<void> {
     if (!this.particleSystem) return;
     
-    // Spawn at world origin (camera is at 0,0 so this will be screen center)
-    const centerX = BUNNYMARK_CONFIG.canvas.width / 2;
-    const centerY = BUNNYMARK_CONFIG.canvas.height / 2;
+    // Spawn at upper left corner
+    const spawnX = 80;
+    const spawnY = 80;
     
     // Debug first spawn
     if (this.totalSpawned === 0) {
-      console.log(`🎯 Spawning at world (${centerX}, ${centerY})`);
+      console.log(`🎯 Spawning at upper left (${spawnX}, ${spawnY})`);
       console.log(`   Camera at (${(this as any).cameraX}, ${(this as any).cameraY})`);
     }
     
     // Burst spawn particles
-    this.particleSystem.burst(BUNNYMARK_CONFIG.spawnIncrement, centerX, centerY);
+    this.particleSystem.burst(BUNNYMARK_CONFIG.spawnIncrement, spawnX, spawnY);
   }
   
   update(dt: number): void {
