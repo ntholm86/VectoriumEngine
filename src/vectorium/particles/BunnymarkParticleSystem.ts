@@ -109,11 +109,11 @@ export class BunnymarkParticleSystem {
       const px = centerX + Math.cos(angle) * radius;
       const py = centerY + Math.sin(angle) * radius;
       
-      // Random velocity - only rightward and downward (no upward)
-      // X velocity: positive (rightward)
-      const vx = min + Math.random() * range;
-      // Y velocity: positive (downward), no negative allowed
-      const vy = Math.abs(min + Math.random() * range);
+      // Random velocity scaled for dt-based physics (PixiJS-like behavior)
+      // X velocity: 0 to max (rightward)
+      const vx = Math.random() * max;
+      // Y velocity: -max/2 to +max/2 (can go up or down)
+      const vy = (Math.random() * max) - (max / 2);
       
       // Write to interleaved arrays (single write, better cache locality)
       this.positions[posIdx] = px;
@@ -130,7 +130,7 @@ export class BunnymarkParticleSystem {
     const count = this.activeCount;
     if (count === 0) return;
     
-    // Hoist all constants outside loop (including dt multipliers)
+    // Hoist all constants outside loop
     const gravity = this.config.gravity * dt;
     const canvasWidth = this.config.canvasWidth;
     const canvasHeight = this.config.canvasHeight;
@@ -165,7 +165,8 @@ export class BunnymarkParticleSystem {
       }
       if (py0 < minY || py0 > maxY) {
         py0 = Math.max(minY, Math.min(maxY, py0));
-        velocities[posIdx + 1] = -vy0;
+        // Energy loss on bounce (PixiJS uses -0.85)
+        velocities[posIdx + 1] = -vy0 * 0.85;
       }
       
       positions[posIdx] = px0; positions[posIdx + 1] = py0;
@@ -183,7 +184,7 @@ export class BunnymarkParticleSystem {
       }
       if (py1 < minY || py1 > maxY) {
         py1 = Math.max(minY, Math.min(maxY, py1));
-        velocities[posIdx + 1] = -vy1;
+        velocities[posIdx + 1] = -vy1 * 0.85;
       }
       
       positions[posIdx] = px1; positions[posIdx + 1] = py1;
@@ -201,7 +202,7 @@ export class BunnymarkParticleSystem {
       }
       if (py2 < minY || py2 > maxY) {
         py2 = Math.max(minY, Math.min(maxY, py2));
-        velocities[posIdx + 1] = -vy2;
+        velocities[posIdx + 1] = -vy2 * 0.85;
       }
       
       positions[posIdx] = px2; positions[posIdx + 1] = py2;
@@ -219,7 +220,7 @@ export class BunnymarkParticleSystem {
       }
       if (py3 < minY || py3 > maxY) {
         py3 = Math.max(minY, Math.min(maxY, py3));
-        velocities[posIdx + 1] = -vy3;
+        velocities[posIdx + 1] = -vy3 * 0.85;
       }
       
       positions[posIdx] = px3; positions[posIdx + 1] = py3;
@@ -237,7 +238,7 @@ export class BunnymarkParticleSystem {
       }
       if (py4 < minY || py4 > maxY) {
         py4 = Math.max(minY, Math.min(maxY, py4));
-        velocities[posIdx + 1] = -vy4;
+        velocities[posIdx + 1] = -vy4 * 0.85;
       }
       
       positions[posIdx] = px4; positions[posIdx + 1] = py4;
@@ -255,7 +256,7 @@ export class BunnymarkParticleSystem {
       }
       if (py5 < minY || py5 > maxY) {
         py5 = Math.max(minY, Math.min(maxY, py5));
-        velocities[posIdx + 1] = -vy5;
+        velocities[posIdx + 1] = -vy5 * 0.85;
       }
       
       positions[posIdx] = px5; positions[posIdx + 1] = py5;
@@ -273,7 +274,7 @@ export class BunnymarkParticleSystem {
       }
       if (py6 < minY || py6 > maxY) {
         py6 = Math.max(minY, Math.min(maxY, py6));
-        velocities[posIdx + 1] = -vy6;
+        velocities[posIdx + 1] = -vy6 * 0.85;
       }
       
       positions[posIdx] = px6; positions[posIdx + 1] = py6;
@@ -291,7 +292,7 @@ export class BunnymarkParticleSystem {
       }
       if (py7 < minY || py7 > maxY) {
         py7 = Math.max(minY, Math.min(maxY, py7));
-        velocities[posIdx + 1] = -vy7;
+        velocities[posIdx + 1] = -vy7 * 0.85;
       }
       
       positions[posIdx] = px7; positions[posIdx + 1] = py7;
@@ -309,7 +310,7 @@ export class BunnymarkParticleSystem {
       }
       if (py8 < minY || py8 > maxY) {
         py8 = Math.max(minY, Math.min(maxY, py8));
-        velocities[posIdx + 1] = -vy8;
+        velocities[posIdx + 1] = -vy8 * 0.85;
       }
       
       positions[posIdx] = px8; positions[posIdx + 1] = py8;
@@ -327,7 +328,7 @@ export class BunnymarkParticleSystem {
       }
       if (py9 < minY || py9 > maxY) {
         py9 = Math.max(minY, Math.min(maxY, py9));
-        velocities[posIdx + 1] = -vy9;
+        velocities[posIdx + 1] = -vy9 * 0.85;
       }
       
       positions[posIdx] = px9; positions[posIdx + 1] = py9;
@@ -345,7 +346,7 @@ export class BunnymarkParticleSystem {
       }
       if (py10 < minY || py10 > maxY) {
         py10 = Math.max(minY, Math.min(maxY, py10));
-        velocities[posIdx + 1] = -vy10;
+        velocities[posIdx + 1] = -vy10 * 0.85;
       }
       
       positions[posIdx] = px10; positions[posIdx + 1] = py10;
@@ -363,7 +364,7 @@ export class BunnymarkParticleSystem {
       }
       if (py11 < minY || py11 > maxY) {
         py11 = Math.max(minY, Math.min(maxY, py11));
-        velocities[posIdx + 1] = -vy11;
+        velocities[posIdx + 1] = -vy11 * 0.85;
       }
       
       positions[posIdx] = px11; positions[posIdx + 1] = py11;
@@ -381,7 +382,7 @@ export class BunnymarkParticleSystem {
       }
       if (py12 < minY || py12 > maxY) {
         py12 = Math.max(minY, Math.min(maxY, py12));
-        velocities[posIdx + 1] = -vy12;
+        velocities[posIdx + 1] = -vy12 * 0.85;
       }
       
       positions[posIdx] = px12; positions[posIdx + 1] = py12;
@@ -399,7 +400,7 @@ export class BunnymarkParticleSystem {
       }
       if (py13 < minY || py13 > maxY) {
         py13 = Math.max(minY, Math.min(maxY, py13));
-        velocities[posIdx + 1] = -vy13;
+        velocities[posIdx + 1] = -vy13 * 0.85;
       }
       
       positions[posIdx] = px13; positions[posIdx + 1] = py13;
@@ -417,7 +418,7 @@ export class BunnymarkParticleSystem {
       }
       if (py14 < minY || py14 > maxY) {
         py14 = Math.max(minY, Math.min(maxY, py14));
-        velocities[posIdx + 1] = -vy14;
+        velocities[posIdx + 1] = -vy14 * 0.85;
       }
       
       positions[posIdx] = px14; positions[posIdx + 1] = py14;
@@ -435,7 +436,7 @@ export class BunnymarkParticleSystem {
       }
       if (py15 < minY || py15 > maxY) {
         py15 = Math.max(minY, Math.min(maxY, py15));
-        velocities[posIdx + 1] = -vy15;
+        velocities[posIdx + 1] = -vy15 * 0.85;
       }
       
       positions[posIdx] = px15; positions[posIdx + 1] = py15;
@@ -458,7 +459,7 @@ export class BunnymarkParticleSystem {
         }
         if (py < minY || py > maxY) {
           py = Math.max(minY, Math.min(maxY, py));
-          velocities[posIdx + 1] = -vy;
+          velocities[posIdx + 1] = -vy * 0.85;
         }
         
         positions[posIdx] = px; positions[posIdx + 1] = py;
