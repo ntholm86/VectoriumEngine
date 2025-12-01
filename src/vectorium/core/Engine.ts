@@ -3,7 +3,9 @@
  * Main engine class coordinating all systems
  */
 
-import { FeatureDetector, EngineConfig } from './FeatureDetector';
+import { FeatureDetector } from './FeatureDetector';
+import { EngineConfig } from '../config/VectoriumConfig';
+import { ENGINE_CONFIG } from '../config/EngineConfig';
 import { RuntimeConfig } from './RuntimeConfig';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
@@ -28,7 +30,7 @@ import { ParticleSystemManager } from '../particles/ParticleSystem';
 // Re-export for convenience
 export { Viewport, Scene };
 export type { Entity, EntityId, EntityFlags } from './Entity';
-export { VectoriumBuilder, VectoriumPresets } from './EngineBuilder';
+export { VectoriumBuilder } from './EngineBuilder';
 export { SceneBuilder, createScene } from './SceneBuilder';
 export { ServiceAwareBase } from './ServiceAwareBase';
 
@@ -55,32 +57,21 @@ export class Vectorium {
   private lastTime = 0;
   private rafId = 0;
 
-  constructor(config: Partial<EngineConfig> = {}) {
+  constructor(config: EngineConfig) {
+    this.config = config;
     this.featureDetector = new FeatureDetector();
-    const optimal = this.featureDetector.getOptimalConfig();
     
     // Use RuntimeConfig defaults as fallback
     this.runtimeConfig = new RuntimeConfig();
-    const { targetFPS } = this.runtimeConfig.quality;
     
-    this.config = {
-      canvas: config.canvas ?? document.createElement('canvas'),
-      width: config.width ?? 1280,
-      height: config.height ?? 720,
-      preferWebGL2: config.preferWebGL2 ?? optimal.preferWebGL2 ?? true,
-      useImageBitmap: config.useImageBitmap ?? optimal.useImageBitmap ?? false,
-      useWorkers: config.useWorkers ?? optimal.useWorkers ?? false,
-      targetFPS: config.targetFPS ?? targetFPS,
-      maxTextureSize: config.maxTextureSize ?? optimal.maxTextureSize ?? 2048,
-      enableAdaptiveQuality: config.enableAdaptiveQuality ?? this.runtimeConfig.quality.enableAdaptiveQuality,
-      initialQuality: config.initialQuality ?? optimal.initialQuality ?? 'high',
-      debugMode: config.debugMode ?? this.runtimeConfig.debug.showStats,
-      enableDebugTools: config.enableDebugTools ?? false
-    };
-    
-    this.canvas = this.config.canvas;
+    this.canvas = this.config.canvas!;
     this.canvas.width = this.config.width;
     this.canvas.height = this.config.height;
+    
+    // Sync ENGINE_CONFIG values
+    (ENGINE_CONFIG as any).maxEntities = this.config.maxEntities;
+    (ENGINE_CONFIG as any).instancedBatchSize = this.config.instancedBatchSize;
+    (ENGINE_CONFIG as any).maxBatchSize = this.config.maxBatchSize;
     
     // Sync RuntimeConfig resolution to match actual canvas dimensions
     this.runtimeConfig.setRendering({ 
@@ -195,6 +186,9 @@ export class Vectorium {
     // This ensures Scene has correct dimensions from the start, not just after loadScene()
     scene.setCanvasDimensions(this.config.width, this.config.height);
     
+    // Inject engine reference automatically
+    (scene as any).engine = this;
+    
     // Set texture manager for DisplayObject API
     (scene as any)._setTextureManager(this.textureManager);
     
@@ -252,6 +246,9 @@ export class Vectorium {
     
     // 🚀 Store AnimationSystem reference (optimized Scene no longer uses services container)
     (this.currentScene as any).animationSystem = animSystem;
+    
+    // Inject performanceMonitor for easy access
+    (this.currentScene as any).performanceMonitor = this.performanceMonitor;
     
     // 🚀 Now call scene.load()
     await this.currentScene.load();

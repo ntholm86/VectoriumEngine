@@ -8,16 +8,13 @@
 
 import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
-import type { Vectorium } from './vectorium/core/Engine';
-import { BUNNYMARK_CONFIG } from './vectorium/config/BunnymarkConfig';
-import { ENGINE_CONFIG } from './vectorium/config/EngineConfig';
+import { EngineConfig } from './vectorium/config/VectoriumConfig';
 import { BunnymarkParticleSystem, BunnymarkParticleConfig } from './vectorium/particles/BunnymarkParticleSystem';
 
 class ParticleBunnymarkScene extends Scene {
   private particleSystem: BunnymarkParticleSystem | null = null;
   private isRunning = false;
   private totalSpawned = 0;
-  private engine: Vectorium | null = null;
   
   async load(): Promise<void> {
     console.log('🐰 Particle Container Bunnymark (Ultra Mode)');
@@ -25,17 +22,11 @@ class ParticleBunnymarkScene extends Scene {
     console.log('💡 Press F to start benchmark (Progressive)');
     
     // Preload bunny texture
-    if (this.engine) {
-      await this.engine.textureManager.loadTexture('/bunny.png');
-      console.log('✅ Bunny texture preloaded');
-    }
+    await this.engine.textureManager.loadTexture('/bunny.png');
+    console.log('✅ Bunny texture preloaded');
     
     // Camera is now simple properties (no Camera class)
-    console.log(`📷 Camera at (${(this as any).cameraX}, ${(this as any).cameraY})`);
-  }
-  
-  setEngine(engine: Vectorium): void {
-    this.engine = engine;
+    console.log(`📷 Camera at (${this.cameraX}, ${this.cameraY})`);
   }
   
   /**
@@ -44,25 +35,26 @@ class ParticleBunnymarkScene extends Scene {
   async startBenchmark(): Promise<void> {
     if (this.isRunning) return;
     
-    console.log(`📊 Starting Particle Bunnymark: ${BUNNYMARK_CONFIG.spawnIncrement} bunnies every ${BUNNYMARK_CONFIG.spawnInterval}ms until FPS < ${BUNNYMARK_CONFIG.targetFPS}`);
+    const spawnIncrement = 10000;
+    const spawnInterval = 100;
+    const targetFPS = 60;
     
-    // Get performance monitor
-    const performanceMonitor = (this as any).performanceMonitor;
+    console.log(`📊 Starting Particle Bunnymark: ${spawnIncrement} bunnies every ${spawnInterval}ms until FPS < ${targetFPS}`);
     
-    if (!performanceMonitor || !this.engine) {
+    if (!this.performanceMonitor || !this.engine) {
       console.error('Missing required services');
       return;
     }
     
     // Create optimized particle system
     const particleConfig: BunnymarkParticleConfig = {
-      maxParticles: ENGINE_CONFIG.maxEntities,
-      canvasWidth: BUNNYMARK_CONFIG.canvas.width,
-      canvasHeight: BUNNYMARK_CONFIG.canvas.height,
-      gravity: BUNNYMARK_CONFIG.physics.gravity ? 980 : 0,
-      spriteWidth: BUNNYMARK_CONFIG.entity.width,
-      spriteHeight: BUNNYMARK_CONFIG.entity.height,
-      velocityRange: BUNNYMARK_CONFIG.velocity
+      maxParticles: this.engine.config.maxEntities,
+      canvasWidth: this.engine.config.width,
+      canvasHeight: this.engine.config.height,
+      gravity: 980,
+      spriteWidth: 26,
+      spriteHeight: 37,
+      velocityRange: { min: 400, max: 600 }
     };
     
     this.particleSystem = new BunnymarkParticleSystem(particleConfig);
@@ -73,11 +65,11 @@ class ParticleBunnymarkScene extends Scene {
     
     // Run progressive benchmark
     const runProgressiveTest = async () => {
-      let spawnDelay: number = BUNNYMARK_CONFIG.spawnInterval;
+      let spawnDelay: number = spawnInterval;
       
       while (this.isRunning) {
         // Check performance BEFORE spawning (measure stable state)
-        const metrics = performanceMonitor.getMetrics();
+        const metrics = this.performanceMonitor.getMetrics();
         const avgFPS = metrics.fps;
         const frameTime = metrics.frameTime;
         
@@ -94,17 +86,17 @@ class ParticleBunnymarkScene extends Scene {
         }
         
         // Adaptive spawning: slow down as we approach frame budget limit
-        if (frameTime > 15.5) { // Over 15.5ms - slow way down
+        if (frameTime > 15.5) {
           spawnDelay = 0;
         } else {
-          spawnDelay = BUNNYMARK_CONFIG.spawnInterval; // Normal speed
+          spawnDelay = spawnInterval;
         }
         
         // Spawn a batch
         await this.spawnBunnyBatch();
-        this.totalSpawned += BUNNYMARK_CONFIG.spawnIncrement;
+        this.totalSpawned += spawnIncrement;
         
-        console.log(`🐰 Spawned ${BUNNYMARK_CONFIG.spawnIncrement} bunnies → delay: ${spawnDelay}ms`);
+        console.log(`🐰 Spawned ${spawnIncrement} bunnies → delay: ${spawnDelay}ms`);
         
         // Wait for adaptive spawn interval (let system stabilize)
         await new Promise(resolve => setTimeout(resolve, spawnDelay));
@@ -117,6 +109,8 @@ class ParticleBunnymarkScene extends Scene {
   private async spawnBunnyBatch(): Promise<void> {
     if (!this.particleSystem) return;
     
+    const spawnIncrement = 10000;
+    
     // Spawn at upper left corner
     const spawnX = 80;
     const spawnY = 80;
@@ -124,11 +118,11 @@ class ParticleBunnymarkScene extends Scene {
     // Debug first spawn
     if (this.totalSpawned === 0) {
       console.log(`🎯 Spawning at upper left (${spawnX}, ${spawnY})`);
-      console.log(`   Camera at (${(this as any).cameraX}, ${(this as any).cameraY})`);
+      console.log(`   Camera at (${this.cameraX}, ${this.cameraY})`);
     }
     
     // Burst spawn particles
-    this.particleSystem.burst(BUNNYMARK_CONFIG.spawnIncrement, spawnX, spawnY);
+    this.particleSystem.burst(spawnIncrement, spawnX, spawnY);
   }
   
   update(dt: number): void {
@@ -162,21 +156,17 @@ class ParticleBunnymarkScene extends Scene {
 }
 
 function initParticleDemo() {
+  // Create config with bunnymark preset
+  const config = new EngineConfig().applyBunnymark();
+  config.enableDebugTools = true; // Enable debug panels
+  
+  // Create scene
   const scene = new ParticleBunnymarkScene('particle-bunnymark');
   
-  const engine = new VectoriumBuilder()
-    .withFullscreenCanvas({
-      width: BUNNYMARK_CONFIG.canvas.width,
-      height: BUNNYMARK_CONFIG.canvas.height
-    })
-    .withQuality('high')
-    .withTargetFPS(BUNNYMARK_CONFIG.targetFPS)
-    .enableDebugTools()
+  // Build engine with config and scene
+  const engine = new VectoriumBuilder(config)
     .withScene('particle-bunnymark', scene)
     .build();
-  
-  // Store engine reference in scene before loading
-  scene.setEngine(engine);
   
   // Start engine
   engine.loadScene('particle-bunnymark').then(() => {

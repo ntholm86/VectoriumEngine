@@ -36,6 +36,10 @@ export class Scene {
   public children: DisplayObject[] = [];
   private _textureManager: any = null; // Set by Engine
   
+  // 🎮 Engine services (injected automatically)
+  protected engine: any = null; // Reference to engine
+  protected performanceMonitor: any = null; // Performance monitoring
+  
   // Viewport & Camera (simplified - no Camera class)
   private viewport: Viewport;
   public cameraX: number = 0;  // Camera X position (world coordinates)

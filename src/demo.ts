@@ -5,7 +5,7 @@
 
 import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
-import { BUNNYMARK_CONFIG } from './vectorium/config/BunnymarkConfig';
+import { EngineConfig } from './vectorium/config/VectoriumConfig';
 
 class WasmDemoScene extends Scene {
   private isRunning = false;
@@ -22,7 +22,11 @@ class WasmDemoScene extends Scene {
   async startBenchmark(): Promise<void> {
     if (this.isRunning) return;
     
-    console.log(`📊 Starting Bunnymark: ${BUNNYMARK_CONFIG.spawnIncrement} bunnies every ${BUNNYMARK_CONFIG.spawnInterval}ms until FPS < ${BUNNYMARK_CONFIG.targetFPS}`);
+    const spawnIncrement = 10000;
+    const spawnInterval = 100;
+    const targetFPS = 60;
+    
+    console.log(`📊 Starting Bunnymark: ${spawnIncrement} bunnies every ${spawnInterval}ms until FPS < ${targetFPS}`);
     
     // Get required services (injected by engine during loadScene)
     const spawnService = (this as any).spawnService;
@@ -41,19 +45,19 @@ class WasmDemoScene extends Scene {
       while (this.isRunning) {
         // Spawn a batch
         await this.spawnBunnyBatch();
-        totalSpawned += BUNNYMARK_CONFIG.spawnIncrement;
+        totalSpawned += spawnIncrement;
         
         // Wait for spawn interval
-        await new Promise(resolve => setTimeout(resolve, BUNNYMARK_CONFIG.spawnInterval));
+        await new Promise(resolve => setTimeout(resolve, spawnInterval));
         
         // Check FPS
         const metrics = performanceMonitor.getMetrics();
         const avgFPS = metrics.fps;
         
-        console.log(`🐰 Spawned ${BUNNYMARK_CONFIG.spawnIncrement} bunnies → Total: ${totalSpawned.toLocaleString()} @ ${avgFPS.toFixed(1)} FPS`);
+        console.log(`🐰 Spawned ${spawnIncrement} bunnies → Total: ${totalSpawned.toLocaleString()} @ ${avgFPS.toFixed(1)} FPS`);
         
         // Stop spawning if FPS drops below target or hit limit
-        if (avgFPS < BUNNYMARK_CONFIG.targetFPS || totalSpawned >= 500000) {
+        if (avgFPS < targetFPS || totalSpawned >= 500000) {
           console.log('');
           console.log('✅ BUNNYMARK STANDARD COMPLETE!');
           console.log(`🏆 Final Score: ${totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS`);
@@ -68,26 +72,27 @@ class WasmDemoScene extends Scene {
   }
   
   private async spawnBunnyBatch(): Promise<void> {
-    const centerX = BUNNYMARK_CONFIG.canvas.width / 2;
-    const centerY = BUNNYMARK_CONFIG.canvas.height / 2;
+    const spawnIncrement = 10000;
+    const centerX = 400;
+    const centerY = 300;
     
     const spawnService = (this as any).spawnService;
     if (spawnService) {
       spawnService.spawn({
         position: { x: centerX, y: centerY },
-        count: BUNNYMARK_CONFIG.spawnIncrement,
+        count: spawnIncrement,
         distribution: { type: 'circle', radius: 200 },
         visual: {
           type: 'sprite',
           texture: '/bunny.png'
         },
-        size: BUNNYMARK_CONFIG.entity.width,
-        color: { r: 255, g: 255, b: 255 }, // White (no tint) like PixiJS bunnymark
+        size: 26,
+        color: { r: 255, g: 255, b: 255 },
         physics: {
           velocity: 'random',
-          speed: BUNNYMARK_CONFIG.velocity,
-          gravity: BUNNYMARK_CONFIG.physics.gravity,
-          collision: BUNNYMARK_CONFIG.physics.collision
+          speed: { min: 400, max: 600 },
+          gravity: true,
+          collision: false
         }
       });
     }
@@ -95,14 +100,12 @@ class WasmDemoScene extends Scene {
 }
 
 function initDemo() {
-  const engine = new VectoriumBuilder()
-    .withFullscreenCanvas({
-      width: BUNNYMARK_CONFIG.canvas.width,
-      height: BUNNYMARK_CONFIG.canvas.height
-    })
-    .withQuality('high')
-    .withTargetFPS(BUNNYMARK_CONFIG.targetFPS)
-    .enableDebugTools()
+  const config = new EngineConfig();
+  config.width = 800;
+  config.height = 600;
+  config.enableDebugTools = true;
+  
+  const engine = new VectoriumBuilder(config)
     .withScene('wasm-demo', new WasmDemoScene('wasm-demo'))
     .build();
   

@@ -14,15 +14,18 @@ export { DisplayObject, Sprite, Graphics } from './vectorium/display';
 export { StateMachine } from './vectorium/core/StateMachine';
 
 // 🍭 Syntax Sugar: Builders & Presets
-export { VectoriumBuilder, VectoriumPresets } from './vectorium/core/EngineBuilder';
+export { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 export { SceneBuilder, createScene } from './vectorium/core/SceneBuilder';
 
 export { Viewport } from './vectorium/core/Viewport';
 
 export { FeatureDetector } from './vectorium/core/FeatureDetector';
-export type { EngineConfig, BrowserCapabilities } from './vectorium/core/FeatureDetector';
+export type { BrowserCapabilities } from './vectorium/core/FeatureDetector';
 
-// Rendering
+// Configuration
+export { EngineConfig } from './vectorium/config/VectoriumConfig';
+export { RuntimeConfig } from './vectorium/core/RuntimeConfig';
+export type { RenderingSettings, PhysicsSettings, DebugSettings, QualitySettings as RuntimeQualitySettings, AnimationSettings } from './vectorium/core/RuntimeConfig';
 export { WebGLBatchRenderer } from './vectorium/rendering/WebGLBatchRenderer';
 // Sprite type removed (not implemented)
 
@@ -39,10 +42,6 @@ export { PerformanceBenchmark, BENCHMARK_SUITES } from './vectorium/performance/
 export type { BenchmarkConfig, BenchmarkResult, BenchmarkSuite } from './vectorium/performance/PerformanceBenchmark';
 export { PerformanceAnalyzer } from './vectorium/performance/PerformanceAnalyzer';
 export type { OptimizationOpportunity, AnalysisReport } from './vectorium/performance/PerformanceAnalyzer';
-
-// Configuration
-export { RuntimeConfig } from './vectorium/core/RuntimeConfig';
-export type { RenderingSettings, PhysicsSettings, DebugSettings, QualitySettings as RuntimeQualitySettings, AnimationSettings } from './vectorium/core/RuntimeConfig';
 
 // Debug Tools
 export { DebugPanel } from './vectorium/debug/DebugPanel';
