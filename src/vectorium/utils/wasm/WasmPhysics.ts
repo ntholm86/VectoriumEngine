@@ -12,9 +12,9 @@
  * - Temporal coherence (contact caching)
  */
 
-import { SpatialHash } from '../physics/SpatialHash';
+import { SpatialHash } from '../../physics/SpatialHash';
 import { WasmPhysicsBridge } from './WasmPhysicsBridge';
-import { ENGINE_CONFIG } from '../config/EngineConfig';
+import { ENGINE_CONFIG } from '../../core/EngineConfig';
 
 export class WasmPhysics {
   private spatialHash: SpatialHash;

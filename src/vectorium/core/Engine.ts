@@ -4,22 +4,22 @@
  */
 
 import { FeatureDetector } from './FeatureDetector';
-import { EngineConfig, ENGINE_CONFIG } from '../config/EngineConfig';
+import { EngineConfig, ENGINE_CONFIG } from './EngineConfig';
 import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
-import { TextPool } from './TextPool';
-import { PerformanceMonitor } from '../performance/PerformanceMonitor';
-import { BufferPool } from '../memory/Pooling';
+import { TextPool } from '../display/TextPool';
+import { PerformanceMonitor } from '../tools/PerformanceMonitor';
+import { BufferPool } from '../utils/Pooling';
 import { Viewport } from './Viewport';
 import { Scene } from './Scene';
-import { EntitySpawner } from '../debug/EntitySpawner';
-import { UIStyleLoader } from '../ui/UIStyleLoader';
-import { UIPanelManager } from '../ui/UIPanelManager';
+import { EntitySpawner } from '../tools/EntitySpawner';
+import { UIStyleLoader } from '../tools/UIStyleLoader';
+import { UIPanelManager } from '../tools/UIPanelManager';
 import { TextureManager } from '../rendering/TextureManager';
-import { AnimationManager } from '../animation/AnimationManager';
-import { AnimationSystem } from '../animation/AnimationSystem';
-import { InputManager } from '../input/InputManager';
-import { ParticleSystemManager } from '../particles/ParticleSystem';
+import { AnimationManager } from '../systems/AnimationManager';
+import { AnimationSystem } from '../systems/AnimationSystem';
+import { InputManager } from '../systems/InputManager';
+import { ParticleSystemManager } from '../systems/ParticleSystem';
 // OLD: EntitySpawnService removed - use DisplayObject API
 // import { EntitySpawnService } from '../entities/EntitySpawnService';
 

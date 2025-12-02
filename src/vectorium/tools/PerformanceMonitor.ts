@@ -3,8 +3,8 @@
  * Adaptive quality system with 5 levels and performance tracking
  */
 
-import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
-import type { InputManager } from '../input/InputManager';
+import { UIPanel, UIPanelConfig } from './UIPanel';
+import type { InputManager } from '../systems/InputManager';
 import {
   InputMetricsCollector,
   FrameSpikeCollector,

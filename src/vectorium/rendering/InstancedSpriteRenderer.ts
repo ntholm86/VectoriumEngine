@@ -15,8 +15,8 @@
  * Performance: 5M+ sprites @ 60 FPS
  */
 
-import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
-import { ENGINE_CONFIG } from '../config/EngineConfig';
+import type { PerformanceMonitor } from '../tools/PerformanceMonitor';
+import { ENGINE_CONFIG } from '../core/EngineConfig';
 
 export class InstancedSpriteRenderer {
   private gl: WebGL2RenderingContext;

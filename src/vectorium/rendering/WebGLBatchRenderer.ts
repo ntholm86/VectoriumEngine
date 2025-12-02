@@ -4,9 +4,9 @@
  * Rewritten for maximum performance - only includes what's actually used
  */
 
-import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
+import type { PerformanceMonitor } from '../tools/PerformanceMonitor';
 import { InstancedSpriteRenderer } from './InstancedSpriteRenderer';
-import { ENGINE_CONFIG } from '../config/EngineConfig';
+import { ENGINE_CONFIG } from '../core/EngineConfig';
 
 export class WebGLBatchRenderer {
   private gl: WebGLRenderingContext | WebGL2RenderingContext;

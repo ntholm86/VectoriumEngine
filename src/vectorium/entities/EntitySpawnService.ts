@@ -11,9 +11,9 @@
 
 import { Scene } from '../core/Engine';
 import { EntityId, World } from '../core/World';
-import { ShapeType } from '../shapes/ShapeType';
-import { TextPool } from '../core/TextPool';
-import { BUNNYMARK_CONFIG } from '../config/BunnymarkConfig';
+import { ShapeType } from '../utils/ShapeType';
+import { TextPool } from '../display/TextPool';
+import { BUNNYMARK_CONFIG } from '../core/BunnymarkConfig';
 
 // Type aliases for cleaner API
 export type PhysicsMode = 'none' | 'gravity' | 'collision' | 'full';

@@ -5,9 +5,9 @@
  */
 
 import { Scene } from '../core/Engine';
-import { UIPanel, UIPanelConfig } from '../ui/UIPanel';
-import type { InputManager } from '../input/InputManager';
-import type { PerformanceMonitor } from '../performance/PerformanceMonitor';
+import { UIPanel, UIPanelConfig } from './UIPanel';
+import type { InputManager } from '../systems/InputManager';
+import type { PerformanceMonitor } from './PerformanceMonitor';
 import { isSpawnableScene } from '../core/ISpawnableScene';
 
 export class EntitySpawner extends UIPanel {

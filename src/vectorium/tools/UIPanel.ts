@@ -5,7 +5,7 @@
  * Integrated with InputManager for coordinated input handling
  */
 
-import type { InputManager } from '../input/InputManager';
+import type { InputManager } from '../systems/InputManager';
 
 export interface UIPanelConfig {
   id: string;                    // Unique identifier (e.g., 'entity-spawner')

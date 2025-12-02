@@ -10,10 +10,10 @@
  * @see ServiceAwareBase for the base class that provides service getters
  */
 
-import type { TextPool } from './TextPool';
-import type { AnimationManager } from '../animation/AnimationManager';
-import type { AnimationSystem } from '../animation/AnimationSystem';
-import type { InputManager } from '../input/InputManager';
+import type { TextPool } from '../display/TextPool';
+import type { AnimationManager } from '../systems/AnimationManager';
+import type { AnimationSystem } from '../systems/AnimationSystem';
+import type { InputManager } from '../systems/InputManager';
 import type { TextureManager } from '../rendering/TextureManager';
 import type { World } from './World';
 import type { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';

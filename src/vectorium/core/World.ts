@@ -11,9 +11,9 @@
  * 🚀 WASM-OPTIMIZED: Using WASM-style patterns for maximum performance
  */
 
-import { WasmPhysics } from '../wasm/WasmPhysics.js';
+import { WasmPhysics } from '../utils/wasm/WasmPhysics.js';
 import type { EntityId, EntityFlags } from './Entity';
-import { ENGINE_CONFIG } from '../config/EngineConfig';
+import { ENGINE_CONFIG } from './EngineConfig';
 
 export type { EntityId, EntityFlags };
 

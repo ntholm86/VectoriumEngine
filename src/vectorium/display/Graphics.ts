@@ -10,7 +10,7 @@
 
 import { DisplayObject } from './DisplayObject';
 import { World } from '../core/World';
-import { ShapeType } from '../shapes/ShapeType';
+import { ShapeType } from '../utils/ShapeType';
 
 export class Graphics extends DisplayObject {
   private _shapeType: ShapeType;

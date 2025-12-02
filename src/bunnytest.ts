@@ -8,8 +8,8 @@
 
 import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
-import { EngineConfig } from './vectorium/config/EngineConfig';
-import { BunnymarkParticleSystem, BunnymarkParticleConfig } from './vectorium/particles/BunnymarkParticleSystem';
+import { EngineConfig } from './vectorium/core/EngineConfig';
+import { BunnymarkParticleSystem, BunnymarkParticleConfig } from './vectorium/systems/BunnymarkParticleSystem';
 
 class ParticleBunnymarkScene extends Scene {
   private particleSystem: BunnymarkParticleSystem | null = null;

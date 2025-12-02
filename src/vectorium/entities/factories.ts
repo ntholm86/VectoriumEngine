@@ -12,8 +12,8 @@
  */
 
 import { World, EntityId } from '../core/World';
-import { ShapeType } from '../shapes/ShapeType'; // 🎨 Import shape types
-import { TextPool } from '../core/TextPool'; // 🎨 Import text pool
+import { ShapeType } from '../utils/ShapeType'; // 🎨 Import shape types
+import { TextPool } from '../display/TextPool'; // 🎨 Import text pool
 
 /**
  * Convert HSL to RGB (inlined utility)

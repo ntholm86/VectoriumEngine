@@ -22,7 +22,7 @@ export class UIStyleLoader {
     const styleLink = document.createElement('link');
     styleLink.id = 'vectorium-ui-styles';
     styleLink.rel = 'stylesheet';
-    styleLink.href = '/src/vectorium/ui/ui-controls.css';
+    styleLink.href = '/src/vectorium/tools/ui-controls.css';
     document.head.appendChild(styleLink);
 
     this.injected = true;

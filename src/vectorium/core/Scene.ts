@@ -18,7 +18,7 @@ import { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import { TextRenderer } from '../rendering/TextRenderer';
 import { DisplayObject } from '../display/DisplayObject';
 import { Sprite } from '../display/Sprite';
-import { ENGINE_CONFIG } from '../config/EngineConfig';
+import { ENGINE_CONFIG } from './EngineConfig';
 
 /**
  * Scene - Container for display objects (PixiJS-inspired)

@@ -3,7 +3,7 @@
  * Shows GPU instancing status prominently
  */
 
-import type { PerformanceMetrics } from '../performance/PerformanceMonitor';
+import type { PerformanceMetrics } from './PerformanceMonitor';
 
 export class MetricsLogger {
   private lastLogTime = 0;
