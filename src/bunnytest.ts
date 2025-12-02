@@ -10,6 +10,7 @@ import { VectoriumBuilder } from './vectorium/core/EngineBuilder';
 import { Scene } from './vectorium/core/Engine';
 import { EngineConfig } from './vectorium/core/EngineConfig';
 import { BunnymarkParticleSystem, BunnymarkParticleConfig } from './vectorium/systems/BunnymarkParticleSystem';
+import { BUNNYMARK_CONFIG } from './vectorium/core/BunnymarkConfig';
 
 class ParticleBunnymarkScene extends Scene {
   private particleSystem: BunnymarkParticleSystem | null = null;
@@ -27,8 +28,8 @@ class ParticleBunnymarkScene extends Scene {
   async startBenchmark(): Promise<void> {
     if (this.isRunning) return;
     
-    const spawnIncrement = 10000;
-    const spawnInterval = 100;
+    const spawnIncrement = BUNNYMARK_CONFIG.spawnIncrement;
+    const spawnInterval = BUNNYMARK_CONFIG.spawnInterval;
     
     if (!this.engine) {
       console.error('Engine not initialized');
@@ -77,7 +78,7 @@ class ParticleBunnymarkScene extends Scene {
         
         // Adaptive spawning: slow down as we approach frame budget limit
         if (frameTime > 15.5) {
-          spawnDelay = 0;
+          spawnDelay = 10;
         } else {
           spawnDelay = spawnInterval;
         }
@@ -97,14 +98,8 @@ class ParticleBunnymarkScene extends Scene {
   private async spawnBunnyBatch(): Promise<void> {
     if (!this.particleSystem) return;
     
-    const spawnIncrement = 10000;
-    
-    // Spawn at upper left corner
-    const spawnX = 80;
-    const spawnY = 80;
-    
-    // Burst spawn particles
-    this.particleSystem.burst(spawnIncrement, spawnX, spawnY);
+    const spawnIncrement = BUNNYMARK_CONFIG.spawnIncrement;
+    this.particleSystem.burst(spawnIncrement, 10, 10);
   }
   
   update(dt: number): void {
@@ -140,9 +135,6 @@ class ParticleBunnymarkScene extends Scene {
 function initParticleDemo() {
   // Create config with only performance profiler
   const config = new EngineConfig();
-  config.width = 800;
-  config.height = 600;
-  config.maxEntities = 6_500_000;
   config.profileOnly(); // Only enable performance monitor, no entity spawner
   
   // Create scene

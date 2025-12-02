@@ -100,9 +100,7 @@ export class Vectorium {
   
   get panelManager(): UIPanelManager {
     if (!this._panelManager) {
-      this._panelManager = new UIPanelManager({
-        enableConsoleAPI: this.config.debugTools.consoleAPI ?? false
-      });
+      this._panelManager = new UIPanelManager();
     }
     return this._panelManager;
   }

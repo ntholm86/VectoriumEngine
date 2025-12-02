@@ -4,7 +4,6 @@
 export interface DebugToolsConfig {
   performanceMonitor?: boolean;  // Press 'P' - Performance profiler
   entitySpawner?: boolean;        // Press 'E' - Entity spawner
-  consoleAPI?: boolean;           // Expose window.vectoriumPanels API
 }
 
 /**
@@ -30,8 +29,7 @@ export class EngineConfig {
   /** Granular control over which debug tools are enabled */
   debugTools: DebugToolsConfig = {
     performanceMonitor: false,
-    entitySpawner: false,
-    consoleAPI: false
+    entitySpawner: false
   };
 
   /** Enable debug mode with all tools */
@@ -40,8 +38,7 @@ export class EngineConfig {
     this.exposeGlobals = true;
     this.debugTools = {
       performanceMonitor: true,
-      entitySpawner: true,
-      consoleAPI: true
+      entitySpawner: true
     };
     return this;
   }
@@ -51,15 +48,14 @@ export class EngineConfig {
     this.debugMode = true;
     this.debugTools = {
       performanceMonitor: true,
-      entitySpawner: false,
-      consoleAPI: true
+      entitySpawner: false
     };
     return this;
   }
 }
 
 export const ENGINE_CONFIG = {
-  maxEntities: 8_000_000,
+  maxEntities: 6_500_000,
   maxBatchSize: 65_000,
   instancedBatchSize: 2_000_000,
 } as const;

@@ -31,14 +31,8 @@ export interface UIPanelManagerAPI {
 
 export class UIPanelManager implements UIPanelManagerAPI {
   private panels = new Map<string, UIPanel>();
-  private enableConsoleAPI: boolean;
   
-  constructor(options: { enableConsoleAPI?: boolean } = {}) {
-    this.enableConsoleAPI = options.enableConsoleAPI ?? true;
-    
-    if (this.enableConsoleAPI) {
-      this.exposeConsoleAPI();
-    }
+  constructor() {
   }
   
   /**
@@ -150,30 +144,6 @@ export class UIPanelManager implements UIPanelManagerAPI {
   dispose(): void {
     this.panels.forEach(panel => panel.hide());
     this.panels.clear();
-    
-    if (this.enableConsoleAPI) {
-      delete (window as any).vectoriumPanels;
-    }
-  }
-  
-  /**
-   * Expose API to window for console access
-   */
-  private exposeConsoleAPI(): void {
-    const api: UIPanelManagerAPI = {
-      show: (name: string) => this.show(name),
-      hide: (name: string) => this.hide(name),
-      toggle: (name: string) => this.toggle(name),
-      showAll: () => this.showAll(),
-      hideAll: () => this.hideAll(),
-      list: () => this.list(),
-      get: (name: string) => this.get(name)
-    };
-    
-    (window as any).vectoriumPanels = api;
-    
-    console.log('UIPanelManager: Console API exposed as window.vectoriumPanels');
-    console.log('  Usage: window.vectoriumPanels.show("debug")');
-    console.log('  Usage: window.vectoriumPanels.list()');
   }
 }
+
