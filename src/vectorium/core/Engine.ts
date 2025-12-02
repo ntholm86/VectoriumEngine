@@ -53,7 +53,6 @@ export class Vectorium {
     this.canvas.height = this.config.height;
     
     (ENGINE_CONFIG as any).maxEntities = this.config.maxEntities;
-    (ENGINE_CONFIG as any).instancedBatchSize = this.config.instancedBatchSize;
     (ENGINE_CONFIG as any).maxBatchSize = this.config.maxBatchSize;
     
     const useWebGL2 = this.config.preferWebGL2 && this.featureDetector.capabilities.hasWebGL2;
@@ -455,32 +454,6 @@ export class Vectorium {
     (window as any).vectoriumScene = this.currentScene;
     (window as any).vectoriumPerfMonitor = this.performanceMonitor;
     
-    (window as any).checkInstancing = () => {
-      const metrics = this.performanceMonitor.getMetrics();
-      if (metrics.gpuInstancingEnabled) {
-        console.log(`
-╔══════════════════════════════════════════════════════════════╗
-║  GPU INSTANCING: ACTIVE                                      ║
-╟──────────────────────────────────────────────────────────────╢
-║  Instanced Draw Calls: ${(metrics.instancedDrawCalls || 0).toString().padEnd(5)}                         ║
-║  Total Instances: ${(metrics.instanceCount || 0).toLocaleString().padEnd(10)}                        ║
-║  Regular Draw Calls: ${(metrics.webglDrawCalls || 0).toString().padEnd(5)}                          ║
-║  Performance Gain: 10-50x faster                             ║
-╟──────────────────────────────────────────────────────────────╢
-║  Current Stats:                                               ║
-║  • FPS: ${metrics.fps.toFixed(1).padEnd(6)} (${metrics.frameTime.toFixed(2)}ms/frame)                 ║
-║  • Entities: ${(metrics.entitiesRendered || 0).toLocaleString().padEnd(7)}                                ║
-║  • Vertices: ${(metrics.verticesRendered || 0).toLocaleString().padEnd(7)}                                ║
-║  • GPU Usage: ${((metrics.gpuUtilization || 0) * 100).toFixed(0)}%                                     ║
-╚══════════════════════════════════════════════════════════════╝`);
-      } else {
-        console.warn('GPU Instancing NOT active');
-        console.log('Using standard batch rendering');
-        console.log(`Draw Calls: ${metrics.webglDrawCalls || 0}`);
-      }
-      return metrics;
-    };
-    
     (window as any).runPerfTest = async (durationMs: number = 2000) => {
       console.log('Starting automated performance test...');
       if (this.performanceMonitor) {
@@ -493,7 +466,6 @@ export class Vectorium {
       }
     };
     
-    console.log('TIP: Run checkInstancing() in console to see GPU instancing status');
     console.log('TIP: Run await runPerfTest() to start automated measurement');
     console.log('TIP: Or click Measure (2s) button in profiler panel');
     console.log('TIP: Agent can read window.lastMeasurementJSON for optimization iterations');

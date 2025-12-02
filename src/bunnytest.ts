@@ -143,7 +143,6 @@ function initParticleDemo() {
   config.width = 800;
   config.height = 600;
   config.maxEntities = 6_500_000;
-  config.instancedBatchSize = 2_000_000;
   config.profileOnly(); // Only enable performance monitor, no entity spawner
   
   // Create scene

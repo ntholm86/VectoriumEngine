@@ -259,7 +259,7 @@ export class InstancedSpriteRenderer {
   /**
    * Draw instanced sprites (ONLY uploads positions - 85% bandwidth reduction!)
    */
-  drawInstancedSprites(
+  render(
     positions: Float32Array, // Interleaved: [x0, y0, x1, y1, ...]
     sizes: Float32Array,
     colorR: Uint8Array,
@@ -423,7 +423,7 @@ export class InstancedSpriteRenderer {
     gl.bindVertexArray(null);
   }
   
-  dispose(): void {
+  destroy(): void {
     const gl = this.gl;
     if (this.program) gl.deleteProgram(this.program);
     if (this.vao) gl.deleteVertexArray(this.vao);

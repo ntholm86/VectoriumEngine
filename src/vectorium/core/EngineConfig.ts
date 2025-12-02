@@ -23,7 +23,6 @@ export class EngineConfig {
   targetFPS = 60;
   useWorkers = false;
   maxEntities = 8_000_000;
-  instancedBatchSize = 1_000_000;
   maxBatchSize = 65_000;
   debugMode = false;
   exposeGlobals = false;
@@ -61,6 +60,6 @@ export class EngineConfig {
 
 export const ENGINE_CONFIG = {
   maxEntities: 8_000_000,
-  instancedBatchSize: 1_000_000,
   maxBatchSize: 65_000,
+  instancedBatchSize: 2_000_000,
 } as const;

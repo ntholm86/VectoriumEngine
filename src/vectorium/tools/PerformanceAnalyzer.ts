@@ -245,8 +245,7 @@ export class PerformanceAnalyzer {
         recommendation:
           '1. Reduce entity size (fewer pixels per entity)\n' +
           '2. Implement LOD culling (skip entities < 4px)\n' +
-          '3. Simplify fragment shader (SDF complexity)\n' +
-          '4. Enable GPU instancing if available',
+          '3. Simplify fragment shader (SDF complexity)',
         affectedTests: highGPUTests.map(t => t.config.name),
         metrics: {
           avgGPUUtil: highGPUTests.reduce((sum, t) => sum + ((t.metrics as any).avgGPUUtilization || 0), 0) / highGPUTests.length,
@@ -372,8 +371,7 @@ export class PerformanceAnalyzer {
       recommendation:
         '1. Reduce entity sizes (8-12px instead of 12-36px)\n' +
         '2. Implement LOD culling (< 4px entities)\n' +
-        '3. Enable GPU instancing\n' +
-        '4. Consider lower-complexity shaders for distant objects',
+        '3. Consider lower-complexity shaders for distant objects',
       affectedTests: tests.map(t => t.config.name),
       metrics: {
         avgGPUUtilization: avgGPUUtil,

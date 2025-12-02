@@ -5,8 +5,8 @@
  */
 
 import type { PerformanceMonitor } from '../tools/PerformanceMonitor';
-import { InstancedSpriteRenderer } from './InstancedSpriteRenderer';
 import { ENGINE_CONFIG } from '../core/EngineConfig';
+import { InstancedSpriteRenderer } from './InstancedSpriteRenderer';
 
 export class WebGLBatchRenderer {
   private gl: WebGLRenderingContext | WebGL2RenderingContext;
@@ -15,14 +15,13 @@ export class WebGLBatchRenderer {
   private vertexBuffer: WebGLBuffer | null = null;
   private indexBuffer: WebGLBuffer | null = null;
   
-  // 🚀 NEW: Instanced sprite renderer for 1M+ particles
-  private instancedRenderer: InstancedSpriteRenderer | null = null;
-  
-  // Batch buffers (pre-allocated for zero allocation rendering)
   private batchVertices: Float32Array;
   private batchVerticesU8: Uint8Array;
   private batchIndices: Uint16Array | Uint32Array;
   private indexType: number;
+  
+  // GPU instancing renderer (optional, for massive particle counts)
+  private instancedRenderer: InstancedSpriteRenderer | null = null;
   
   // Shape shader buffers (allocated on demand)
   private shapeVertices: Float32Array | null = null;
@@ -135,13 +134,6 @@ export class WebGLBatchRenderer {
     
     this.gl = gl as WebGLRenderingContext;
     
-    // 🚀 Initialize instanced renderer for WebGL2
-    if (gl instanceof WebGL2RenderingContext) {
-      this.instancedRenderer = new InstancedSpriteRenderer(gl);
-      console.log('✅ Instanced sprite renderer initialized (1M+ sprite capability)');
-    }
-    
-    // Use Uint32 indices for WebGL2 (unlimited batch size), Uint16 for WebGL1 (16k limit)
     const useUint32Indices = useWebGL2;
     this.indexType = useUint32Indices ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
     
@@ -183,29 +175,30 @@ export class WebGLBatchRenderer {
       this.sinCache[deg] = Math.sin(rad);
     }
     
+    // Initialize GPU instancing renderer if WebGL2
+    if (useWebGL2 && gl instanceof WebGL2RenderingContext) {
+      this.instancedRenderer = new InstancedSpriteRenderer(gl);
+    }
+    
     this.initialize();
   }
 
   setPerformanceMonitor(monitor: PerformanceMonitor | null): void {
     this.perfMonitor = monitor;
-    if (monitor) {
-      monitor.setMaxBatchSize(this.maxBatchSize);
-      monitor.setGPUInstancingEnabled(false); // Instancing disabled - indexed rendering is faster
-    }
-    // Pass monitor to instanced renderer
     if (this.instancedRenderer) {
       this.instancedRenderer.setPerformanceMonitor(monitor);
     }
+    if (monitor) {
+      monitor.setMaxBatchSize(this.maxBatchSize);
+    }
   }
 
-  // Legacy method - always return true for shape shader support
   isGPUAccelerationEnabled(): boolean {
     return this.shapeProgram !== null;
   }
 
-  // Legacy method - instancing disabled for better performance
   hasInstancingSupport(): boolean {
-    return false;
+    return this.instancedRenderer !== null;
   }
 
   private initialize(): void {
@@ -1345,16 +1338,13 @@ void main() {
   getContext(): WebGLRenderingContext | WebGL2RenderingContext {
     return this.gl;
   }
-
+  
   /**
-   * 🚀 NEW: Instanced sprite drawing for 1M+ sprites
-   * Uses WebGL2 instanced rendering for maximum performance
-   * 
-   * This is 10-100x faster than batching for large sprite counts
-   * because it uploads 1 quad geometry and draws it N times with per-instance data
+   * GPU Instanced Rendering - Zero-copy, 5M+ sprites
+   * Used by particle systems that need maximum performance
    */
   drawInstancedSprites(
-    positions: Float32Array, // Interleaved: [x0, y0, x1, y1, ...]
+    positions: Float32Array,
     sizes: Float32Array,
     colorR: Uint8Array,
     colorG: Uint8Array,
@@ -1370,61 +1360,17 @@ void main() {
     canvasHeight: number
   ): void {
     if (!this.instancedRenderer) {
-      console.warn('Instanced rendering not available (WebGL2 required)');
+      console.warn('[RENDERER] GPU instancing not available, falling back to batch rendering');
       return;
     }
     
-    // Draw using instanced renderer
-    this.instancedRenderer.drawInstancedSprites(
+    this.instancedRenderer.render(
       positions, sizes,
       colorR, colorG, colorB, alphas,
       uvU0, uvV0, uvU1, uvV1,
-      count,
-      texture,
-      canvasWidth,
-      canvasHeight
+      count, texture,
+      canvasWidth, canvasHeight
     );
-    
-    this.drawCallCount++;
-  }
-  
-  /**
-   * Draw instanced sprites from separate posX/posY arrays (WASM SoA format)
-   */
-  drawInstancedSpritesSeparate(
-    posX: Float32Array,
-    posY: Float32Array,
-    sizes: Float32Array,
-    colorR: Uint8Array,
-    colorG: Uint8Array,
-    colorB: Uint8Array,
-    alphas: Float32Array,
-    uvU0: Uint16Array,
-    uvV0: Uint16Array,
-    uvU1: Uint16Array,
-    uvV1: Uint16Array,
-    count: number,
-    texture: WebGLTexture,
-    canvasWidth: number,
-    canvasHeight: number
-  ): void {
-    if (!this.instancedRenderer) {
-      console.warn('Instanced rendering not available (WebGL2 required)');
-      return;
-    }
-    
-    // Draw using instanced renderer (interleaves on upload)
-    this.instancedRenderer.drawInstancedSpritesSeparate(
-      posX, posY, sizes,
-      colorR, colorG, colorB, alphas,
-      uvU0, uvV0, uvU1, uvV1,
-      count,
-      texture,
-      canvasWidth,
-      canvasHeight
-    );
-    
-    this.drawCallCount++;
   }
 
   destroy(): void {
@@ -1433,5 +1379,8 @@ void main() {
     if (this.shapeProgram) gl.deleteProgram(this.shapeProgram);
     if (this.vertexBuffer) gl.deleteBuffer(this.vertexBuffer);
     if (this.indexBuffer) gl.deleteBuffer(this.indexBuffer);
+    if (this.instancedRenderer) {
+      this.instancedRenderer.destroy();
+    }
   }
 }

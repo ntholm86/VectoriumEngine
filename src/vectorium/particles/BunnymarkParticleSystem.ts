@@ -1,23 +1,20 @@
 /**
- * 🚀 BUNNYMARK PARTICLE SYSTEM - Ultra-High Performance (5M+ @ 60 FPS)
+ * BUNNYMARK PARTICLE SYSTEM - Ultra-High Performance
  * 
  * Key Optimizations:
  * - Interleaved positions [x0,y0,x1,y1,...] for zero-copy GPU upload
  * - Interleaved velocities [vx0,vy0,vx1,vy1,...] for cache locality
  * - 16x loop unrolling for maximum CPU instruction-level parallelism
  * - Conditional velocity writes (only on boundary collision)
- * - Hoisted boundary constants (minX, maxX, minY, maxY) - no repeated calculations
+ * - Hoisted boundary constants (minX, maxX, minY, maxY)
  * - Pre-allocated arrays (zero allocation per frame)
- * - Static data uploaded ONCE on init (NEVER re-uploaded - 39MB/frame saved!)
- * - 2M batch size (2-3 draw calls for 5M entities)
- * - NO double writes (removed WASM overhead)
+ * - Static data uploaded ONCE on init
+ * - Batch rendering for optimal performance
  * 
  * Architecture:
- * - Pure JavaScript physics on interleaved arrays (optimal cache locality)
+ * - Pure JavaScript physics on interleaved arrays
  * - Single write per particle (no copying)
- * - GPU instancing with 2M batch size
- * 
- * Performance: 5M+ sprites @ 60 FPS (GPU-bound)
+ * - Batch rendering with indexed draw calls
  */
 
 export interface BunnymarkParticleConfig {
@@ -79,7 +76,6 @@ export class BunnymarkParticleSystem {
     this.uvU1 = new Uint16Array(max);
     this.uvV1 = new Uint16Array(max);
     
-    // Pre-fill constant values (only once!)
     const size = config.spriteWidth;
     for (let i = 0; i < max; i++) {
       this.sizes[i] = size;
@@ -509,22 +505,30 @@ export class BunnymarkParticleSystem {
     const texture = textureManager.getTexture('/bunny.png');
     if (!texture?.glTexture) return;
     
-    // Use GPU instancing for maximum performance (5M+ sprites)
-    renderer.drawInstancedSprites(
-      this.positions,
-      this.sizes,
-      this.colorR,
-      this.colorG,
-      this.colorB,
-      this.alphas,
-      this.uvU0,
-      this.uvV0,
-      this.uvU1,
-      this.uvV1,
-      count,
-      texture.glTexture,
-      this.config.canvasWidth,
-      this.config.canvasHeight
+    const indices = new Uint32Array(count);
+    for (let i = 0; i < count; i++) {
+      indices[i] = i;
+    }
+    
+    const posX = new Float32Array(count);
+    const posY = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      posX[i] = this.positions[i * 2];
+      posY[i] = this.positions[i * 2 + 1];
+    }
+    
+    const rotation = new Float32Array(count);
+    const flags = new Uint8Array(count);
+    flags.fill(1);
+    
+    renderer.drawBulkSpritesIndexed(
+      posX, posY, rotation, this.sizes,
+      this.colorR, this.colorG, this.colorB, this.alphas,
+      this.textureIds,
+      this.uvU0, this.uvV0, this.uvU1, this.uvV1,
+      flags, indices, count, 1,
+      _cameraX, _cameraY, _cameraZoom,
+      textureManager
     );
   }
   

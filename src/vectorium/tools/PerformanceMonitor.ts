@@ -51,14 +51,10 @@ export interface PerformanceMetrics {
   timestamp?: number; // For tracking when measurement was taken
 
   // GPU metrics
-  gpuFrameTime?: number; // GPU execution time (WebGL2 queries)
-  gpuWaitTime?: number; // CPU waiting for GPU
-  vertexThroughput?: number; // Vertices per second
-  gpuInstancingEnabled?: boolean; // GPU instancing available
-  instancedDrawCalls?: number; // Number of instanced draw calls
-  instanceCount?: number; // Total instances rendered
+  gpuFrameTime?: number;
+  gpuWaitTime?: number;
+  vertexThroughput?: number;
   
-  // Rendering efficiency
   verticesRendered: number;
   indicesRendered: number;
   trianglesRendered: number;
@@ -232,9 +228,6 @@ export class PerformanceMonitor extends UIPanel {
   private drawCalls = 0;
   private webglDrawCalls = 0;
   private textDrawCalls = 0;
-  private instancedDrawCalls = 0;
-  private instanceCount = 0;
-  private gpuInstancingEnabled = false;
   private textMemory = 0;
   private particleCount = 0;
   private adaptiveEnabled = true;
@@ -372,8 +365,6 @@ export class PerformanceMonitor extends UIPanel {
     this.drawCalls = 0;
     this.webglDrawCalls = 0;
     this.textDrawCalls = 0;
-    this.instancedDrawCalls = 0;
-    this.instanceCount = 0;
     this.textMemory = 0;
     
     // Reset per-frame counters
@@ -491,15 +482,6 @@ export class PerformanceMonitor extends UIPanel {
   recordTextDrawCalls(count: number): void {
     this.textDrawCalls = count;
     this.drawCalls = this.webglDrawCalls + this.textDrawCalls;
-  }
-
-  setGPUInstancingEnabled(enabled: boolean): void {
-    this.gpuInstancingEnabled = enabled;
-  }
-
-  recordInstancedDrawCall(instanceCount: number): void {
-    this.instancedDrawCalls++;
-    this.instanceCount += instanceCount;
   }
 
   recordTextMemory(memory: number): void {
@@ -828,12 +810,6 @@ export class PerformanceMonitor extends UIPanel {
       particleCount: this.particleCount,
       quality: this.currentQuality,
 
-      // GPU instancing metrics
-      gpuInstancingEnabled: this.gpuInstancingEnabled,
-      instancedDrawCalls: this.instancedDrawCalls,
-      instanceCount: this.instanceCount,
-
-      // Rendering efficiency
       verticesRendered: this.verticesThisFrame,
       indicesRendered: this.indicesThisFrame,
       trianglesRendered: this.trianglesThisFrame,
@@ -1056,26 +1032,6 @@ export class PerformanceMonitor extends UIPanel {
               <div class="ui-row">
                 <span class="ui-label">Upload</span>
                 <span class="ui-value" data-metric="upload">0MB</span>
-              </div>
-            </div>
-
-            <div class="section-header">🚀 GPU INSTANCING</div>
-            <div class="ui-section">
-              <div class="ui-row">
-                <span class="ui-label">Status</span>
-                <span class="ui-value" data-metric="instancingstatus">OFF</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Draw Calls</span>
-                <span class="ui-value" data-metric="instanceddrawcalls">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Instances</span>
-                <span class="ui-value" data-metric="instancecount">0</span>
-              </div>
-              <div class="ui-row">
-                <span class="ui-label">Speedup</span>
-                <span class="ui-value" data-metric="instancingspeedup">N/A</span>
               </div>
               <div class="ui-row">
                 <span class="ui-label">Culling Eff</span>
@@ -1581,30 +1537,6 @@ export class PerformanceMonitor extends UIPanel {
     
     set('gputimefallback', metrics.usingGPUTimingFallback ? 'Yes' : 'No', metrics.usingGPUTimingFallback ? 'critical' : 'excellent');
 
-    // GPU Instancing section
-    const instancingEnabled = metrics.gpuInstancingEnabled || false;
-    set('instancingstatus', instancingEnabled ? '✅ ACTIVE' : '⚠️ OFF', instancingEnabled ? 'excellent' : 'warning');
-    
-    const instancedDrawCalls = metrics.instancedDrawCalls || 0;
-    const instancedCallsClass = getColorClass(instancedDrawCalls, {excellent: 5, good: 10, ok: 20, warning: 50, critical: 100}, false);
-    set('instanceddrawcalls', instancedDrawCalls.toString(), instancedCallsClass);
-    
-    const instanceCount = metrics.instanceCount || 0;
-    const instanceCountK = instanceCount / 1000;
-    const instanceCountClass = getColorClass(instanceCountK, {excellent: 2, good: 5, ok: 10, warning: 25, critical: 50}, false);
-    set('instancecount', instanceCount > 1000 ? `${instanceCountK.toFixed(1)}K` : instanceCount.toString(), instanceCountClass);
-    
-    // Calculate estimated speedup (instances per draw call)
-    if (instancingEnabled && instancedDrawCalls > 0 && instanceCount > 0) {
-      const avgInstancesPerCall = instanceCount / instancedDrawCalls;
-      const speedup = avgInstancesPerCall > 1 ? `${avgInstancesPerCall.toFixed(0)}x` : 'N/A';
-      const speedupClass = getColorClass(avgInstancesPerCall, {excellent: 100, good: 50, ok: 25, warning: 10, critical: 5}, true);
-      set('instancingspeedup', speedup, speedupClass);
-    } else {
-      set('instancingspeedup', 'N/A');
-    }
-
-    // Batch Analysis section
     const batchCountClass = getColorClass(metrics.totalBatches || 0, {excellent: 5, good: 20, ok: 50, warning: 100, critical: 200, severe: 500}, false);
     set('batchcount', (metrics.totalBatches || 0).toString(), batchCountClass);
     
