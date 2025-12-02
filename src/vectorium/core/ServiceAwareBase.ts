@@ -23,7 +23,6 @@
 
 import type { SceneServicesContainer } from './SceneServices';
 import type { World } from './World';
-import type { Camera } from './Camera';
 import type { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import type { TextRenderer } from '../rendering/TextRenderer';
 import type { TextPool } from './TextPool';
@@ -47,11 +46,6 @@ export abstract class ServiceAwareBase {
   /** Core ECS data structure */
   protected get world(): World {
     return this.services.world;
-  }
-  
-  /** Camera for world/screen transforms */
-  protected get camera(): Camera {
-    return this.services.camera;
   }
   
   /** WebGL batch renderer for custom rendering */

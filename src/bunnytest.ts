@@ -132,13 +132,13 @@ class ParticleBunnymarkScene extends Scene {
 }
 
 function initParticleDemo() {
-  // Create config
+  // Create config with only performance profiler
   const config = new EngineConfig();
   config.width = 800;
   config.height = 600;
   config.maxEntities = 8_000_000;
   config.instancedBatchSize = 2_000_000;
-  config.enableDebugTools = true;
+  config.profileOnly(); // Only enable performance monitor, no entity spawner
   
   // Create scene
   const scene = new ParticleBunnymarkScene('particle-bunnymark');

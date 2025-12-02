@@ -12,29 +12,34 @@
     }
     
     body {
+      display: flex;
+      justify-content: flex-start;
+      align-items: flex-start;
+      flex-direction: column;
+      min-height: 100vh;
       background: #1a1a2e;
       color: #eee;
       font-family: 'Courier New', monospace;
       overflow: hidden;
+      gap: 20px;
+      padding: 20px;
     }
     
     canvas {
-      display: block;
-      margin: 20px auto;
+      display: flex;
       border: 2px solid #00ff88;
       box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
     }
     
     #info {
-      position: absolute;
-      top: 20px;
-      left: 20px;
+      width: 800px;
       background: rgba(0, 0, 0, 0.8);
       padding: 15px;
       border: 1px solid #00ff88;
       border-radius: 8px;
       font-size: 14px;
       line-height: 1.6;
+      text-align: center;
     }
     
     h1 {

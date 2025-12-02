@@ -97,8 +97,7 @@ export class BunnymarkParticleSystem {
    */
   burst(count: number, centerX: number, centerY: number): void {
     const toSpawn = Math.min(count, this.config.maxParticles - this.activeCount);
-    const { min, max } = this.config.velocityRange;
-    const range = max - min;
+    const { max } = this.config.velocityRange;
     
     for (let i = 0; i < toSpawn; i++) {
       const idx = this.activeCount++;

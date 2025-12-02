@@ -16,7 +16,6 @@ import type { AnimationSystem } from '../animation/AnimationSystem';
 import type { InputManager } from '../input/InputManager';
 import type { TextureManager } from '../rendering/TextureManager';
 import type { World } from './World';
-import type { Camera } from './Camera';
 import type { WebGLBatchRenderer } from '../rendering/WebGLBatchRenderer';
 import type { TextRenderer } from '../rendering/TextRenderer';
 
@@ -27,7 +26,6 @@ import type { TextRenderer } from '../rendering/TextRenderer';
 export interface SceneServices {
   // Core ECS & Rendering
   readonly world: World;
-  readonly camera: Camera;
   readonly renderer: WebGLBatchRenderer;
   readonly textRenderer: TextRenderer;
   readonly canvas: HTMLCanvasElement;
@@ -47,7 +45,6 @@ export interface SceneServices {
 export class SceneServicesContainer implements SceneServices {
   // Core ECS & Rendering
   private _world: World | null = null;
-  private _camera: Camera | null = null;
   private _renderer: WebGLBatchRenderer | null = null;
   private _textRenderer: TextRenderer | null = null;
   private _canvas: HTMLCanvasElement | null = null;
@@ -62,11 +59,6 @@ export class SceneServicesContainer implements SceneServices {
   get world(): World {
     if (!this._world) throw new Error('World not initialized');
     return this._world;
-  }
-  
-  get camera(): Camera {
-    if (!this._camera) throw new Error('Camera not initialized');
-    return this._camera;
   }
   
   get renderer(): WebGLBatchRenderer {
@@ -115,7 +107,6 @@ export class SceneServicesContainer implements SceneServices {
    */
   initialize(services: {
     world: World;
-    camera: Camera;
     renderer: WebGLBatchRenderer;
     textRenderer: TextRenderer;
     canvas: HTMLCanvasElement;
@@ -126,7 +117,6 @@ export class SceneServicesContainer implements SceneServices {
     textureManager: TextureManager;
   }): void {
     this._world = services.world;
-    this._camera = services.camera;
     this._renderer = services.renderer;
     this._textRenderer = services.textRenderer;
     this._canvas = services.canvas;
@@ -142,7 +132,6 @@ export class SceneServicesContainer implements SceneServices {
    */
   isInitialized(): boolean {
     return this._world !== null &&
-           this._camera !== null &&
            this._renderer !== null &&
            this._textRenderer !== null &&
            this._canvas !== null &&

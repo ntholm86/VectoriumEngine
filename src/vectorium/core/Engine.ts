@@ -15,7 +15,6 @@ import { Scene } from './Scene';
 import { EntitySpawner } from '../debug/EntitySpawner';
 import { UIStyleLoader } from '../ui/UIStyleLoader';
 import { UIPanelManager } from '../ui/UIPanelManager';
-import { DebugToolRegistry } from '../debug/DebugToolRegistry';
 import { TextureManager } from '../rendering/TextureManager';
 import { AnimationManager } from '../animation/AnimationManager';
 import { AnimationSystem } from '../animation/AnimationSystem';
@@ -45,7 +44,6 @@ export class Vectorium {
   readonly particleManager: ParticleSystemManager;
   private inputManager: InputManager | null = null;  // Created when scene loads
   readonly panelManager: UIPanelManager;
-  readonly debugRegistry: DebugToolRegistry;
   
   private scenes = new Map<string, Scene>();
   private currentScene: Scene | null = null;
@@ -100,14 +98,14 @@ export class Vectorium {
     // 🚀 Set texture manager on renderer for sprite rendering
     this.renderer.setTextureManager(this.textureManager);
     
-    // 🚀 Initialize UI panel manager
-    this.panelManager = new UIPanelManager({ enableConsoleAPI: true });
+    // 🚀 Initialize UI panel manager (only if debug tools enabled)
+    const hasDebugTools = Object.values(this.config.debugTools).some(v => v === true);
+    this.panelManager = new UIPanelManager({ 
+      enableConsoleAPI: this.config.debugTools.consoleAPI ?? false 
+    });
     
-    // 🚀 Initialize debug tool registry
-    this.debugRegistry = new DebugToolRegistry(this, { enableConsoleAPI: true });
-    
-    // Initialize debug tools if enabled
-    if (this.config.enableDebugTools) {
+    // Initialize debug tools if any are enabled
+    if (hasDebugTools) {
       this.initializeDebugTools();
     }
     
@@ -118,7 +116,13 @@ export class Vectorium {
     console.log(`WebGL2: ${useWebGL2}`);
     console.log(`Target FPS: ${this.config.targetFPS}`);
     console.log(`Adaptive Quality: ${this.config.enableAdaptiveQuality}`);
-    console.log(`Debug Tools: ${this.config.enableDebugTools ? 'Enabled (Press C, E, V, P)' : 'Disabled'}`);
+    
+    const enabledTools = Object.entries(this.config.debugTools)
+      .filter(([_, enabled]) => enabled)
+      .map(([tool]) => tool);
+    if (enabledTools.length > 0) {
+      console.log(`Debug Tools: ${enabledTools.join(', ')}`);
+    }
   }
   
   private setupDefaultKeyboardShortcuts(): void {
@@ -193,8 +197,10 @@ export class Vectorium {
       this.currentScene.getSpatialHash()
     );
     
-    // Initialize PerformanceMonitor UI now that InputManager exists
-    this.performanceMonitor.initializeUI(this.inputManager);
+    // Initialize PerformanceMonitor UI only if enabled in config
+    if (this.config.debugTools.performanceMonitor) {
+      this.performanceMonitor.initializeUI(this.inputManager);
+    }
     
     // 🚀 Phase 1: Create and set AnimationSystem for this scene
     const animSystem = new AnimationSystem(this.currentScene.world, this.animationManager);
@@ -213,16 +219,19 @@ export class Vectorium {
     // Now use: scene.add(Sprite.from('/texture.png', scene.world))
     (this.currentScene as any).performanceMonitor = this.performanceMonitor;
     
-    // 🚀 Register debug panels with UIPanelManager
-    if (this.config.enableDebugTools) {
-      // Register PerformanceMonitor (Press P)
+    // 🚀 Register debug panels based on config
+    if (this.config.debugTools.performanceMonitor) {
       this.panelManager.register('performance', this.performanceMonitor);
-      
-      // Register Entity Spawner UI Panel (Press E) - pass performance monitor for benchmarks
+    }
+    
+    if (this.config.debugTools.entitySpawner) {
       const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager, this.performanceMonitor);
       this.panelManager.register('spawner', entitySpawner);
-      
-      console.log('Debug panels registered: ' + this.panelManager.list().join(', '));
+    }
+    
+    const registeredPanels = this.panelManager.list();
+    if (registeredPanels.length > 0) {
+      console.log('Debug panels: ' + registeredPanels.join(', '));
     }
     
     // Apply initial config values
@@ -677,11 +686,7 @@ export class Vectorium {
     this.stop();
     
     // Clean up debug tools
-    // Dispose all panels via manager
     this.panelManager.dispose();
-    
-    // Dispose debug registry
-    this.debugRegistry.dispose();
     
     // Clean up scene and rendering
     if (this.currentScene) {

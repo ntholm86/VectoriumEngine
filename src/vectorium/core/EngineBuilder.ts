@@ -41,8 +41,6 @@ export class VectoriumBuilder {
     if (!this.config.canvas) {
       this.config.canvas = document.createElement('canvas');
       document.body.appendChild(this.config.canvas);
-      this.config.canvas.style.display = 'block';
-      this.config.canvas.style.margin = '0 auto';
     }
     
     const engine = new Vectorium(this.config);
@@ -53,7 +51,8 @@ export class VectoriumBuilder {
     }
     
     // Setup debug tools if enabled
-    if (this.config.enableDebugTools) {
+    const hasDebugTools = Object.values(this.config.debugTools).some(v => v === true);
+    if (hasDebugTools) {
       engine.enableClickToSpawn();
       if (this.config.exposeGlobals) {
         engine.exposeGlobals();

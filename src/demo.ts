@@ -103,7 +103,7 @@ function initDemo() {
   const config = new EngineConfig();
   config.width = 800;
   config.height = 600;
-  config.enableDebugTools = true;
+  config.debug(); // Enable all debug tools
   
   const engine = new VectoriumBuilder(config)
     .withScene('wasm-demo', new WasmDemoScene('wasm-demo'))
