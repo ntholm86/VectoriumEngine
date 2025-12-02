@@ -41,10 +41,11 @@ class ParticleBunnymarkScene extends Scene {
       maxParticles: this.engine.config.maxEntities,
       canvasWidth: this.engine.config.width,
       canvasHeight: this.engine.config.height,
-      gravity: 45,
+      gravity: 2500,
       spriteWidth: 26,
       spriteHeight: 37,
-      velocityRange: { min: 0, max: 600 }
+      velocityRange: { min: 0, max: 400 },
+      restitution: 1.0 // Perfect elastic bounce (no energy loss)
     };
     
     this.particleSystem = new BunnymarkParticleSystem(particleConfig);

@@ -27,15 +27,6 @@ export class EngineConfig {
     this.exposeGlobals = true;
     return this;
   }
-
-  /** Optimize for mobile devices */
-  mobile(): this {
-    this.initialQuality = 'medium';
-    this.maxTextureSize = 1024;
-    this.targetFPS = 30;
-    this.maxEntities = 1_000_000;
-    return this;
-  }
 }
 
 export const ENGINE_CONFIG = {
