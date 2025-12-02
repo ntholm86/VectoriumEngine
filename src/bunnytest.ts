@@ -29,10 +29,16 @@ class ParticleBunnymarkScene extends Scene {
     
     const spawnIncrement = 10000;
     const spawnInterval = 100;
-    const targetFPS = 60;
     
-    if (!this.performanceMonitor || !this.engine) {
-      console.error('Missing required services');
+    if (!this.engine) {
+      console.error('Engine not initialized');
+      return;
+    }
+    
+    // Access performanceMonitor to trigger lazy initialization
+    const perfMonitor = this.engine.performanceMonitor;
+    if (!perfMonitor) {
+      console.error('Performance monitor not available');
       return;
     }
     
@@ -58,12 +64,12 @@ class ParticleBunnymarkScene extends Scene {
       
       while (this.isRunning) {
         // Check performance BEFORE spawning (measure stable state)
-        const metrics = this.performanceMonitor.getMetrics();
+        const metrics = perfMonitor.getMetrics();
         const avgFPS = metrics.fps;
         const frameTime = metrics.frameTime;
         
         // Stop spawning if frame time exceeds budget or hit limit
-        if (frameTime > 17 || this.totalSpawned >= 8000000) {
+        if (frameTime > 17 || this.totalSpawned >= 6500000) {
           console.log('✅ BUNNYMARK COMPLETE!');
           console.log(`🏆 ${this.totalSpawned.toLocaleString()} bunnies @ ${avgFPS.toFixed(1)} FPS`);
           break;
@@ -136,7 +142,7 @@ function initParticleDemo() {
   const config = new EngineConfig();
   config.width = 800;
   config.height = 600;
-  config.maxEntities = 8_000_000;
+  config.maxEntities = 6_500_000;
   config.instancedBatchSize = 2_000_000;
   config.profileOnly(); // Only enable performance monitor, no entity spawner
   

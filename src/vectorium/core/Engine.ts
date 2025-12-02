@@ -35,15 +35,17 @@ export class Vectorium {
   readonly config: EngineConfig;
   readonly featureDetector: FeatureDetector;
   readonly renderer: WebGLBatchRenderer;
-  readonly textRenderer: TextRenderer;
-  readonly textPool: TextPool;
-  readonly performanceMonitor: PerformanceMonitor;
-  readonly bufferPool: BufferPool;
   readonly textureManager: TextureManager;
-  readonly animationManager: AnimationManager;
-  readonly particleManager: ParticleSystemManager;
-  private inputManager: InputManager | null = null;  // Created when scene loads
-  readonly panelManager: UIPanelManager;
+  
+  // Optional systems - created only by Scene if needed
+  private _textRenderer: TextRenderer | null = null;
+  private _textPool: TextPool | null = null;
+  private _performanceMonitor: PerformanceMonitor | null = null;
+  private _bufferPool: BufferPool | null = null;
+  private _animationManager: AnimationManager | null = null;
+  private _particleManager: ParticleSystemManager | null = null;
+  private _inputManager: InputManager | null = null;
+  private _panelManager: UIPanelManager | null = null;
   
   private scenes = new Map<string, Scene>();
   private currentScene: Scene | null = null;
@@ -64,82 +66,93 @@ export class Vectorium {
     (ENGINE_CONFIG as any).instancedBatchSize = this.config.instancedBatchSize;
     (ENGINE_CONFIG as any).maxBatchSize = this.config.maxBatchSize;
     
-    // Initialize renderer
+    // Initialize renderer (CORE - always needed)
     const useWebGL2 = this.config.preferWebGL2 && this.featureDetector.capabilities.hasWebGL2;
     this.renderer = new WebGLBatchRenderer(this.canvas, useWebGL2);
     
-    // Initialize text renderer (renders text as textures → WebGLBatchRenderer)
-    this.textRenderer = new TextRenderer(this.config.width, this.config.height);
-    // Lazy atlas initialization - will be done on first loadScene()
-    this.textRenderer.setBatchRenderer(this.renderer);
-    
-    // Initialize TextPool for ECS text entities
-    this.textPool = new TextPool(10000);
-    
-    // Initialize performance monitor
-    this.performanceMonitor = new PerformanceMonitor(
-      this.config.targetFPS,
-      this.config.initialQuality
-    );
-    this.performanceMonitor.setAdaptiveQuality(this.config.enableAdaptiveQuality);
-    
-    // Connect performance monitor to renderer for detailed metrics
-    this.renderer.setPerformanceMonitor(this.performanceMonitor);
-    this.performanceMonitor.setRenderer(this.renderer);
-    
-    // Initialize buffer pool
-    this.bufferPool = new BufferPool();
-    
-    // 🚀 Phase 1: Initialize new systems
+    // Initialize texture manager (CORE - always needed for sprites)
     this.textureManager = new TextureManager(this.renderer.getContext() as WebGL2RenderingContext);
-    this.animationManager = new AnimationManager();
-    this.particleManager = new ParticleSystemManager();
-    
-    // 🚀 Set texture manager on renderer for sprite rendering
     this.renderer.setTextureManager(this.textureManager);
     
-    // 🚀 Initialize UI panel manager (only if debug tools enabled)
-    const hasDebugTools = Object.values(this.config.debugTools).some(v => v === true);
-    this.panelManager = new UIPanelManager({ 
-      enableConsoleAPI: this.config.debugTools.consoleAPI ?? false 
-    });
-    
-    // Initialize debug tools if any are enabled
-    if (hasDebugTools) {
-      this.initializeDebugTools();
-    }
-    
-    // Setup default keyboard shortcuts
-    this.setupDefaultKeyboardShortcuts();
+    // All other systems are LAZY - created only when Scene needs them
     
     console.log(`Vectorium Engine initialized`);
     console.log(`WebGL2: ${useWebGL2}`);
-    console.log(`Target FPS: ${this.config.targetFPS}`);
-    console.log(`Adaptive Quality: ${this.config.enableAdaptiveQuality}`);
-    
-    const enabledTools = Object.entries(this.config.debugTools)
-      .filter(([_, enabled]) => enabled)
-      .map(([tool]) => tool);
-    if (enabledTools.length > 0) {
-      console.log(`Debug Tools: ${enabledTools.join(', ')}`);
+  }
+  
+  // Lazy getters for optional systems (Scene requests these)
+  get textRenderer(): TextRenderer {
+    if (!this._textRenderer) {
+      this._textRenderer = new TextRenderer(this.config.width, this.config.height);
+      this._textRenderer.setBatchRenderer(this.renderer);
     }
+    return this._textRenderer;
   }
   
-  private setupDefaultKeyboardShortcuts(): void {
-    // Spacebar to pause/resume
-    this.onKey('Space', (e) => {
-      e.preventDefault(); // Prevent page scroll
-      this.togglePause();
-    });
+  get textPool(): TextPool {
+    if (!this._textPool) {
+      this._textPool = new TextPool(10000);
+    }
+    return this._textPool;
   }
   
-  private initializeDebugTools(): void {
-    // Inject consolidated UI styles once
-    UIStyleLoader.injectStyles();
-    
-    // Panels will be registered in loadScene() after InputManager exists
+  get performanceMonitor(): PerformanceMonitor {
+    if (!this._performanceMonitor) {
+      this._performanceMonitor = new PerformanceMonitor(
+        this.config.targetFPS,
+        this.config.initialQuality
+      );
+      this._performanceMonitor.setAdaptiveQuality(this.config.enableAdaptiveQuality);
+      this._performanceMonitor.setRenderer(this.renderer);
+      this.renderer.setPerformanceMonitor(this._performanceMonitor);
+      
+      // Initialize debug tools if configured
+      const hasDebugTools = Object.values(this.config.debugTools).some(v => v === true);
+      if (hasDebugTools) {
+        UIStyleLoader.injectStyles();
+      }
+    }
+    return this._performanceMonitor;
   }
-
+  
+  get panelManager(): UIPanelManager {
+    if (!this._panelManager) {
+      this._panelManager = new UIPanelManager({
+        enableConsoleAPI: this.config.debugTools.consoleAPI ?? false
+      });
+    }
+    return this._panelManager;
+  }
+  
+  get inputManager(): InputManager | null {
+    return this._inputManager;
+  }
+  
+  set inputManager(manager: InputManager | null) {
+    this._inputManager = manager;
+  }
+  
+  get bufferPool(): BufferPool {
+    if (!this._bufferPool) {
+      this._bufferPool = new BufferPool();
+    }
+    return this._bufferPool;
+  }
+  
+  get animationManager(): AnimationManager {
+    if (!this._animationManager) {
+      this._animationManager = new AnimationManager();
+    }
+    return this._animationManager;
+  }
+  
+  get particleManager(): ParticleSystemManager {
+    if (!this._particleManager) {
+      this._particleManager = new ParticleSystemManager();
+    }
+    return this._particleManager;
+  }
+  
   registerScene(name: string, scene: Scene): void {
     // Initialize scene viewport with engine's canvas dimensions
     // This ensures Scene has correct dimensions from the start, not just after loadScene()
@@ -179,8 +192,7 @@ export class Vectorium {
     this.currentScene.setCanvasDimensions(this.canvas.width, this.canvas.height);
     console.log(`Scene loaded: ${name} | Viewport: ${this.canvas.width}×${this.canvas.height} | World: ${this.currentScene.getWorldWidth()}×${this.currentScene.getWorldHeight()} (${this.currentScene['viewport'].worldScale}x)`);
     
-    // 🚀 CRITICAL: Initialize WASM Physics with zero-copy shared memory
-    // This is THE KEY to 5-10x performance improvement
+    // Initialize WASM Physics with zero-copy shared memory
     const wasmOk = await this.currentScene.world.initializeWasm();
     if (wasmOk) {
       console.log('✅ WASM Physics initialized (5-10x acceleration)');
@@ -190,42 +202,43 @@ export class Vectorium {
       console.warn('⚠️ WASM unavailable, using JavaScript fallback (10x slower)');
     }
     
-    // 🚀 Phase 1: Initialize InputManager with scene's world and spatial hash
-    this.inputManager = new InputManager(
-      this.canvas,
-      this.currentScene.world,
-      this.currentScene.getSpatialHash()
-    );
-    
-    // Initialize PerformanceMonitor UI only if enabled in config
-    if (this.config.debugTools.performanceMonitor) {
-      this.performanceMonitor.initializeUI(this.inputManager);
+    // Initialize InputManager (only if debug tools need it)
+    const needsInput = this.config.debugTools.performanceMonitor || this.config.debugTools.entitySpawner;
+    if (needsInput) {
+      this._inputManager = new InputManager(
+        this.canvas,
+        this.currentScene.world,
+        this.currentScene.getSpatialHash()
+      );
     }
     
-    // 🚀 Phase 1: Create and set AnimationSystem for this scene
-    const animSystem = new AnimationSystem(this.currentScene.world, this.animationManager);
+    // Initialize text renderer (only if needed by scene)
+    if (this._textRenderer) {
+      await this._textRenderer.setGLContext(this.renderer.getContext());
+    }
     
-    // 🚀 Store AnimationSystem reference (optimized Scene no longer uses services container)
-    (this.currentScene as any).animationSystem = animSystem;
+    // Initialize AnimationSystem (only if scene uses animations)
+    if (this._animationManager) {
+      const animSystem = new AnimationSystem(this.currentScene.world, this._animationManager);
+      (this.currentScene as any).animationSystem = animSystem;
+    }
     
-    // Inject performanceMonitor for easy access
-    (this.currentScene as any).performanceMonitor = this.performanceMonitor;
+    // Inject performanceMonitor if debug tools are enabled (triggers lazy initialization)
+    if (this.config.debugTools.performanceMonitor) {
+      (this.currentScene as any).performanceMonitor = this.performanceMonitor;
+    }
     
-    // 🚀 Now call scene.load()
+    // Now call scene.load()
     await this.currentScene.load();
     
-    // OLD: EntitySpawnService removed - use DisplayObject API instead
-    // const spawnService = new EntitySpawnService(...);
-    // Now use: scene.add(Sprite.from('/texture.png', scene.world))
-    (this.currentScene as any).performanceMonitor = this.performanceMonitor;
-    
-    // 🚀 Register debug panels based on config
-    if (this.config.debugTools.performanceMonitor) {
+    // Register debug panels only if configured
+    if (this.config.debugTools.performanceMonitor && this._inputManager) {
+      this.performanceMonitor.initializeUI(this._inputManager);
       this.panelManager.register('performance', this.performanceMonitor);
     }
     
-    if (this.config.debugTools.entitySpawner) {
-      const entitySpawner = new EntitySpawner(this.currentScene, this.inputManager, this.performanceMonitor);
+    if (this.config.debugTools.entitySpawner && this._inputManager) {
+      const entitySpawner = new EntitySpawner(this.currentScene, this._inputManager, this.performanceMonitor);
       this.panelManager.register('spawner', entitySpawner);
     }
     
@@ -240,7 +253,7 @@ export class Vectorium {
       this.currentScene.setWorldBoundsMultiplier(1.2);
     }
     
-    // 🚀 Notify behaviors of activation
+    // Notify behaviors of activation
     (this.currentScene as any).behaviors?.activate();
     
     console.log(`Loaded scene: ${name}`);
@@ -267,7 +280,10 @@ export class Vectorium {
   private gameLoop = (): void => {
     if (!this.running) return;
     
-    this.performanceMonitor.beginFrame();
+    // Only track performance if monitor exists
+    if (this._performanceMonitor) {
+      this._performanceMonitor.beginFrame();
+    }
     
     const now = performance.now();
     const dt = Math.min((now - this.lastTime) / 1000, 0.1); // Cap at 100ms
@@ -281,71 +297,71 @@ export class Vectorium {
       
       this.currentScene.update(dt);
       
-      // 🚀 Phase 1: Update InputManager with camera transform
-      // Note: Spatial hash is already populated by physics update
-      if (this.inputManager && this.currentScene) {
-        this.inputManager.updateCamera(
+      // Update InputManager if it exists
+      if (this._inputManager && this.currentScene) {
+        this._inputManager.updateCamera(
           this.currentScene.cameraX,
           this.currentScene.cameraY,
           this.currentScene.cameraZoom
         );
-        this.inputManager.update(dt);
+        this._inputManager.update(dt);
       }
       
       // Record entities processed for performance monitoring
-      this.performanceMonitor.recordEntitiesProcessed(this.currentScene.perfMetrics.ecsActiveEntities);
-      this.performanceMonitor.recordEntitiesRendered(this.currentScene.perfMetrics.ecsActiveEntities);
+      if (this._performanceMonitor) {
+        this._performanceMonitor.recordEntitiesProcessed(this.currentScene.perfMetrics.ecsActiveEntities);
+        this._performanceMonitor.recordEntitiesRendered(this.currentScene.perfMetrics.ecsActiveEntities);
+      }
     }
     
     // Render WebGL
     this.renderer.begin(this.canvas.width, this.canvas.height);
     
-    // Begin text rendering
-    this.textRenderer.begin();
+    // Begin text rendering (only if text renderer exists)
+    if (this._textRenderer) {
+      this._textRenderer.begin();
+    }
     
     if (this.currentScene && this.currentScene.active) {
-      this.currentScene.render(this.renderer, this.textRenderer, this.textPool);
+      this.currentScene.render(this.renderer, this._textRenderer || undefined, this._textPool || undefined);
       
       // Record culling statistics if available
-      const visibleCount = (this.currentScene as any).visibleCount;
-      const culledCount = (this.currentScene as any).culledCount;
-      if (visibleCount !== undefined && culledCount !== undefined) {
-        this.performanceMonitor.recordCulling(visibleCount, culledCount);
+      if (this._performanceMonitor) {
+        const visibleCount = (this.currentScene as any).visibleCount;
+        const culledCount = (this.currentScene as any).culledCount;
+        if (visibleCount !== undefined && culledCount !== undefined) {
+          this._performanceMonitor.recordCulling(visibleCount, culledCount);
+        }
       }
     }
     
     this.renderer.end();
     
-    // Debug info (rendered as text)
-    if (this.config.debugMode) {
-      this.renderDebugInfo();
+    // Record metrics only if monitor exists
+    if (this._performanceMonitor) {
+      this._performanceMonitor.recordWebGLDrawCalls(this.renderer.getDrawCallCount());
+      
+      // Record text memory usage (only if text renderer exists)
+      if (this._textRenderer) {
+        this._performanceMonitor.recordTextMemory(this._textRenderer.getMemoryUsage());
+      }
+      
+      // Record particle count (only if particle manager exists)
+      if (this._particleManager) {
+        this._performanceMonitor.recordParticleCount(this._particleManager.getTotalParticles());
+      }
+      
+      // Record physics metrics
+      if (this.currentScene) {
+        const physicsMetrics = this.currentScene.world.getPhysicsMetrics();
+        this._performanceMonitor.recordPhysicsMetrics(physicsMetrics);
+      }
+      
+      this._performanceMonitor.endFrame();
     }
-    
-    // Record metrics from rendering
-    this.performanceMonitor.recordWebGLDrawCalls(this.renderer.getDrawCallCount());
-    // Text rendering now unified through WebGLBatchRenderer (included in draw call count above)
-    
-    // Record text memory usage
-    this.performanceMonitor.recordTextMemory(this.textRenderer.getMemoryUsage());
-    
-    // Record particle count
-    this.performanceMonitor.recordParticleCount(this.particleManager.getTotalParticles());
-    
-    // Record physics metrics
-    if (this.currentScene) {
-      const physicsMetrics = this.currentScene.world.getPhysicsMetrics();
-      this.performanceMonitor.recordPhysicsMetrics(physicsMetrics);
-    }
-    
-    // End performance monitoring (includes both WebGL and text rendering)
-    this.performanceMonitor.endFrame();
     
     this.rafId = requestAnimationFrame(this.gameLoop);
   };
-
-  private renderDebugInfo(): void {
-    // Debug info removed - use DebugPanel for metrics
-  }
 
   resize(width: number, height: number): void {
     this.canvas.width = width;

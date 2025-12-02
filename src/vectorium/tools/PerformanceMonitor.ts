@@ -245,6 +245,8 @@ export class PerformanceMonitor extends UIPanel {
 
   // Enhanced tracking
   private frameTimeHistory: number[] = []; // For variance calculation
+  private frameTimeHistoryIndex = 0; // Circular buffer index
+  private frameTimeHistorySize = 0; // Current fill level
   private verticesThisFrame = 0;
   private indicesThisFrame = 0;
   private trianglesThisFrame = 0;
@@ -267,6 +269,8 @@ export class PerformanceMonitor extends UIPanel {
   private gcEventCount = 0;
   private lastGCTime = 0;
   private heapHistory: number[] = [];
+  private heapHistoryIndex = 0; // Circular buffer index
+  private heapHistorySize = 0; // Current fill level
   private maxHeapHistorySize = 120; // 2 seconds at 60fps
   
   // Modular metric collectors
@@ -380,7 +384,7 @@ export class PerformanceMonitor extends UIPanel {
     this.stateChangesThisFrame = 0;
     this.entitiesProcessedThisFrame = 0;
     this.entitiesRenderedThisFrame = 0;
-    this.batchSpriteCounts = [];
+    this.batchSpriteCounts.length = 0; // Reuse array instead of allocating new one
     
     // Reset batch break tracking each frame
     this.batchBreakCollector.reset();
@@ -438,9 +442,11 @@ export class PerformanceMonitor extends UIPanel {
     const memory = (performance as any).memory;
     if (memory) {
       const currentHeap = memory.usedJSHeapSize;
-      this.heapHistory.push(currentHeap);
-      if (this.heapHistory.length > this.maxHeapHistorySize) {
-        this.heapHistory.shift();
+      // Circular buffer write (no shift needed!)
+      this.heapHistory[this.heapHistoryIndex] = currentHeap;
+      this.heapHistoryIndex = (this.heapHistoryIndex + 1) % this.maxHeapHistorySize;
+      if (this.heapHistorySize < this.maxHeapHistorySize) {
+        this.heapHistorySize++;
       }
       
       // Detect GC event (heap size suddenly drops)
@@ -453,10 +459,11 @@ export class PerformanceMonitor extends UIPanel {
       this.lastHeapSize = currentHeap;
     }
 
-    // Track frame time history for variance
-    this.frameTimeHistory.push(frameTime);
-    if (this.frameTimeHistory.length > 300) { // 5 seconds at 60fps
-      this.frameTimeHistory.shift();
+    // Track frame time history for variance (circular buffer)
+    this.frameTimeHistory[this.frameTimeHistoryIndex] = frameTime;
+    this.frameTimeHistoryIndex = (this.frameTimeHistoryIndex + 1) % 300; // 5 seconds at 60fps
+    if (this.frameTimeHistorySize < 300) {
+      this.frameTimeHistorySize++;
     }
 
     // Adaptive quality adjustment
@@ -748,17 +755,19 @@ export class PerformanceMonitor extends UIPanel {
       ? batchMetrics.avgSpritesPerBatch / this.maxBatchSize
       : 0;
 
-    // Calculate frame time variance
+    // Calculate frame time variance (using actual filled size)
     let frameTimeVariance = 0;
     let frameTimeMin = 0;
     let frameTimeMax = 0;
-    if (this.frameTimeHistory.length > 0) {
-      const avg = this.frameTimeHistory.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length;
-      const squareDiffs = this.frameTimeHistory.map(value => Math.pow(value - avg, 2));
-      frameTimeVariance = Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / this.frameTimeHistory.length);
+    if (this.frameTimeHistorySize > 0) {
+      // Use only filled portion of circular buffer
+      const filled = this.frameTimeHistory.slice(0, this.frameTimeHistorySize);
+      const avg = filled.reduce((a, b) => a + b, 0) / this.frameTimeHistorySize;
+      const squareDiffs = filled.map(value => Math.pow(value - avg, 2));
+      frameTimeVariance = Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / this.frameTimeHistorySize);
       
       // Calculate 1% lows (best 1% frames) and worst
-      const sorted = [...this.frameTimeHistory].sort((a, b) => a - b);
+      const sorted = [...filled].sort((a, b) => a - b);
       const onePercentIndex = Math.floor(sorted.length * 0.01);
       frameTimeMin = sorted[onePercentIndex] || sorted[0];
       frameTimeMax = sorted[sorted.length - 1];
