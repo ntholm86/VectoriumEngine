@@ -108,7 +108,7 @@ export class BunnymarkParticleSystem {
       
       // Random position in small cluster at spawn point
       const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * 50;
+      const radius = Math.random() * 10;
       const px = centerX + Math.cos(angle) * radius;
       const py = centerY + Math.sin(angle) * radius;
       

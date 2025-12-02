@@ -12,8 +12,8 @@ export interface DebugToolsConfig {
  */
 export class EngineConfig {
   canvas?: HTMLCanvasElement;
-  width = 1280;
-  height = 720;
+  width = 800;
+  height = 600;
   backgroundColor = '#000000';
   preferWebGL2 = true;
   maxTextureSize = 2048;
@@ -22,7 +22,7 @@ export class EngineConfig {
   initialQuality: 'ultra' | 'high' | 'medium' | 'low' | 'potato' = 'high';
   targetFPS = 60;
   useWorkers = false;
-  maxEntities = 8_000_000;
+  maxEntities = 6_500_000;
   maxBatchSize = 65_000;
   debugMode = false;
   exposeGlobals = false;
