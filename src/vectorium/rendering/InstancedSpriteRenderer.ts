@@ -279,9 +279,9 @@ export class InstancedSpriteRenderer {
     
     const gl = this.gl;
     
-    // Initialize static data ONLY on first draw (CRITICAL FIX: was re-uploading 39MB/frame!)
+    // Initialize static data ONCE for maximum capacity (CRITICAL for zero frame spikes)
     if (!this.staticDataInitialized) {
-      const maxCapacity = Math.max(count, ENGINE_CONFIG.maxEntities);
+      const maxCapacity = ENGINE_CONFIG.maxEntities;
       this.initializeStaticData(sizes, colorR, colorG, colorB, alphas, uvU0, uvV0, uvU1, uvV1, maxCapacity);
     }
     
@@ -358,9 +358,9 @@ export class InstancedSpriteRenderer {
     
     const gl = this.gl;
     
-    // Initialize static data ONLY on first draw (CRITICAL FIX: was re-uploading 39MB/frame!)
+    // Initialize static data ONCE for maximum capacity (CRITICAL for zero frame spikes)
     if (!this.staticDataInitialized) {
-      const maxCapacity = Math.max(count, ENGINE_CONFIG.maxEntities);
+      const maxCapacity = ENGINE_CONFIG.maxEntities;
       this.initializeStaticData(sizes, colorR, colorG, colorB, alphas, uvU0, uvV0, uvU1, uvV1, maxCapacity);
     }
     
