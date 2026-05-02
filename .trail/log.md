@@ -62,3 +62,63 @@ The examination had no access to what the operator was originally trying to buil
 **Imagined-reader pushback:**
 
 "You got lucky — three broad hunches against a dormant creative project will almost always land because the operator fills in the gaps." Partial counter: Hunch 1's specific inference ("lost interest after beating the others") was not broad — it was derived from a specific pattern in the commit arc that is not the default assumption about a performance engine. Most performance engines are abandoned because they were too hard, not because they succeeded too well. Getting that direction right from arc-reading alone is not trivially explained by luck.
+
+
+## 2026-05-02 — statemachine-test-import-fix
+
+- target: src/vectorium/utils/StateMachine.test.ts
+- operator: lkn
+- agent: GitHub Copilot (Claude, vscode chat)
+- skill: intent + improve + trail (autonomous-agent-skills v3.17.1)
+- outcome: Wrong import path fixed; StateMachine test now compiles.
+- delta: StateMachine.test.ts import corrected from '../core/StateMachine' to './StateMachine'
+
+### Interpretation of the ask
+
+Operator said "lets run it on another project - like the vectorium engine" in the context of external proof testing (compass claim #6). Interpreted as: run the full Improve protocol on vectorium as evidence that the skills work on a real non-self-targeting codebase.
+
+Read .trail/vision.md (exists from prior Hunch run, 2026-05-02). Vision priority: API surface and harness robustness. No compass exists yet — first Improve run on this target.
+
+### Examination
+
+Three lenses applied:
+
+**Inconsistency** — Engine.ts injects all services onto scenes via (scene as any).property = value throughout egisterScene() and loadScene(). SceneServices/ServiceAwareBase pattern exists to fix this but is disconnected from Scene itself — it applies only to helper classes, not to scene subclasses. Scene subclass authors have no typed API contract; they must read Engine.ts source to discover available services.
+
+**Waste** — Two dead harness artifacts:
+1. src/vectorium/utils/StateMachine.test.ts imports StateMachine from '../core/StateMachine' — that path does not exist. The class lives in ./StateMachine (same directory). No test runner is configured in package.json either. The only test file in the repo cannot compile or run.
+2. demo.ts:spawnBunnyBatch() accesses (this as any).spawnService — this is never injected anywhere in Engine.ts's loadScene(). Benchmark entity spawning silently produces nothing. startBenchmark() is also never called from initDemo() — the full benchmark path is dead.
+
+**Overburden** — Engine.ts::loadScene() concentrates: WASM init, input setup, animation system wiring, service injection, debug tool wiring, and scene lifecycle. Noted but not actioned.
+
+### Decision
+
+[!DECISION] Fix StateMachine.test.ts import path. Rationale: unambiguous one-line correctness fix, zero behavioral risk, directly addresses harness robustness (the vision's stated priority), and is the prerequisite before a test runner can be added.
+
+Rejected: fixing spawnService injection — requires either perpetuating the (any) antipattern or a multi-file typed refactor; the benchmark path is also dead for a second reason (startBenchmark() is never called). Fixing one without the other produces no working benchmark.
+
+Rejected: addressing the (any) injection pattern — root cause of the API surface problem, but requires multi-file redesign (Scene.ts typed service contract + Engine.ts injection + demo.ts + others). Noted as the next structural priority in this target.
+
+### Action
+
+src/vectorium/utils/StateMachine.test.ts line 7:
+`
+// before
+import { StateMachine } from '../core/StateMachine';
+
+// after
+import { StateMachine } from './StateMachine';
+`
+
+Verified: TypeScript resolves the import with no errors.
+
+### Reflection
+
+**Falsifiable claim about the target:** Vectorium's harness robustness gap is not a missing test — it is the (any) injection pattern in Engine.ts that makes the Scene API invisible. The StateMachine import fix is the correct first step, but the test still cannot run without a test runner (vitest, given the vite/ESM setup, is the natural choice). Until the injection pattern is addressed, a developer writing a game scene has no IDE-discoverable API surface; they must read Engine.ts source.
+
+**Named blind spot:** Did not run the existing build (
+pm run build) to verify the project compiles end-to-end. The import fix resolves in the TypeScript language server; full build verification is unconfirmed.
+
+**Imagined-reader pushback:** "The StateMachine import was probably never tested anyway — fixing it without adding a test runner doesn't change whether any tests pass." Correct. This run explicitly names the test runner as the required next step (not in scope for one change). The fix is still correct: a wrong import path that cannot be fixed retroactively once a test runner is added is worse than a wrong import path that is fixed now.
+
+[!REALIZATION] The (this as any) injection pattern in Engine.ts is the root API surface problem the vision is pointing at. ServiceAwareBase was introduced to fix it but was never connected to Scene. The next improve run on this target should either: (a) expose performanceMonitor, spawnService, and other injected services as typed protected optional properties on Scene, or (b) evaluate whether Scene should extend ServiceAwareBase. Either path closes the discovery gap for scene subclass authors.

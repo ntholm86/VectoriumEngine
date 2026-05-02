@@ -3,7 +3,7 @@
  * Comprehensive test suite for the Vectorium state machine
  */
 
-import { StateMachine } from '../core/StateMachine';
+import { StateMachine } from './StateMachine';
 
 // Test helpers
 let logs: string[] = [];
