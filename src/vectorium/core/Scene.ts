@@ -5,6 +5,8 @@ import { TextRenderer } from '../rendering/TextRenderer';
 import { DisplayObject } from '../display/DisplayObject';
 import { Sprite } from '../display/Sprite';
 import { ENGINE_CONFIG } from './EngineConfig';
+import type { AnimationSystem } from '../systems/AnimationSystem';
+import type { PerformanceMonitor } from '../tools/PerformanceMonitor';
 
 export class Scene {
   name: string;
@@ -16,7 +18,8 @@ export class Scene {
   private _textureManager: any = null;
   
   protected engine: any = null;
-  protected performanceMonitor: any = null;
+  protected performanceMonitor: PerformanceMonitor | null = null;
+  protected animationSystem: AnimationSystem | null = null;
   
   private viewport: Viewport;
   public cameraX: number = 0;
@@ -106,6 +109,16 @@ export class Scene {
    */
   _setTextureManager(textureManager: any): void {
     this._textureManager = textureManager;
+  }
+
+  /** @internal Called by Engine during scene loading */
+  _setAnimationSystem(animSystem: AnimationSystem | null): void {
+    this.animationSystem = animSystem;
+  }
+
+  /** @internal Called by Engine during scene loading */
+  _setPerformanceMonitor(monitor: PerformanceMonitor | null): void {
+    this.performanceMonitor = monitor;
   }
 
   async load(): Promise<void> {

@@ -137,7 +137,7 @@ export class Vectorium {
   registerScene(name: string, scene: Scene): void {
     scene.setCanvasDimensions(this.config.width, this.config.height);
     (scene as any).engine = this;
-    (scene as any)._setTextureManager(this.textureManager);
+    scene._setTextureManager(this.textureManager);
     this.scenes.set(name, scene);
   }
 
@@ -187,11 +187,11 @@ export class Vectorium {
     
     if (this._animationManager) {
       const animSystem = new AnimationSystem(this.currentScene.world, this._animationManager);
-      (this.currentScene as any).animationSystem = animSystem;
+      this.currentScene._setAnimationSystem(animSystem);
     }
     
     if (this.config.debugTools.performanceMonitor) {
-      (this.currentScene as any).performanceMonitor = this.performanceMonitor;
+      this.currentScene._setPerformanceMonitor(this.performanceMonitor);
     }
     
     await this.currentScene.load();
@@ -281,8 +281,8 @@ export class Vectorium {
       this.currentScene.render(this.renderer, this._textRenderer || undefined, this._textPool || undefined);
       
       if (this._performanceMonitor) {
-        const visibleCount = (this.currentScene as any).visibleCount;
-        const culledCount = (this.currentScene as any).culledCount;
+        const visibleCount = this.currentScene.visibleCount;
+        const culledCount = this.currentScene.culledCount;
         if (visibleCount !== undefined && culledCount !== undefined) {
           this._performanceMonitor.recordCulling(visibleCount, culledCount);
         }
