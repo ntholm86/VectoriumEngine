@@ -1,4 +1,4 @@
-# Vectorium — Evidence Trail
+﻿# Vectorium — Evidence Trail
 
 Append-only. One entry per substantive session. Newest at the bottom.
 
@@ -195,3 +195,76 @@ Rejected: fixing only the implementation bug (leaves 3 test bugs, harness still 
 **Named blind spot:** Did not examine whether the "open-state" semantics (no rules = allow all) is the right design for a game engine context, or whether it should be "closed by default" (no rules = block all, requiring explicit definition). The test suite now validates open-state; the animation scenario validates that explicitly-restricted states are correctly blocked. The choice was made to preserve backward compatibility with existing tests.
 
 **Imagined-reader pushback:** "You fixed 4 things at once — that's not one change." Counter: this run's stated goal was harness robustness, and a test suite with 4 failures is not a harness. The 4 fixes are the minimum to produce the deliverable. Each fix was examined independently before being made.
+
+
+## 2026-05-02 — typed-scene-services
+
+- target: `src/vectorium/core/Scene.ts`, `src/vectorium/core/Engine.ts`
+- operator: lkn
+- agent: GitHub Copilot (Claude, vscode chat)
+- skill: intent + improve + trail (autonomous-agent-skills v3.17.1)
+- outcome: 5 Engine.ts `(any)` casts removed; `animationSystem` and `performanceMonitor` now typed protected fields on Scene with typed internal-API setters following the `_setTextureManager` pattern.
+- delta: Scene.ts: +2 imports, +1 field, +2 methods. Engine.ts: 5 `(any)` casts replaced.
+
+### Interpretation of the ask
+
+"continue" ? proceed with next compass priority. Vitest is done (prior run). Next: typed service properties on Scene, per compass item #2.
+
+Checked vision.md (priority: API surface and harness robustness) and compass.md (item #2: expose injected services as typed protected properties on Scene; `_setTextureManager` pattern as the model).
+
+Generated agent-initiated direction before acting, per skill protocol for underspecified ask. Three hunches: (1) typed services on Scene is highest-leverage (compass claim #1+#2 converge here); (2) WASM classification is an examination task, lower risk to defer; (3) original game requirements is a design/Hunch question, not a code task. Proceeded on hunch #1.
+
+### Examination
+
+**Inconsistency lens:**
+
+`Scene.ts` declares `protected engine: any = null` and `protected performanceMonitor: any = null` � typed as `any`. `animationSystem` is not declared at all. Engine.ts injects via `(this.currentScene as any).animationSystem = animSystem` (no corresponding field) and `(this.currentScene as any).performanceMonitor` (ignores the declared field). The typing is inconsistent with the pattern already established for `_setTextureManager`.
+
+**Waste lens:**
+
+Eight `(any)` casts in Engine.ts when loading/activating a scene. Five are provably unnecessary given the existing public API or fixable with one-time method additions:
+- `(scene as any)._setTextureManager(...)` � `_setTextureManager` is already a public method; cast was never needed
+- `(this.currentScene as any).animationSystem = animSystem` � no declared field; cast is the only option today
+- `(this.currentScene as any).performanceMonitor = ...` � field declared as `protected any`; cast bypasses access modifier
+- `(this.currentScene as any).visibleCount` / `.culledCount` � already `public` fields; casts are redundant
+
+Three remain (`engine`: circular dep; `behaviors` �2: optional scene-specific hook, not an engine service).
+
+**Pattern analysis:**
+
+`_setTextureManager(manager: any)` is already a public method Engine calls via `(any)` unnecessarily. It establishes the precedent: Engine-to-Scene internal API uses underscore-prefixed public methods. Extending this pattern to `animationSystem` and `performanceMonitor` is the correct path.
+
+### Decision
+
+[!DECISION] Add typed internal-API setter methods to Scene (`_setAnimationSystem`, `_setPerformanceMonitor`) with properly-typed `protected` fields, following the `_setTextureManager` pattern. Update Engine.ts to call these methods directly and remove the redundant `(any)` casts for `visibleCount`/`culledCount` and `_setTextureManager`.
+
+Rejected: extending Scene from ServiceAwareBase � requires Engine to also populate a `SceneServicesContainer` and assign it to `scene.services`; that is a larger redesign (separate concern, separate run). Rejected: typing `engine` field � circular import (Engine.ts imports Scene.ts; Scene.ts would import Engine.ts even type-only).
+
+### Action
+
+`Scene.ts`:
+- Added `import type { AnimationSystem } from '../systems/AnimationSystem'`
+- Added `import type { PerformanceMonitor } from '../tools/PerformanceMonitor'`
+- `protected performanceMonitor: any` ? `protected performanceMonitor: PerformanceMonitor | null = null`
+- Added `protected animationSystem: AnimationSystem | null = null`
+- Added `_setAnimationSystem(animSystem: AnimationSystem | null): void` (sets the field)
+- Added `_setPerformanceMonitor(monitor: PerformanceMonitor | null): void` (sets the field)
+
+`Engine.ts`:
+- `(scene as any)._setTextureManager(...)` ? `scene._setTextureManager(...)`
+- `(this.currentScene as any).animationSystem = animSystem` ? `this.currentScene._setAnimationSystem(animSystem)`
+- `(this.currentScene as any).performanceMonitor = ...` ? `this.currentScene._setPerformanceMonitor(...)`
+- `(this.currentScene as any).visibleCount` ? `this.currentScene.visibleCount`
+- `(this.currentScene as any).culledCount` ? `this.currentScene.culledCount`
+
+`tsc --noEmit`: no new errors in changed files. Pre-existing errors (PerformanceSystem.ts unused var; StateMachine.test.ts vitest globals not in tsconfig types) unchanged. `npx vitest run`: 30/30 passing.
+
+Committed: 74adc7a.
+
+### Reflection
+
+**Falsifiable claim:** The injection pattern in Engine.ts is now partly typed. The three remaining `(any)` casts (`engine`, `behaviors` �2) are qualitatively different from the service casts: `engine` requires solving a circular dependency, and `behaviors` is a user-supplied optional hook (not an engine service). A future run that closes the `engine` cast will need to introduce an interface or a forward reference; a future run that closes `behaviors` will need to declare it as an optional typed hook on Scene.
+
+**Named blind spot:** Did not verify that a scene subclass author can actually discover the new properties in their IDE (autocomplete, go-to-definition). The typed fields are correct TypeScript, but whether the IDE experience is meaningfully better was not tested with a concrete subclass example. The API discoverability improvement is structural, not empirically validated.
+
+**Imagined-reader pushback:** "`_setTextureManager` was already using `(any)` unnecessarily � if you caught that, why didn't you also remove the `engine` cast by changing it to `protected engine` and adding a `_setEngine` method?" Counter: `_setEngine` would accept a `Vectorium` instance, requiring Scene.ts to import from Engine.ts � a circular dependency. The `engine: any` field + `(any)` cast pattern is the established workaround for that. Resolving it requires an interface extraction (e.g., `IVectoriumEngine`) which is a distinct architectural move, not a drop-in setter addition.
