@@ -122,3 +122,29 @@ pm run build) to verify the project compiles end-to-end. The import fix resolves
 **Imagined-reader pushback:** "The StateMachine import was probably never tested anyway — fixing it without adding a test runner doesn't change whether any tests pass." Correct. This run explicitly names the test runner as the required next step (not in scope for one change). The fix is still correct: a wrong import path that cannot be fixed retroactively once a test runner is added is worse than a wrong import path that is fixed now.
 
 [!REALIZATION] The (this as any) injection pattern in Engine.ts is the root API surface problem the vision is pointing at. ServiceAwareBase was introduced to fix it but was never connected to Scene. The next improve run on this target should either: (a) expose performanceMonitor, spawnService, and other injected services as typed protected optional properties on Scene, or (b) evaluate whether Scene should extend ServiceAwareBase. Either path closes the discovery gap for scene subclass authors.
+
+
+## 2026-05-02 — retrospect-after-hunch-and-improve
+
+- target: vectorium (`C:\git\vectorium`)
+- operator: lkn
+- agent: GitHub Copilot (Claude, vscode chat)
+- skill: retrospect v1.5.0 (autonomous-agent-skills v3.17.1)
+- outcome: First compass written for vectorium. Five arc-claims. Sessions dir created.
+- delta: `.trail/compass.md` created; `.trail/sessions/2026-05-02-retrospect-after-hunch-and-improve.md` created
+
+### Scope
+
+Read the two-run arc (Hunch + Improve) as a single document against vision.md. Question: is the loop looking at the right part of the target? What does the arc show the target is becoming?
+
+### Arc-claims
+
+1. Same diagnosis reached from two independent angles (commit arc via Hunch; code examination via Improve): the target is stuck between showcase and usable engine. Root problem is the `(any)` injection pattern — no typed API contract for scene subclass authors.
+2. Harness robustness has one shallow fix (import path); test still cannot run without a test runner.
+3. WASM physics integration flagged twice, never examined — unknown status (feature gap / deferral / dead code).
+4. Original game requirements are the missing design input — "better API" is abstract until grounded in what the game actually needs.
+5. Capability is proven (6M bunnies @ 60 FPS); usability evidence does not yet exist.
+
+### Loop-effectiveness findings
+
+Two runs is thin. Both found real findings; one-change discipline held. Diagnosis has converged from two directions. Most important gap: the concrete test (original game) named in vision has not been operationalized by any run.
