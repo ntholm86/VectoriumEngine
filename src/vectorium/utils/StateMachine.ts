@@ -122,18 +122,18 @@ export class StateMachine<TState extends string = string> {
    * @returns true if transition succeeded, false if blocked by validation
    */
   transition(newState: TState): boolean {
-    // Ignore if already in this state
-    if (this.currentState === newState) {
-      return true;
-    }
-    
-    // Validate transition if enabled
+    // Validate transition if enabled (before same-state guard, so rules can block self-transitions)
     if (this.validateTransitions && this.currentState) {
       const allowed = this.allowedTransitions.get(this.currentState);
       if (allowed && !allowed.has(newState)) {
         console.warn(`[StateMachine] Invalid transition: ${this.currentState} -> ${newState}`);
         return false;
       }
+    }
+
+    // Ignore if already in this state
+    if (this.currentState === newState) {
+      return true;
     }
     
     // Exit current state
