@@ -1,39 +1,33 @@
 # Compass — vectorium
 
-_Last updated: 2026-05-03 (run: scene-animationsystem-any-cast-fix)_  
-_Derived from: four-run arc (hunch + statemachine-import-fix + statemachine-tests-all-green + scene-animationsystem-any-cast-fix), read against vision.md._
+_Last updated: 2026-05-03 (run: engine-typed-interface)_  
+_Derived from: five-run arc, read against vision.md._
 
 ---
 
 ## Current claims
 
-**1. The loop has confirmed the root diagnosis; the migration toward typed services is underway but shallow.**  
-Hunch and the first Improve run both converged on "`(any)` injection / no typed API for scene subclasses" from independent entry points. Three subsequent runs have made incremental progress: StateMachine import fixed, vitest added (30/30), one `any`-cast removed from Scene.update(). The structural problem — `engine: any`, `_setTextureManager(any)`, and the missing typed surface for subclasses to discover services — has not been closed.
+**1. The typed-engine migration is nearly complete.**  
+`engine`, `animationSystem`, and `performanceMonitor` are now all typed on `Scene` with proper setters. `(scene as any).engine` in Engine.ts is gone. `IEngine.ts` cleanly breaks the circular-import constraint. The remaining `any`s in Scene.ts's injection surface are `_setTextureManager(any)` parameter and `private _textureManager: any` — two lines, one run.
 
-**2. Harness is operational; 30/30 tests pass.**  
-Compass claim 2 is closed. vitest installed, StateMachine.ts validation order fixed, test bugs corrected. The harness gap is gone.
+**2. Harness is operational; 30/30 tests pass.** (closed)
 
-**3. Scene.ts is in a partially-migrated state — the migration direction is clear.**  
-`animationSystem` and `performanceMonitor` are typed protected properties with typed setters. `engine` is typed as `any` with no internal consumer. `_setTextureManager` takes `any`. `demo.ts` (a Scene subclass) still accesses `(this as any).performanceMonitor` — unnecessary because the base class already declares it typed. Each run should close one more instance.
+**3. The original game's requirements are the missing design input; the usability proof does not yet exist.**  
+Vision: "can I now build that game with vectorium?" No run has examined what the original game required. The API surface is getting typed — but typed against what the *benchmark demo* uses, not against what a *game* would need. `IEngine` exposes textureManager, config, performanceMonitor. Whether inputManager, spawnService, or other services belong in the contract is unknown without the original game's requirements.
 
-**4. The WASM physics integration gap has been flagged three times but never examined.**  
-Hunch, first Improve, and this compass all note it. `assembly/physics.ts` is not wired into the main update loop; main physics path is `SpatialHash.ts` only. Status unknown: feature gap, deliberate deferral, or dead code. Cannot stay unknown if API surface work begins.
-
-**5. The original game's requirements are the missing design input; the usability proof does not yet exist.**  
-Vision names it: "can I now build that game with vectorium?" No run has examined what the original game required. Without that grounding, "API surface work" remains abstract — the loop can reduce `any`-casts but cannot validate that the result is actually usable for the intended purpose.
+**4. The WASM physics integration gap has been flagged four times but never examined.**  
+Unchanged from prior compass.
 
 ---
 
 ## What the next runs should test
 
-1. **Fix `(this as any).performanceMonitor` in demo.ts** — same inconsistency class as the animationSystem fix, one file over. `performanceMonitor` is already a typed protected field on Scene; WasmDemoScene casts to `any` to read it. Zero-risk two-line change.
-2. **Fix `engine: any` → typed setter pattern** — requires defining an `IEngine` interface (to avoid circular imports: Engine.ts → Scene.ts → Engine.ts). Pattern is `_setEngine(engine: IEngine)` matching `_setAnimationSystem` and `_setPerformanceMonitor`. This closes the last `(scene as any)` cast in Engine.ts.
-3. **Determine WASM physics integration status** — one-run examination of `assembly/physics.ts` against the main update loop. Classify: feature gap, deferral, or dead code. Forecloses a persistent unknown.
-4. **Name the original game's API requirements** — Hunch question. Grounds "API surface work" in concrete game requirements.
+1. **Type `_setTextureManager`** — change `private _textureManager: any` to `private _textureManager: TextureManager | null` and `_setTextureManager(textureManager: TextureManager)`. Closes the last `any` in Scene.ts's injection surface. One-run clean-up.
+2. **Determine WASM physics integration status** — read `assembly/physics.ts` vs main update loop. Four-run-old unknown: classify as feature gap, deferral, or dead code.
+3. **Name the original game's API requirements** — Hunch question. Without it, typed API improvements are validated against the benchmark demo only, not the actual intended use.
 
 ---
 
 ## Loop-effectiveness notes
 
-Four runs, genuine findings each time, one-change discipline holding. The arc shows a real migration in progress. The risk now is incremental cosmetic fixes accumulating without closing the structural gap: `engine: any` and the subclass service discovery problem are the root issues; reducing `any` in adjacent places is useful but does not substitute. The compass should track whether the structural fix (typed engine interface + typed Scene service surface) is actually getting closer, or whether the loop is staying comfortable in the shallower fixes.
-
+Five runs. The structural risk (cosmetic fixes instead of root fix) was named — and this run acted on the root. `IEngine` required creating a new interface file and touching four files; it was the right move. The remaining `any` in Scene.ts is shallower and can be closed in the next run. The loop is now close to exhausting the "typed service surface" class of findings — the next structural question will be whether the typed surface is complete for the *original game*, not just the benchmark.

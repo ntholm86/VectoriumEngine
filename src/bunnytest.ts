@@ -14,7 +14,7 @@ class ParticleBunnymarkScene extends Scene {
   private totalSpawned = 0;
   
   async load(): Promise<void> {
-    await this.engine.textureManager.loadTexture('/bunny.png');
+    await this.engine!.textureManager.loadTexture('/bunny.png');
   }
   
   async startBenchmark(): Promise<void> {
@@ -24,9 +24,9 @@ class ParticleBunnymarkScene extends Scene {
     const spawnInterval = BUNNYMARK_CONFIG.spawnInterval;
     
     const particleConfig: BunnymarkParticleConfig = {
-      maxParticles: this.engine.config.maxEntities,
-      canvasWidth: this.engine.config.width,
-      canvasHeight: this.engine.config.height,
+      maxParticles: this.engine!.config.maxEntities,
+      canvasWidth: this.engine!.config.width,
+      canvasHeight: this.engine!.config.height,
       gravity: 2500,
       spriteWidth: 26,
       spriteHeight: 37,
@@ -41,7 +41,7 @@ class ParticleBunnymarkScene extends Scene {
       let spawnDelay: number = spawnInterval;
       
       while (this.isRunning) {
-        const metrics = this.engine.performanceMonitor.getMetrics();
+        const metrics = this.engine!.performanceMonitor.getMetrics();
         const avgFPS = metrics.fps;
         const frameTime = metrics.frameTime;
         

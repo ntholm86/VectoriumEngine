@@ -324,3 +324,49 @@ Verification: vitest run → 30/30 passed.
 **Imagined-reader pushback.** "This is a cosmetic fix. The field was already typed; you just removed a redundant cast. No API surface improved, no new service became discoverable." Partial counter: the value of removing it is not that the behavior changed — it is that the code now says what it means. An author reading Scene.ts's update() can see that `animationSystem` is a normal typed property, not something dynamic. The inconsistency was a signal that the code was in mid-migration; removing it advances the migration cleanly.
 
 [!REALIZATION] Scene.ts is in a partially-migrated state. Some services (animationSystem, performanceMonitor) are typed protected properties with proper setters. Other services (engine, textureManager) are still typed as `any` or set via any-casts. The migration direction is clear; each run should close one more instance. The next run's target is either (a) `_setTextureManager(any)` → typed parameter, or (b) `engine: any` → typed interface with `_setEngine()` setter.
+
+## 2026-05-03 — engine-typed-interface
+
+- target: vectorium (`C:\git\vectorium`)
+- operator: lkn
+- agent: GitHub Copilot (Claude Sonnet 4.6 / Anthropic)
+- skill: improve v3.7.0 (autonomous-agent-skills v3.17.2)
+- outcome: changed — `engine: any` on Scene replaced with `engine: IEngine | null` backed by a new `IEngine` interface; `(scene as any).engine = this` in Engine.ts replaced with `scene._setEngine(this)`
+- delta: IEngine.ts (new); Scene.ts (import, field type, _setEngine() setter); Engine.ts (import, implements IEngine, _setEngine call); bunnytest.ts (non-null assertions on engine)
+
+### Interpretation of the ask
+
+"you decide" — operator delegated. Compass loop-effectiveness note explicitly warned: "the risk now is incremental cosmetic fixes accumulating without closing the structural gap." Option #2 (engine: any → typed interface) is the structural fix named as the root. Taking it.
+
+### Examination
+
+**Inconsistency lens.** Engine.ts has `(scene as any).engine = this` in `registerScene()` — a direct any-cast injection of the engine instance onto Scene. Scene declares `protected engine: any = null;` — the field exists and is used by subclasses (bunnytest.ts uses `this.engine.textureManager`, `this.engine.config`, `this.engine.performanceMonitor`), but has no type contract. The pattern is inconsistent with the typed setter pattern used for `animationSystem` and `performanceMonitor` on the same class.
+
+**Circular import constraint.** Engine.ts imports Scene.ts. Scene.ts cannot import Engine.ts (circular). The fix requires an interface file (`IEngine.ts`) that both can reference without circularity: Engine.ts → IEngine.ts (ok), Scene.ts → IEngine.ts (ok), Engine.ts → Scene.ts (existing, unchanged).
+
+**Scope.** `IEngine` needs to expose only what subclasses actually use: `textureManager: TextureManager`, `config: EngineConfig`, `performanceMonitor: PerformanceMonitor`. The `Vectorium` class satisfies this structurally (all three are already typed public members).
+
+**Challenge the first read.** Should `engine` be `IEngine` (non-null) with definite assignment (`engine!: IEngine`)? Rejected — the field genuinely IS null until `registerScene()` is called. Nullable type `IEngine | null` is correct. Subclass code in lifecycle methods (`load()`, `startBenchmark()`) is called after `registerScene()` and correctly uses `!` assertions; the explicit null check in `render()` already provided correct narrowing and continues to.
+
+### Decision
+
+[!DECISION] Create `IEngine.ts`, add `_setEngine(engine: IEngine)` to Scene, update Engine.ts to `implements IEngine` and call `scene._setEngine(this)`. Update bunnytest.ts with `!` assertions at call sites in lifecycle methods.
+
+### Action
+
+1. `src/vectorium/core/IEngine.ts` — new file, interface with `textureManager`, `config`, `performanceMonitor`.
+2. `src/vectorium/core/Scene.ts` — added `import type { IEngine }`, changed `engine: any` → `engine: IEngine | null`, added `_setEngine(engine: IEngine)` setter.
+3. `src/vectorium/core/Engine.ts` — added `import type { IEngine }`, `export type { IEngine }`, `implements IEngine` on Vectorium, `scene._setEngine(this)` in `registerScene()`.
+4. `src/bunnytest.ts` — `!` assertions on `this.engine` at lines 17, 27-29, 44 (lifecycle methods called after engine setup).
+
+Verification: `tsc --noEmit` — zero errors in changed files; pre-existing errors unchanged (test file types, PerformanceSystem unused param). vitest → 30/30 passed.
+
+### Reflection
+
+**Falsifiable claim about the target's current state.** `(scene as any).engine` is gone. The last remaining structural any-cast in Engine.ts's scene setup path is `_setTextureManager(textureManager: any)` — the parameter type, not the storage. Scene.ts still has `private _textureManager: any = null`. These are the same class of finding, one step further. The API surface for scene subclasses is now typed for engine, animationSystem, and performanceMonitor — three of the five services subclasses actually use.
+
+**Named blind spot.** `IEngine` exposes three services. A scene subclass that needs `inputManager`, `renderer`, or `textPool` from the engine has no typed path; those services are injected via different mechanisms or not at all. Whether the original game's requirements would surface those as gaps is unknown — compass claim 5 (original game as design input) remains unexamined.
+
+**Imagined-reader pushback.** "You added `engine!` assertions in bunnytest.ts — that's just restoring the unsafety you removed from the type." Counter: `(this as any).engine` suppressed all type errors for all properties on engine. `this.engine!` asserts non-null only — if the engine type changes (new property required, existing property removed), TypeScript will catch it. The change narrows the unsafety from "anything goes on this object" to "this object is non-null at this call site." That is a genuine improvement.
+
+[!REALIZATION] The migration direction in Scene.ts is now clear and close to complete: `engine` (done this run), `animationSystem` (done prior run), `performanceMonitor` (typed, setter exists). Remaining: `_setTextureManager(any)` and `private _textureManager: any`. Those two are the last `any`s in Scene.ts's injection surface. One more run closes it.

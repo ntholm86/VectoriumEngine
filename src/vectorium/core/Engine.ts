@@ -21,8 +21,10 @@ export type { Entity, EntityId, EntityFlags } from './Entity';
 export { VectoriumBuilder } from './EngineBuilder';
 export { SceneBuilder, createScene } from './SceneBuilder';
 export { ServiceAwareBase } from './ServiceAwareBase';
+export type { IEngine } from './IEngine';
+import type { IEngine } from './IEngine';
 
-export class Vectorium {
+export class Vectorium implements IEngine {
   readonly canvas: HTMLCanvasElement;
   readonly config: EngineConfig;
   readonly featureDetector: FeatureDetector;
@@ -136,7 +138,7 @@ export class Vectorium {
   
   registerScene(name: string, scene: Scene): void {
     scene.setCanvasDimensions(this.config.width, this.config.height);
-    (scene as any).engine = this;
+    scene._setEngine(this);
     scene._setTextureManager(this.textureManager);
     this.scenes.set(name, scene);
   }
