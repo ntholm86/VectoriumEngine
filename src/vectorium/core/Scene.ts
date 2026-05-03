@@ -150,8 +150,8 @@ export class Scene {
     this.culledCount = this.world.getActiveCount() - this.visibleCount;
     
     const animStart = performance.now();
-    if ((this as any).animationSystem) {
-      (this as any).animationSystem.update(dt);
+    if (this.animationSystem) {
+      this.animationSystem.update(dt);
     }
     this.perfMetrics.updateAnimation = performance.now() - animStart;
     

@@ -268,3 +268,59 @@ Committed: 74adc7a.
 **Named blind spot:** Did not verify that a scene subclass author can actually discover the new properties in their IDE (autocomplete, go-to-definition). The typed fields are correct TypeScript, but whether the IDE experience is meaningfully better was not tested with a concrete subclass example. The API discoverability improvement is structural, not empirically validated.
 
 **Imagined-reader pushback:** "`_setTextureManager` was already using `(any)` unnecessarily � if you caught that, why didn't you also remove the `engine` cast by changing it to `protected engine` and adding a `_setEngine` method?" Counter: `_setEngine` would accept a `Vectorium` instance, requiring Scene.ts to import from Engine.ts � a circular dependency. The `engine: any` field + `(any)` cast pattern is the established workaround for that. Resolving it requires an interface extraction (e.g., `IVectoriumEngine`) which is a distinct architectural move, not a drop-in setter addition.
+
+## 2026-05-03 — scene-animationsystem-any-cast-fix
+
+- target: vectorium (`C:\git\vectorium`)
+- operator: lkn
+- agent: GitHub Copilot (Claude Sonnet 4.6 / Anthropic)
+- skill: improve v3.7.0 (autonomous-agent-skills v3.17.2)
+- outcome: changed — Scene.ts update() no longer casts `this.animationSystem` via `(this as any)`
+- delta: Scene.ts lines 153-154: `(this as any).animationSystem` -> `this.animationSystem`
+
+### Interpretation of the ask
+
+"lets try" — underspecified continuation on vectorium. Per the skill: proceed with highest-confidence compass hunch. Compass priority #1 (vitest) is done (statemachine-tests-all-green). Compass priority #2: expose injected services as typed properties on Scene. This run advances that direction by removing an unnecessary any-cast on a property Scene already declares typed.
+
+### Examination
+
+**Inconsistency lens.** Scene.ts declares `protected animationSystem: AnimationSystem | null = null;` (line ~22) and a typed setter `_setAnimationSystem(animSystem: AnimationSystem | null)` (line ~115). In update() (lines 153-154), the same property is accessed via `(this as any).animationSystem` — the class declares the property, provides a typed setter, then casts to `any` to read it in the same file. This is a self-contradiction: the type information exists and is correct but is bypassed for no reason.
+
+**Waste lens.** `protected engine: any = null;` on Scene is set by `(scene as any).engine = this;` in Engine.ts registerScene(). No usage of `this.engine` exists anywhere in Scene.ts (confirmed: grep found zero internal references). The field is set but never consumed — waste, not currently actionable without knowing whether subclasses use it.
+
+**Challenge the first read.** Is there a reason `(this as any)` was used instead of `this.animationSystem`? One possible explanation: the field was added later than the update() method, and the any-cast was a quick workaround that was never cleaned up. No reason to preserve it. Another explanation: the author was unsure whether subclasses might shadow the property — but the property is `protected`, not `private`, so subclasses can access it directly. No reason survives examination.
+
+### Decision
+
+[!DECISION] Fix `(this as any).animationSystem` in Scene.ts update() to use `this.animationSystem` directly. Zero behavioral change — same access, typed correctly.
+
+Rejected: fix `engine: any = null` / `(scene as any).engine = this;` — the field has no internal consumers; fixing it requires defining an IEngine interface to avoid circular imports (Engine.ts imports Scene.ts; Scene.ts cannot import Engine.ts). A separate run.
+
+Rejected: connect Scene to ServiceAwareBase — larger structural refactor. One change per run.
+
+### Action
+
+Scene.ts update() — two lines changed:
+```
+// before
+if ((this as any).animationSystem) {
+  (this as any).animationSystem.update(dt);
+}
+
+// after
+if (this.animationSystem) {
+  this.animationSystem.update(dt);
+}
+```
+
+Verification: vitest run → 30/30 passed.
+
+### Reflection
+
+**Falsifiable claim about the target's current state.** Scene.ts's update() is internally consistent: it declares typed properties and accesses them as typed. The remaining any-cast in Scene.ts is `_setTextureManager(textureManager: any)` (the parameter, not the storage) and `(this.world as any).maxEntities` in renderECSBatch. Neither is in the same class as the animationSystem fix. The `engine: any` field exists but has no internal consumer — if a subclass uses it, it would read an `any`-typed engine reference. That is still a gap.
+
+**Named blind spot.** Did not examine whether `demo.ts`'s `(this as any).performanceMonitor` can be fixed by the same token — `performanceMonitor` is also a typed protected field on Scene; a subclass accessing it via `(this as any)` is the same anti-pattern. This run touched Scene.ts only; the subclass variant is the same finding one file over.
+
+**Imagined-reader pushback.** "This is a cosmetic fix. The field was already typed; you just removed a redundant cast. No API surface improved, no new service became discoverable." Partial counter: the value of removing it is not that the behavior changed — it is that the code now says what it means. An author reading Scene.ts's update() can see that `animationSystem` is a normal typed property, not something dynamic. The inconsistency was a signal that the code was in mid-migration; removing it advances the migration cleanly.
+
+[!REALIZATION] Scene.ts is in a partially-migrated state. Some services (animationSystem, performanceMonitor) are typed protected properties with proper setters. Other services (engine, textureManager) are still typed as `any` or set via any-casts. The migration direction is clear; each run should close one more instance. The next run's target is either (a) `_setTextureManager(any)` → typed parameter, or (b) `engine: any` → typed interface with `_setEngine()` setter.
