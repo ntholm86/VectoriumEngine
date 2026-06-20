@@ -1,0 +1,16 @@
+models:
+  analyze: claude-haiku-4-5
+  propose: claude-haiku-4-5
+  implement: claude-haiku-4-5
+  verify: claude-haiku-4-5
+  judge: claude-haiku-4-5
+
+scope:
+  allowed:
+    - "src/**/*.ts"
+  blocked:
+    - "node_modules/**"
+    - "dist/**"
+
+# Working tree has untracked .trail/ files — allow until they are committed.
+allow_dirty: true
