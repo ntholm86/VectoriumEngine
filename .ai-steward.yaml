@@ -1,4 +1,4 @@
-models:
+﻿models:
   analyze: claude-haiku-4-5
   propose: claude-haiku-4-5
   implement: claude-haiku-4-5
@@ -12,5 +12,5 @@ scope:
     - "node_modules/**"
     - "dist/**"
 
-# Working tree has untracked .trail/ files — allow until they are committed.
+# Working tree has untracked .acm/ files â€” allow until they are committed.
 allow_dirty: true
