@@ -543,3 +543,43 @@ Operator is building `game-portal` as the first real game/demo on top of vectori
 The engine still fetches `/physics.wasm` and `/rendering.wasm` from the site root. Consumers must copy these files to their own `public/` directory. A proper fix is a configurable WASM base path in `EngineConfig`; not implemented this run because the workaround (copy files) is sufficient for the demo and the operator may want to decide the packaging strategy.
 
 Cost: light — 3 files changed in vectorium, 2 rebuilds, no subagent.
+
+
+## 2026-07-05 — work-skill: fix rotation out-of-bounds renderer lookup
+
+- target: vectorium (C:\git\vectorium)
+- operator: Nils Holmager
+- agent: GitHub Copilot (Claude), skill: work v3.1.0 (from pea/work-skill)
+- outcome: Fixed a real rendering bug discovered by the first external game consumer (`game-portal`). Negative rotation angles were stored as large unsigned values in the `Uint16Array`, causing the renderer's 360-entry cos/sin cache to be indexed out of bounds and the entity to disappear.
+
+### Interpretation of the ask
+
+Operator reported the Vectoroids spaceship "disappears sometimes and comes back." Read as: a rendering bug in vectorium exposed by the new demo, not a demo-code bug. The destination.md priority is API surface and harness robustness; this is exactly the kind of harness bug that blocks real-game use.
+
+### Examination
+
+1. **Reproduced in the running demo.** Ship rotation after start was `65446` degrees — impossible for a 0-360 system.
+2. **Root cause located in `WebGLBatchRenderer.ts`.** It pre-computes `cosCache` and `sinCache` as `Float32Array(360)` and indexes them directly with `rotation[idx]`. No bounds check or normalization.
+3. **Source of the bad value traced to two places:**
+   - `World.setRotation()` used `Math.floor(degrees) % 360`, which preserves negative remainders in JavaScript.
+   - `DisplayObject.rotation` setter wrote the raw value straight into the `Uint16Array`, where `-90` becomes `65446`.
+
+### Decision and action
+
+[!DECISION] Fix normalization at the data-entry points rather than adding a runtime bounds check in the renderer. The renderer's direct cache lookup is a deliberate performance choice; the contract should be that rotation values are always in `[0, 359]`.
+
+Changes:
+- `src/vectorium/core/World.ts` — added `static normalizeRotation(degrees)` and used it in `setRotation()`.
+- `src/vectorium/display/DisplayObject.ts` — `rotation` setter now calls `World.normalizeRotation(value)` before storing.
+- Rebuilt `dist/vectorium.js` and `dist/index.d.ts`.
+
+### Verification
+
+- `game-portal` dev server: ship initial rotation now `270` (normalized `-90`), rotating left past 0 stays in range (`92`), rotating right returns to `270`.
+- `npx tsc --noEmit` in `game-portal` passes.
+
+### Open item
+
+WASM physics/animation may write rotation directly to shared memory if it ever loads successfully. That path was not exercised here (WASM fails to load in the demo) and should be audited for the same normalization contract when integrated.
+
+Cost: moderate — ~12 tool ops, browser verification, no subagent.
