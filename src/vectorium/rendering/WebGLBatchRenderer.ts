@@ -123,6 +123,16 @@ export class WebGLBatchRenderer {
   private cosCache: Float32Array = new Float32Array(360);
   private sinCache: Float32Array = new Float32Array(360);
 
+  // Normalize any rotation value to [0, 359] for the cache lookup.
+  // Rotation is stored as Uint16 in the ECS; negative values wrap to large
+  // positives, so the renderer must defend against any upstream value.
+  private normalizeRotation(rot: number): number {
+    let r = rot | 0;
+    r %= 360;
+    if (r < 0) r += 360;
+    return r;
+  }
+
   constructor(canvas: HTMLCanvasElement, useWebGL2: boolean = true) {
     const gl = useWebGL2 
       ? canvas.getContext('webgl2', { alpha: false, antialias: false, premultipliedAlpha: false })
@@ -788,7 +798,7 @@ void main() {
         const screenSize = hw * 2 * cameraZoom;
         if (screenSize < 4) continue; // Too small to see, skip rendering
         
-        const rotDeg = rotation[idx];
+        const rotDeg = this.normalizeRotation(rotation[idx]);
         
         const cos = this.cosCache[rotDeg];
         const sin = this.sinCache[rotDeg];
@@ -929,7 +939,7 @@ void main() {
         const screenSize = hw * 2 * cameraZoom;
         if (screenSize < 4) continue; // Too small to see, skip rendering
         
-        const rotDeg = rotation[i];
+        const rotDeg = this.normalizeRotation(rotation[i]);
         const shapeType = shapeTypes[i];
         
         const cos = this.cosCache[rotDeg];
@@ -1158,7 +1168,7 @@ void main() {
           const y = posY[entityIdx];
           const size = sizes[entityIdx];
           const hw = size * 0.5;
-          const rotDeg = rotation[entityIdx];
+          const rotDeg = this.normalizeRotation(rotation[entityIdx]);
           
           const cos = this.cosCache[rotDeg];
           const sin = this.sinCache[rotDeg];
