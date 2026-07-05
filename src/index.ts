@@ -46,3 +46,8 @@ export type { PointerState } from './vectorium/systems/InputManager';
 // Particle System
 export { ParticleSystemManager, ParticleEmitter } from './vectorium/systems/ParticleSystem';
 export type { ParticleEmitterConfig } from './vectorium/systems/ParticleSystem';
+
+// GPU Particle System (transform feedback — zero CPU physics/upload)
+export { GpuParticleSystem } from './vectorium/systems/GpuParticleSystem';
+export type { GpuParticleConfig } from './vectorium/systems/GpuParticleSystem';
+export type { IParticleSystem } from './vectorium/systems/IParticleSystem';

@@ -20,6 +20,8 @@
  * Performance: 5M+ sprites @ 60 FPS (GPU-bound)
  */
 
+import type { IParticleSystem } from './IParticleSystem';
+
 export interface BunnymarkParticleConfig {
   maxParticles: number;
   canvasWidth: number;
@@ -35,7 +37,7 @@ export interface BunnymarkParticleConfig {
  * Ultra-optimized particle system for bunnymark
  * Renders sprites with textures, handles physics and bouncing
  */
-export class BunnymarkParticleSystem {
+export class BunnymarkParticleSystem implements IParticleSystem {
   // Particle data - interleaved for zero-copy GPU upload
   public positions: Float32Array; // [x0,y0,x1,y1,...] - both physics and GPU
   public velocities: Float32Array; // [vx0,vy0,vx1,vy1,...] - INTERLEAVED for cache locality!
@@ -510,6 +512,7 @@ export class BunnymarkParticleSystem {
     if (!texture?.glTexture) return;
     
     // Use GPU instancing for maximum performance (5M+ sprites)
+    // aspectY renders sprites at true WxH (26x37 bunny), not squashed squares
     renderer.drawInstancedSprites(
       this.positions,
       this.sizes,
@@ -524,7 +527,8 @@ export class BunnymarkParticleSystem {
       count,
       texture.glTexture,
       this.config.canvasWidth,
-      this.config.canvasHeight
+      this.config.canvasHeight,
+      this.config.spriteHeight / this.config.spriteWidth
     );
   }
   

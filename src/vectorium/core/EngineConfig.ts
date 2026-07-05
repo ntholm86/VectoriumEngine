@@ -21,6 +21,10 @@ export class EngineConfig {
   initialQuality: 'ultra' | 'high' | 'medium' | 'low' | 'potato' = 'high';
   targetFPS = 60;
   useWorkers = false;
+  // Default ALLOCATION SIZE for SoA arrays and static GPU buffers — not a
+  // performance cap. Limits are discovered, never declared (destination
+  // constraint 2026-07-05): raise/lower per app via config; GpuParticleSystem
+  // allocates independently and is not bound by this value.
   maxEntities = 6_500_000;
   maxBatchSize = 65_000;
   debugMode = false;

@@ -51,6 +51,7 @@ export class InstancedSpriteRenderer {
   // Cached uniform locations
   private u_projection: WebGLUniformLocation | null = null;
   private u_texture: WebGLUniformLocation | null = null;
+  private u_aspect: WebGLUniformLocation | null = null;
   
   // Performance monitoring
   private perfMonitor: PerformanceMonitor | null = null;
@@ -69,13 +70,14 @@ export class InstancedSpriteRenderer {
     layout(location = 4) in float a_size;       // Instance size
     
     uniform mat3 u_projection;
+    uniform vec2 u_aspect;   // multiplies a_size per axis (1, h/w) for non-square sprites
     
     out vec2 v_texCoord;
     out vec4 v_color;
     
     void main() {
-      // Calculate vertex position: instance position + quad offset * size
-      vec2 vertexPos = a_position + a_quadPos * a_size;
+      // Calculate vertex position: instance position + quad offset * size * per-axis aspect
+      vec2 vertexPos = a_position + a_quadPos * a_size * u_aspect;
       
       // Apply projection
       gl_Position = vec4((u_projection * vec3(vertexPos, 1.0)).xy, 0.0, 1.0);
@@ -135,6 +137,7 @@ export class InstancedSpriteRenderer {
     // Get uniform locations
     this.u_projection = gl.getUniformLocation(this.program, 'u_projection');
     this.u_texture = gl.getUniformLocation(this.program, 'u_texture');
+    this.u_aspect = gl.getUniformLocation(this.program, 'u_aspect');
     
     // Cleanup
     gl.deleteShader(vertexShader);
@@ -273,7 +276,8 @@ export class InstancedSpriteRenderer {
     count: number,
     texture: WebGLTexture,
     canvasWidth: number,
-    canvasHeight: number
+    canvasHeight: number,
+    aspectY: number = 1
   ): void {
     if (count === 0) return;
     
@@ -286,6 +290,7 @@ export class InstancedSpriteRenderer {
     }
     
     gl.useProgram(this.program);
+    gl.uniform2f(this.u_aspect, 1, aspectY);
     
     // Cache projection matrix (only update if canvas size changed)
     if (this.cachedCanvasWidth !== canvasWidth || this.cachedCanvasHeight !== canvasHeight) {

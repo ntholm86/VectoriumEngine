@@ -592,6 +592,15 @@ void main() {
   begin(width: number, height: number): void {
     const gl = this.gl;
     
+    // Reset cached state at the start of each frame. Child renderers (e.g.
+    // InstancedSpriteRenderer) may have switched programs/buffers without
+    // updating this cache, so trusting it here causes stale state to persist.
+    this.currentShaderProgram = null;
+    this.boundVertexBuffer = null;
+    this.boundIndexBuffer = null;
+    this.currentBlendMode = null;
+    this.currentViewport = [0, 0, 0, 0];
+    
     this.cachedSetViewport(0, 0, width, height);
     gl.clearColor(this.clearColor[0], this.clearColor[1], this.clearColor[2], this.clearColor[3]);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -1367,7 +1376,8 @@ void main() {
     count: number,
     texture: WebGLTexture,
     canvasWidth: number,
-    canvasHeight: number
+    canvasHeight: number,
+    aspectY: number = 1
   ): void {
     if (!this.instancedRenderer) {
       console.warn('[RENDERER] GPU instancing not available, falling back to batch rendering');
@@ -1379,7 +1389,8 @@ void main() {
       colorR, colorG, colorB, alphas,
       uvU0, uvV0, uvU1, uvV1,
       count, texture,
-      canvasWidth, canvasHeight
+      canvasWidth, canvasHeight,
+      aspectY
     );
   }
 
