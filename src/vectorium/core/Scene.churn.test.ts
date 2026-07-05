@@ -23,13 +23,18 @@ interface CapturedDraw {
 
 function makeStubRenderer(captured: CapturedDraw[]) {
   return {
-    drawBulkShapesIndexed(
+    // Stubbing the WebGL1 fallback shape of the unified path: Scene fills
+    // the indices array when supportsInstancedEntities is false, then calls
+    // drawEntities — THE single general-entity entry point.
+    supportsInstancedEntities: false,
+    drawEntities(
       _posX: Float32Array, _posY: Float32Array, _rotation: Uint16Array, _sizes: Float32Array,
       _colorR: Uint8Array, _colorG: Uint8Array, _colorB: Uint8Array, _alphas: Float32Array,
       _shapeTypes: Uint8Array, flags: Uint32Array, indices: Uint32Array,
       count: number, flagVisible: number
-    ): void {
+    ): number {
       captured.push({ flags, indices, count, flagVisible });
+      return count;
     },
   } as any;
 }

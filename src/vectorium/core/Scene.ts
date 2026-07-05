@@ -223,11 +223,10 @@ export class Scene {
       }
     }
     
-    for (let j = 0; j < idRange; j++) {
-      this.visibleIndices[j] = j;
-    }
-    
     if (hasTextures && typeof (renderer as any).drawBulkSpritesIndexed === 'function') {
+      for (let j = 0; j < idRange; j++) {
+        this.visibleIndices[j] = j;
+      }
       const textureManager = (renderer as any).textureManager || null;
       (renderer as any).drawBulkSpritesIndexed(
         posX, posY, rotation, this.scaledSizes,
@@ -240,7 +239,15 @@ export class Scene {
         textureManager
       );
     } else {
-      renderer.drawBulkShapesIndexed(
+      // Unified general-entity path: GPU-instanced on WebGL2 (iterates SoA
+      // directly, no index fill needed); legacy CPU batcher on WebGL1
+      // (which requires the indices array pre-filled).
+      if (!renderer.supportsInstancedEntities) {
+        for (let j = 0; j < idRange; j++) {
+          this.visibleIndices[j] = j;
+        }
+      }
+      renderer.drawEntities(
         posX, posY, rotation, this.scaledSizes,
         colorR, colorG, colorB, alphas, shapeTypes,
         flags, this.visibleIndices, idRange, this.world.FLAG_VISIBLE,

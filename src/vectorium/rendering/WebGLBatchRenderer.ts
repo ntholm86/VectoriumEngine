@@ -7,6 +7,7 @@
 import type { PerformanceMonitor } from '../tools/PerformanceMonitor';
 import { ENGINE_CONFIG } from '../core/EngineConfig';
 import { InstancedSpriteRenderer } from './InstancedSpriteRenderer';
+import { InstancedShapeRenderer } from './InstancedShapeRenderer';
 
 export class WebGLBatchRenderer {
   private gl: WebGLRenderingContext | WebGL2RenderingContext;
@@ -22,6 +23,7 @@ export class WebGLBatchRenderer {
   
   // GPU instancing renderer (optional, for massive particle counts)
   private instancedRenderer: InstancedSpriteRenderer | null = null;
+  private instancedShapeRenderer: InstancedShapeRenderer | null = null;
   
   // Shape shader buffers (allocated on demand)
   private shapeVertices: Float32Array | null = null;
@@ -185,9 +187,10 @@ export class WebGLBatchRenderer {
       this.sinCache[deg] = Math.sin(rad);
     }
     
-    // Initialize GPU instancing renderer if WebGL2
+    // Initialize GPU instancing renderers if WebGL2
     if (useWebGL2 && gl instanceof WebGL2RenderingContext) {
       this.instancedRenderer = new InstancedSpriteRenderer(gl);
+      this.instancedShapeRenderer = new InstancedShapeRenderer(gl);
     }
     
     this.initialize();
@@ -1358,6 +1361,61 @@ void main() {
     return this.gl;
   }
   
+  /** True when the GPU-instanced general-entity path is available (WebGL2). */
+  get supportsInstancedEntities(): boolean {
+    return this.instancedShapeRenderer !== null;
+  }
+  
+  /**
+   * 🚀 THE unified general-entity draw call (shapes/SDF path).
+   * WebGL2: GPU-instanced — per-instance rotation/size/color/shape computed
+   * in the vertex shader; CPU only fills 20 B/instance. WebGL1: falls back
+   * to the legacy CPU quad-expansion batcher (drawBulkShapesIndexed).
+   * Returns the number of instances actually rendered.
+   */
+  drawEntities(
+    posX: Float32Array,
+    posY: Float32Array,
+    rotation: Uint16Array,
+    sizes: Float32Array,
+    colorR: Uint8Array,
+    colorG: Uint8Array,
+    colorB: Uint8Array,
+    alphas: Float32Array,
+    shapeTypes: Uint8Array,
+    flags: Uint32Array,
+    indices: Uint32Array,
+    idRange: number,
+    flagVisible: number,
+    cameraX: number = 0,
+    cameraY: number = 0,
+    cameraZoom: number = 1
+  ): number {
+    if (this.instancedShapeRenderer) {
+      const rendered = this.instancedShapeRenderer.render(
+        posX, posY, rotation, sizes,
+        colorR, colorG, colorB, alphas, shapeTypes,
+        flags, idRange, flagVisible,
+        this.cachedCanvasWidth, this.cachedCanvasHeight,
+        cameraX, cameraY, cameraZoom
+      );
+      // Instanced path binds its own program/VAO — invalidate cached GL state
+      // so the next batch draw rebinds (same defense as begin()'s reset).
+      this.currentShaderProgram = null;
+      this.boundVertexBuffer = null;
+      return rendered;
+    }
+    
+    // WebGL1 fallback: legacy CPU batcher (requires a filled indices array)
+    this.drawBulkShapesIndexed(
+      posX, posY, rotation, sizes,
+      colorR, colorG, colorB, alphas, shapeTypes,
+      flags, indices, idRange, flagVisible,
+      cameraX, cameraY, cameraZoom
+    );
+    return idRange;
+  }
+  
   /**
    * GPU Instanced Rendering - Zero-copy, 5M+ sprites
    * Used by particle systems that need maximum performance
@@ -1402,6 +1460,9 @@ void main() {
     if (this.indexBuffer) gl.deleteBuffer(this.indexBuffer);
     if (this.instancedRenderer) {
       this.instancedRenderer.destroy();
+    }
+    if (this.instancedShapeRenderer) {
+      this.instancedShapeRenderer.destroy();
     }
   }
 }
