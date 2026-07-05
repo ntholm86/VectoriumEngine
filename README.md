@@ -292,9 +292,8 @@ engine.registerScene('game', scene);
 
 ### **Advanced Features**
 
-**Frustum Culling:**
+**Camera:**
 ```typescript
-scene.setCullingEnabled(true);  // Only render visible entities
 const camera = scene.getCamera();
 camera.setPosition(x, y);       // Move camera
 ```
@@ -490,6 +489,15 @@ class Player {
 See `demo-state-machine.html` for a complete working example with menu, gameplay, pause, and game over states.
 
 ## 📊 Performance Analysis
+
+### **Benchmark Harness Flags** (`bunnytest.html`)
+
+| Flag | Effect |
+|------|--------|
+| `?cpu=1` | Use the CPU-physics particle system (`BunnymarkParticleSystem`) instead of the default GPU transform-feedback system (`GpuParticleSystem`). Use for like-for-like comparisons against CPU-physics engines. |
+| `?max=N` | Override particle capacity (e.g. `?max=20000000`). GPU path takes any N (32 B/particle VRAM); CPU path clamps to `config.maxEntities`. |
+
+Measurement rule: engine-internal frame time is **CPU-side only** — for true frame cost, use a GPU-synced probe (1px `readPixels` after render; `gl.finish()` is a no-op under ANGLE). Publishable numbers come from fresh same-session runs.
 
 ### **Benchmark Results**
 ```

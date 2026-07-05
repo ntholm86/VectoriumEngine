@@ -26,7 +26,6 @@ export class Scene {
   public cameraX: number = 0;
   public cameraY: number = 0;
   public cameraZoom: number = 1;
-  private cullingEnabled = true;
   
   private visibleIndices: Uint32Array;
   private scaledSizes: Float32Array;
@@ -194,12 +193,15 @@ export class Scene {
     const shapeTypes = this.world.getShapeTypes();
     const textureIds = this.world.getTextureIds();
     
-    const totalCount = this.world.getActiveCount();
-    const worldMax = (this.world as any).maxEntities;
+    // CRITICAL: iterate the allocated ID range (high-water mark), NEVER an entity
+    // *count*. IDs are sparse after free-list recycling: with 50 allocated and 30
+    // active, live entities can have IDs >= 30 — bounding a loop by a count skips
+    // them (invisible-but-colliding bug, fixed 2026-07-05). Inactive IDs carry
+    // flags = 0 and are skipped by the FLAG_VISIBLE check in the renderer.
+    const idRange = this.world.getTotalCount();
+    const activeCount = this.world.getActiveCount();
     
-    console.log(`[SCENE] renderECSBatch: totalCount=${totalCount}, worldMax=${worldMax}`);
-    
-    const simdCount = totalCount & ~3;
+    const simdCount = idRange & ~3;
     let i = 0;
     
     for (; i < simdCount; i += 4) {
@@ -209,59 +211,21 @@ export class Scene {
       this.scaledSizes[i + 3] = sizes[i + 3] * scales[i + 3];
     }
     
-    for (; i < totalCount; i++) {
+    for (; i < idRange; i++) {
       this.scaledSizes[i] = sizes[i] * scales[i];
     }
     
     let hasTextures = false;
-    for (let j = 0; j < totalCount; j++) {
+    for (let j = 0; j < idRange; j++) {
       if (textureIds[j] > 0) {
         hasTextures = true;
         break;
       }
     }
     
-    const worldScale = this.viewport.worldScale;
-    const shouldCull = this.cullingEnabled && worldScale > 1.01;
-    
-    if (!shouldCull) {
-      for (let j = 0; j < totalCount; j++) {
-        this.visibleIndices[j] = j;
-      }
-      
-      if (hasTextures && typeof (renderer as any).drawBulkSpritesIndexed === 'function') {
-        const textureManager = (renderer as any).textureManager || null;
-        console.log(`[SCENE] Calling drawBulkSpritesIndexed with count=${totalCount}`);
-        (renderer as any).drawBulkSpritesIndexed(
-          posX, posY, rotation, this.scaledSizes,
-          colorR, colorG, colorB, alphas,
-          textureIds,
-          this.world.getUVU0(), this.world.getUVV0(),
-          this.world.getUVU1(), this.world.getUVV1(),
-          flags, this.visibleIndices, totalCount, this.world.FLAG_VISIBLE,
-          this.cameraX, this.cameraY, this.cameraZoom,
-          textureManager
-        );
-        
-        this.culledCount = 0;
-        this.visibleCount = totalCount;
-        return;
-      }
-      
-      renderer.drawBulkShapesIndexed(
-        posX, posY, rotation, this.scaledSizes,
-        colorR, colorG, colorB, alphas, shapeTypes,
-        flags, this.visibleIndices, totalCount, this.world.FLAG_VISIBLE,
-        this.cameraX, this.cameraY, this.cameraZoom
-      );
-      
-      this.culledCount = 0;
-      this.visibleCount = totalCount;
-      return;
+    for (let j = 0; j < idRange; j++) {
+      this.visibleIndices[j] = j;
     }
-    
-    const visibleCount = totalCount;
-    this.visibleIndices.set(new Uint32Array(totalCount).map((_, i) => i));
     
     if (hasTextures && typeof (renderer as any).drawBulkSpritesIndexed === 'function') {
       const textureManager = (renderer as any).textureManager || null;
@@ -271,25 +235,21 @@ export class Scene {
         textureIds,
         this.world.getUVU0(), this.world.getUVV0(),
         this.world.getUVU1(), this.world.getUVV1(),
-        flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
+        flags, this.visibleIndices, idRange, this.world.FLAG_VISIBLE,
         this.cameraX, this.cameraY, this.cameraZoom,
         textureManager
       );
-      
-      this.culledCount = totalCount - visibleCount;
-      this.visibleCount = visibleCount;
-      return;
+    } else {
+      renderer.drawBulkShapesIndexed(
+        posX, posY, rotation, this.scaledSizes,
+        colorR, colorG, colorB, alphas, shapeTypes,
+        flags, this.visibleIndices, idRange, this.world.FLAG_VISIBLE,
+        this.cameraX, this.cameraY, this.cameraZoom
+      );
     }
     
-    renderer.drawBulkShapesIndexed(
-      posX, posY, rotation, this.scaledSizes,
-      colorR, colorG, colorB, alphas, shapeTypes,
-      flags, this.visibleIndices, visibleCount, this.world.FLAG_VISIBLE,
-      this.cameraX, this.cameraY, this.cameraZoom
-    );
-    
-    this.culledCount = totalCount - visibleCount;
-    this.visibleCount = visibleCount;
+    this.culledCount = 0;
+    this.visibleCount = activeCount;
   }
   
   getWorld(): World {
@@ -298,10 +258,6 @@ export class Scene {
   
   getSpatialHash() {
     return this.world.getSpatialHash();
-  }
-  
-  setCullingEnabled(enabled: boolean): void {
-    this.cullingEnabled = enabled;
   }
   
   setCanvasDimensions(width: number, height: number): void {

@@ -234,9 +234,8 @@ engine.start();
 
 ### **Advanced Features**
 
-**Frustum Culling:**
+**Camera:**
 ```typescript
-scene.setCullingEnabled(true);  // Only render visible entities
 const camera = scene.getCamera();
 camera.setPosition(x, y);       // Move camera
 ```

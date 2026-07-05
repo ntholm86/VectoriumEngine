@@ -214,7 +214,6 @@ export class Vectorium implements IEngine {
     }
     
     if (this.currentScene) {
-      this.currentScene.setCullingEnabled(true);
       this.currentScene.setWorldBoundsMultiplier(1.2);
     }
     
