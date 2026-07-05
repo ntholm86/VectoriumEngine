@@ -932,10 +932,10 @@ export class PerformanceMonitor extends UIPanel {
   protected createContent(): string {
     return `
       <div class="profiler-content">
-        <div class="section-header">📊 PERFORMANCE</div>
+        <div class="section-header">📊 PERFORMANCE (CPU-side)</div>
         <div class="ui-section">
           <div class="ui-row">
-            <span class="ui-label">FPS</span>
+            <span class="ui-label" title="CPU-side only: does not wait for the GPU. GPU-bound scenes read far higher than true FPS.">CPU FPS</span>
             <span class="ui-value" data-metric="fps" style="font-size: 24px; font-weight: bold; color: #00ff00;">60.0</span>
           </div>
           <div class="ui-row">
@@ -943,11 +943,11 @@ export class PerformanceMonitor extends UIPanel {
             <span class="ui-value" data-metric="active" style="font-size: 20px; font-weight: bold; color: #00ccff;">0</span>
           </div>
           <div class="ui-row">
-            <span class="ui-label">Frame Time</span>
+            <span class="ui-label" title="CPU-side only: excludes GPU execution time. Use a GPU-synced probe for true frame cost.">CPU Frame Time</span>
             <span class="ui-value" data-metric="frame">16.67ms</span>
           </div>
           <div class="ui-row">
-            <span class="ui-label">Frame Budget</span>
+            <span class="ui-label">CPU Frame Budget</span>
             <span class="ui-value" data-metric="framebudget">0.0/16.67ms</span>
           </div>
           <div class="frame-budget-bar">
@@ -983,10 +983,10 @@ export class PerformanceMonitor extends UIPanel {
               </div>
             </div>
 
-            <div class="section-header">🎯 FRAME TIMING</div>
+            <div class="section-header">🎯 FRAME TIMING (CPU-side)</div>
             <div class="ui-section">
               <div class="ui-row">
-                <span class="ui-label">FPS</span>
+                <span class="ui-label">CPU FPS</span>
                 <span class="ui-value" data-metric="fps">60.0</span>
               </div>
               <div class="ui-row">
