@@ -1,5 +1,7 @@
 # Vectorium Performance Optimization Log
 
+> **⚠️ Verdicts are dated, not eternal (note added 2026-07-05).** Every WIN and FAIL below was measured against the architecture of its day. At least one has already been overturned: "GPU Instancing: 78% slower" was true for the old design, but after the zero-copy/static-buffer redesign, GPU instancing became the flagship rendering path (`InstancedSpriteRenderer`), and GPU transform-feedback physics (`GpuParticleSystem`) later pushed the same benchmark from 601k to 3.2M entities @ 60 FPS (GPU-synced). Before rejecting a technique because this log rejected it, re-test it against the current architecture.
+
 ## Tested Optimizations
 
 ### ✅ **WINS** (Implemented & Kept)
