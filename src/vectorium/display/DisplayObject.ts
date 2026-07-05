@@ -44,7 +44,7 @@ export class DisplayObject {
   }
   
   set rotation(value: number) {
-    this._world.getRotation()[this._entityId] = value;
+    this._world.getRotation()[this._entityId] = World.normalizeRotation(value);
   }
   
   get scale(): number {

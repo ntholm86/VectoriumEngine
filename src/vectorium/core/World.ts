@@ -890,7 +890,18 @@ export class World {
    * Set rotation for entity (0-360 degrees)
    */
   setRotation(id: EntityId, degrees: number): void {
-    this.rotation[id] = Math.floor(degrees) % 360;
+    this.rotation[id] = World.normalizeRotation(degrees);
+  }
+
+  /**
+   * Normalize degrees to [0, 359] for the Uint16 rotation cache.
+   * JavaScript's `%` keeps negative remainders, so `-90 % 360 === -90`,
+   * which stores as 65446 in a Uint16Array and breaks the renderer's 0-359 lookup.
+   */
+  static normalizeRotation(degrees: number): number {
+    let r = Math.floor(degrees) % 360;
+    if (r < 0) r += 360;
+    return r;
   }
   
   /**
