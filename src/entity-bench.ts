@@ -52,6 +52,9 @@ function init() {
         const vy = (Math.random() - 0.5) * 80;
         const id = world.createEntity(x, y, vx, vy);
         world.setShapeType(id, 1); // circle — generic non-textured entity
+        // Real-game workload parity: continuous per-entity rotation,
+        // integrated by the engine (idiomatic vectorium usage).
+        world.setRotationSpeed(id, (Math.random() - 0.5) * 360);
       }
       return world.getTotalCount();
     }

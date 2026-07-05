@@ -517,6 +517,18 @@ See `demo-state-machine.html` for a complete working example with menu, gameplay
 
 Measurement rule: engine-internal frame time is **CPU-side only** — for true frame cost, use a GPU-synced probe (1px `readPixels` after render; `gl.finish()` is a no-op under ANGLE). Publishable numbers come from fresh same-session runs.
 
+### **Rival Comparison — the general gaming path** (2026-07-05)
+
+Each engine measured on its **idiomatic game-object path** (not particle stunts): entities with per-entity drift, wall bounce, and continuous rotation, updated the way a real game written in that engine would do it. Same machine, same 800×600 canvas, same GPU-synced protocol. Harnesses: `entity-bench.html`, `pixi-general.html`, `phaser-general.html`.
+
+| Engine (idiomatic path) | 60 FPS ceiling | Frame time @ 100k entities |
+|---|---|---|
+| **Vectorium** (`World` + instanced shapes) | **~500,000** | **3.8 ms (265 FPS)** |
+| PixiJS v8 (`Container` + `Sprite`) | ~100,000 | 16.2 ms (62 FPS) |
+| Phaser 3 (`GameObjects.Image`) | ~85,000 | 18.2 ms (55 FPS) |
+
+**~5× PixiJS and ~6× Phaser at the 60 FPS ceiling.** Known asymmetry, stated openly: vectorium renders SDF shapes (26 px circles) while the rivals render the 26×37 bunny texture — comparable screen area, different fragment work. The structural difference being measured is real, though: SoA typed arrays + engine-integrated physics + GPU-instanced rendering vs. per-object JS scene graphs. On the particle path (`ParticleContainer` vs `GpuParticleSystem`) vectorium's lead is larger still — see below.
+
 ### **Benchmark Results**
 > **Re-measured 2026-07-05** with a GPU-synced protocol (1px `readPixels` per frame; engine-internal FPS is CPU-side only and reads misleadingly high — see the measurement rule above). Harness: `entity-bench.html` (drives `Scene`/`World` directly, not the specialized bunnymark particle systems).
 >
