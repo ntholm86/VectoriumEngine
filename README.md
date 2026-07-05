@@ -1,10 +1,23 @@
 # 🎮 Vectorium Engine
 
-A high-performance, production-ready WebGL sprite rendering engine built with TypeScript. Achieves **60 FPS @ 600k entities** through ECS architecture, optimized batch rendering, and GPU-friendly vertex formats.
+A high-performance, production-ready WebGL sprite rendering engine built with TypeScript.
+
+> **⚠️ Two performance numbers, two different jobs — read this before citing either one**
+>
+> | | General entities (`Scene`/`World`) | Bunnymark particle systems |
+> |---|---|---|
+> | **60 FPS ceiling** | **~500,000** (GPU-instanced path, synced, this machine) | **~3.2M** (GPU-physics) / ~1.8M (CPU-physics) |
+> | **What it measures** | Real game objects — arbitrary per-entity rotation, shape, size, CPU-driven logic | A uniform, GPU-instanced particle storm — identical sprites, no per-entity rotation |
+> | **Physics location** | CPU (`World.updateFrame`) | GPU (transform feedback) or CPU, selectable |
+> | **Used by** | Your actual game code (e.g. the Asteroids demo) | `bunnytest.html` only |
+> | **Bottleneck** | CPU instance-fill + physics (GPU trig since 2026-07-05 unification) | GPU fill rate / VRAM |
+>
+> **These are not contradictory** — both now share the same GPU-instancing technique (unified 2026-07-05: `InstancedShapeRenderer` gives general entities per-instance GPU-side rotation/size/color/shape). The particle path remains faster because it trades away per-entity flexibility and can move physics to the GPU. Never cite one number as if it describes the other path.
 
 ## 🏆 Performance Benchmarks
 
-- **600,000 entities @ 60 FPS** (10M+ vertices/frame)
+- **~500,000 generic entities @ 60 FPS** (GPU-synced, 2026-07-05, unified instanced path — up from ~300k before unification)
+- **~3,200,000 particles @ 60 FPS** (GPU-physics bunnymark; see Benchmark Harness Flags below — a specialized configuration of the same instancing technique)
 - **Single draw call** batch rendering with automatic state management
 - **24-byte optimized vertex format** for maximum GPU cache efficiency
 - **Zero-allocation rendering** with pre-allocated typed arrays
@@ -25,22 +38,27 @@ See [NPM_PACKAGE_GUIDE.md](NPM_PACKAGE_GUIDE.md) for complete usage instructions
 
 ### Quick Start
 ```typescript
-import { Vectorium, Scene } from 'vectorium-engine';
+import { Vectorium, Scene, EngineConfig, VectoriumBuilder } from 'vectorium-engine';
 
-const engine = new Vectorium({
-  canvas: document.getElementById('game'),
-  width: 800,
-  height: 600
-});
+const config = new EngineConfig();
+config.width = 800;
+config.height = 600;
+// config.canvas = document.getElementById('game') as HTMLCanvasElement; // optional: provide your own canvas
 
 class GameScene extends Scene {
+  constructor() {
+    super('game'); // Scene requires a name
+  }
+
   async load() {
     // Your game logic
   }
 }
 
-const scene = new GameScene();
-engine.registerScene('game', scene);
+const engine = new VectoriumBuilder(config)
+  .withScene('game', new GameScene())
+  .build();
+
 await engine.loadScene('game');
 engine.start();
 ```
@@ -500,6 +518,21 @@ See `demo-state-machine.html` for a complete working example with menu, gameplay
 Measurement rule: engine-internal frame time is **CPU-side only** — for true frame cost, use a GPU-synced probe (1px `readPixels` after render; `gl.finish()` is a no-op under ANGLE). Publishable numbers come from fresh same-session runs.
 
 ### **Benchmark Results**
+> **Re-measured 2026-07-05** with a GPU-synced protocol (1px `readPixels` per frame; engine-internal FPS is CPU-side only and reads misleadingly high — see the measurement rule above). Harness: `entity-bench.html` (drives `Scene`/`World` directly, not the specialized bunnymark particle systems).
+>
+> **After path unification (InstancedShapeRenderer, same day):** the general entity path now renders via GPU instancing — per-instance rotation/size/color/shape computed in the vertex shader, 20 B/instance upload, no CPU corner math. 60 FPS ceiling moved from ~300k to **~500k**.
+
+```
+Entity Count  │ FPS (unified/instanced) │ FPS (pre-unification CPU batcher)
+───────────────┐─────────────────────────┐─────────────────────────────────
+100,000      │ 263.5 (3.8ms)           │ 159.6 (6.27ms)
+300,000      │ 105.4 (9.5ms)           │ 61.1 (16.38ms)  ← old ceiling
+500,000      │ 61.2 (16.3ms)  ← new ceiling │ 40.1 (24.94ms)
+600,000      │ 52.2 (19.2ms)           │ 33.7 (29.66ms)
+1,000,000    │ 33.6 (29.8ms)           │ —
+```
+
+The original table (unverified assumptions, kept for history — do not cite as current):
 ```
 Entity Count  │ FPS  │ Frame Time │ Vertices  │ Memory
 ──────────────┼──────┼────────────┼───────────┼─────────
@@ -510,6 +543,8 @@ Entity Count  │ FPS  │ Frame Time │ Vertices  │ Memory
 ```
 
 ### **Critical Performance Findings**
+
+> The tables below compare relative trade-offs (format, batch size) measured against the historical, now-invalidated 600k/60FPS anchor. The *direction* of each finding (packed bytes > float colors, integer degrees > float radians, larger batches > smaller) is architecturally plausible and unchanged, but the absolute FPS numbers should be re-measured, not cited as current.
 
 **1. Vertex Format Impact (600k entities)**
 ```

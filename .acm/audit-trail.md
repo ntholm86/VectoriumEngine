@@ -383,3 +383,73 @@ Predicted all-green with no behavior change beyond the API removal: build clean,
 Plateau status vs scorecard v2: items 4, 5, 8, 9, 10 improved; items 1, 2, 3, 6 unchanged (project-sized). Re-scoring now would be premature — the deferred items are the remaining distance to the plateau.
 
 Cost: moderate — 9 files touched (2 API removals, 1 new interface, 3 doc fixes, 1 comment, 2 wiring), 1 build, 1 test run, 1 live game verification. No subagent.
+
+---
+
+## 2026-07-05 — meaningful-commits-and-push
+
+Read "meaningful commits and push" literally, but first audited working-tree state since much of it predated this conversation. Found 9 deleted legacy files (System.ts, VectoriumCore.ts, EntitySpawnService.ts, entities/factories.ts, old particles/BunnymarkParticleSystem.ts, ExampleBehaviors.ts, PerformanceSystem.ts, RenderSystem.ts, SceneBehavior.ts) already removed in the working tree but never committed. Verified before including them: grepped all current src for references (none, only stale comments), and found corroborating evidence in .acm/compass.md (a prior session, "auditonomy v3.0.0", had already flagged RenderSystem.ts as dead/safe-to-remove, and the branch is literally named back-to-scratch) — concluded these were pre-existing intentional cleanup, safe to finalize.
+
+**[!DECISION]** Structured 6 commits by theme rather than one dump, matching today's own DRY/clarity boundary applied to git history itself: (1) legacy scaffolding removal + pixi.js dep, (2) sparse-ID render fix + branch consolidation + culling API removal + regression test, (3) GPU particle system + shared interface + aspect fix + cap removal, (4) profiler honesty relabel, (5) PixiJS rival benchmark harness + stale-verdict doc note, (6) .acm/ trail state. Verified build + full test suite green before and after staging, then pushed to the already-tracked origin/back-to-scratch (no force, no branch surprises).
+
+**[!REALIZATION]** Found an untracked, superseded duplicate: src/pixi-bunnymark.ts + pixi-bunnymark.html — an earlier, cruder version of today's pixitest.ts rival harness, with a hardcoded `MAX_BUNNIES = 6500000` that directly contradicts the no-hardcoded-caps boundary set this session. Not referenced anywhere else. Left deliberately UNCOMMITTED and untouched rather than silently deleting unfamiliar work or silently folding it in — flagged to the operator for a keep/delete ruling.
+
+**Also found (worth a correction note, not acted on):** .acm/compass.md (a different, pre-existing skill's file) records an explicit operator correction from 2026-07-04: manual/interactive browser driving IS the accepted test methodology here, and future runs should NOT propose adding Playwright/e2e test infrastructure as if fixing a gap. This session's own scorecard item 3 ("add a headless-GL/browser-run vitest smoke test") sits close to that line — noted as a boundary check for the next run to weigh before executing that specific backlog item, not reversed here since it wasn't executed this run.
+
+Pushed: 6 commits, 50b6d64..0b9a6ce, origin/back-to-scratch. Build clean, 32/32 tests green both before staging and after the push.
+
+Cost: moderate — repo audit (git status/diff/grep across ~30 files), 6 staged commits, 1 build, 1 test run, 1 push. No subagent.
+
+---
+
+## 2026-07-05 — readme-performance-claims-audit
+
+Read "is README.md correct in its performance claims" as a verification audit, not a rewrite request — check what is cheaply verifiable, fix what is definitely wrong, name what is merely stale/unverified rather than guessing at it.
+
+**Findings, by confidence:**
+
+1. **DEFINITELY WRONG, fixed:** headline said "600,000 entities @ 60 FPS (10M+ vertices/frame)" — the README's own benchmark table two sections down says 600k entities = 2,400,000 vertices (4/quad). 10M+ was an unexplained ~4x overclaim contradicting the doc's own data. Corrected to "2.4M+ vertices/frame, 4 vertices/entity."
+
+2. **DEFINITELY WRONG, fixed and independently verified via `tsc --noEmit` against real src types:** the flagship Quick Start example did not compile. Three real errors: (a) `new Vectorium({canvas, width, height})` — `Vectorium`'s constructor requires an `EngineConfig` class instance (it has methods like `debug()`), a plain object literal fails structural typing; (b) `document.getElementById('game')` returns `HTMLElement | null`, not `HTMLCanvasElement` — type mismatch even if (a) were fixed; (c) `new GameScene()` — `Scene`'s constructor requires a `name: string` with no default, so a subclass with no constructor cannot be instantiated with zero arguments. Ran the ORIGINAL snippet through `tsc` first to confirm all 3 errors precisely, then the CORRECTED snippet (using `EngineConfig` + `VectoriumBuilder`, the same pattern bunnytest.ts/pixitest.ts actually use in this repo) to confirm zero errors. This is the first README code sample in this repo verified by an actual compiler rather than by reading.
+
+**Flagged, not fixed — needs an operator decision, not a guess:** the "600,000 entities @ 60 FPS / 14.5ms" general-purpose ECS batch-rendering table (and its sibling Vertex-Format/Rotation-Cache/Batch-Size sub-tables) is the historical pre-revival number (matches engineDocs' "601,000 @ 60 FPS — Unrivalled" almost exactly) and is a DIFFERENT code path from today's bunnymark-specific particle systems (Scene/World's general `drawBulkShapesIndexed`/`drawBulkSpritesIndexed` path, not `BunnymarkParticleSystem`/`GpuParticleSystem`). It was almost certainly measured with the same CPU-only unsynced FPS counter fixed today, and predates today's `Scene.renderECSBatch` changes (sparse-ID fix, branch consolidation). Not proven wrong — genuinely unverified. Named rather than silently assumed correct or silently rewritten.
+
+Blind spot: did not verify the "Architecture Decisions" section's qualitative claims (SoA cache-friendliness, etc.) — those are structural/architectural facts unlikely to have rotted, lower priority than numeric benchmark claims.
+
+Next candidate (operator's call, project-sized): run a fresh GPU-synced benchmark of the general Scene/World entity path (not the specialized particle systems) to confirm or correct the 600k table — same rigor already applied to the bunnymark numbers today.
+
+Cost: light-moderate — read ~150 README lines, grepped/read 4 source files, wrote and tsc-verified 2 throwaway snippets (then deleted them), 2 README edits, 1 build, 1 test run. No subagent.
+
+---
+
+## 2026-07-05 — general-entity-benchmark-verified-600k-was-wrong
+
+Operator pushed back on the prior audit's "flagged, not fixed" item: "is 600k @ 60fps correct? I thought performance was higher." Read intent as: stop flagging, actually measure the general Scene/World entity path (not the bunnymark particle systems) with today's GPU-synced protocol, and correct the README with the real number either way.
+
+**[!DECISION]** Built entity-bench.html/src/entity-bench.ts: a minimal harness driving the real Scene/World/WebGLBatchRenderer path directly (world.createEntity + setShapeType, Scene.update/render), GPU-synced via 1px readPixels per frame — same protocol as every other benchmark today. Kept as a permanent harness (like pixitest.ts), not a throwaway.
+
+**Prediction:** expected the operator's instinct ("performance was higher") to be right in spirit but the specific 600k/14.5ms table to be stale/optimistic given it's the same unsynced-FPS-counter era as the other historical claims found today.
+
+**What happened — the operator was right that something was off, but in the OPPOSITE direction than hoped:** GPU-synced measurement shows the true 60 FPS ceiling for generic (non-textured, shape) entities on this machine is **~300,000**, not 600,000. Ladder: 280k=65.1 FPS, 300k=61.1 FPS (crossover), 340k=52.7 FPS, 600k=33.7 FPS — less than half the claimed FPS at the claimed count. Phase-split at 600k: update 6.07ms, CPU render-submit 20.86ms (corner/rotation calc + SDF batching in `drawBulkShapesIndexed` — the bottleneck), GPU-sync 3.63ms. Visually verified (screenshot, entity count, zero GL errors) — real, not a measurement artifact.
+
+**[!REALIZATION]** The specialized bunnymark particle systems (GpuParticleSystem, ~3.2M @ 60 FPS) and the general Scene/World entity path (~300k @ 60 FPS) are TWO DIFFERENT, unequally-optimized pipelines. The GPU-instanced/transform-feedback work done today only benefits particle-system users; a typical game entity (a shape or sprite added via `world.createEntity`, like Asteroids' ship/asteroids/bullets) still goes through the older CPU-bound SDF/batch path and never received that speedup. The README's headline number conflated "the engine" as a monolith when it is actually two performance classes.
+
+Corrected README.md: headline now states ~300k for generic entities (GPU-synced, dated) alongside the ~3.2M GPU-particle figure, both labeled by which path they measure. Replaced the Benchmark Results table with the real ladder, kept the original table below marked explicitly "unverified assumptions, kept for history — do not cite as current." Added a caveat above the Vertex-Format/Rotation-Cache/Batch-Size sub-tables noting their absolute numbers share the same invalidated anchor even though their qualitative direction (packed bytes > float, etc.) is still architecturally plausible. Fixed one incidental markdown fence-spacing bug introduced by the prior edit.
+
+Blind spot: did not attempt to CLOSE the gap (optimize the general entity path to match the particle path's technique) — that is a real, now well-evidenced next candidate, but a project, not this run's scope. Also did not re-verify the Vertex-Format/Rotation-Cache/Batch-Size sub-tables' numbers directly (flagged, not measured) — same discipline as before: don't guess, name it.
+
+Cost: moderate — 1 new benchmark harness (2 files, kept permanently), ~6 measurement rounds across 2 page loads, 1 screenshot, 2 README sections corrected, build+test verification. No subagent.
+
+---
+
+## 2026-07-05 — clarify-two-benchmark-numbers-readme-callout
+
+Operator remained confused after the prior fix's brief mention: "we had 6.5M bunnies, why only 300k now?" Read this as direct evidence the prior README edit did not communicate the distinction clearly enough — a documentation-clarity failure, not a new measurement question (the numbers themselves were already correct and trailed).
+
+**[!DECISION]** Explained directly in chat first (comparison table: what each path measures, physics location, who uses it, bottleneck), then made the README itself unmistakable rather than relying on scattered mentions: added a prominent comparison callout immediately after the H1, before any specific number is stated, so a reader hits the explanation before either number. One correction: my first pass used an h3 inside a blockquote, skipping a heading level (h1->h3) — caught by the markdown linter, converted to bold text instead, matching the file's own existing informal-heading style (already full of MD036 bold-as-heading patterns).
+
+**[!REALIZATION]** A number can be individually correct and verified (as both 300k and 3.2M were, per the prior two trail entries) and still cause confusion if the DOCUMENT doesn't explain why two true numbers about "the same engine" differ by 10x. Verification and communication are separate failure modes — this session fixed the first without fully fixing the second on the first attempt. Worth carrying forward: after correcting a number, ask "would a reader with no session context understand why this differs from the other number nearby?", not just "is this number now true?"
+
+No new measurements taken this run — pure documentation clarity fix, informed entirely by prior trail entries and today's already-established facts.
+
+Cost: light — 1 README section rewritten, 1 lint-driven correction, no builds/tests needed (docs only).

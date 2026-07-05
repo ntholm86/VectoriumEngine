@@ -108,3 +108,21 @@ _Temporary plateau diagnostic. Scores describe the current shape of the codebase
 **Aggregate: 68/100** — nominally flat vs. the superseded v1 (69/100), but the composition is different: this scorecard measures against a much larger destination (rival benchmarking, measurement honesty, architectural boundaries) that v1 didn't test for at all. Read as "holding the line while the bar rose," not stagnation.
 
 **Plateau reading:** the day's work (measurement honesty, cap removal, one DRY fix, one regression test) opened more debt than it closed — every new capability (GPU particle system, rival harness) arrived without its own test or without full API unification. That is expected of a revival's first day, not a warning sign, provided the next few runs close what today opened rather than open more. The two cheapest, most load-bearing next moves by boundary-fit: (a) resolve `setCullingEnabled` (transparency, one line either way), (b) `IParticleSystem` interface (DRY, zero performance cost). Both satisfy "performance and quality overrule" trivially since neither touches a hot path.
+
+---
+
+## Mini-orient — 2026-07-05 (session-close check; backstop fired at 6 entries)
+
+Trigger: backstop counter (6 entries since last mini-orient) + natural arc boundary (operator asked "are we done").
+
+**Arc claims since last mini-orient:**
+1. The revival day's shape held: scorecard v2 (68/100) executed 5 of 9 improvement items same-day, remainder named not abandoned.
+2. Repo hygiene closed a real gap: 6 themed commits pushed, resolving pre-existing uncommitted legacy-scaffolding deletions that predated this session.
+3. Documentation-honesty became its own finding-class today, distinct from measurement-honesty: two README numbers were each individually true but under-explained, requiring a second pass (clarify-two-benchmark-numbers) after the first fix. Lesson banked: verification and communication are separate failure modes.
+4. **Not yet true "done":** uncommitted work exists (README.md's two follow-up fixes, entity-bench.html/ts, .acm trail) since the last push (0b9a6ce). This is the one fact that answers "are we done" honestly — not yet, at minimum a commit is outstanding.
+
+**Open operator rulings, unchanged, still queued (surface once, not nagging further):**
+- pixi-bunnymark.ts/html: orphaned duplicate with a hardcoded cap — keep or delete?
+- Whether to invest in closing the 300k-vs-3.2M general-entity-path gap (a named, evidenced, unscoped project).
+
+**Watch for:** if the operator says "done" without addressing the outstanding commit, that is their call to make (uncommitted local work is not itself broken), not a thing to push back on unprompted.
