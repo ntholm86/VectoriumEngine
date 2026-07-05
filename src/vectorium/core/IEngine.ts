@@ -11,9 +11,12 @@
 import type { TextureManager } from '../rendering/TextureManager';
 import type { EngineConfig } from './EngineConfig';
 import type { PerformanceMonitor } from '../tools/PerformanceMonitor';
+import type { InputManager } from '../systems/InputManager';
 
 export interface IEngine {
+  readonly canvas: HTMLCanvasElement;
   readonly textureManager: TextureManager;
   readonly config: EngineConfig;
   readonly performanceMonitor: PerformanceMonitor;
+  inputManager: InputManager | null;
 }

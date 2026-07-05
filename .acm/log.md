@@ -83,7 +83,8 @@ Read .trail/vision.md (exists from prior Hunch run, 2026-05-02). Vision priority
 
 Three lenses applied:
 
-**Inconsistency** — Engine.ts injects all services onto scenes via (scene as any).property = value throughout egisterScene() and loadScene(). SceneServices/ServiceAwareBase pattern exists to fix this but is disconnected from Scene itself — it applies only to helper classes, not to scene subclasses. Scene subclass authors have no typed API contract; they must read Engine.ts source to discover available services.
+**Inconsistency** — Engine.ts injects all services onto scenes via (scene as any).property = value throughout 
+egisterScene() and loadScene(). SceneServices/ServiceAwareBase pattern exists to fix this but is disconnected from Scene itself — it applies only to helper classes, not to scene subclasses. Scene subclass authors have no typed API contract; they must read Engine.ts source to discover available services.
 
 **Waste** — Two dead harness artifacts:
 1. src/vectorium/utils/StateMachine.test.ts imports StateMachine from '../core/StateMachine' — that path does not exist. The class lives in ./StateMachine (same directory). No test runner is configured in package.json either. The only test file in the repo cannot compile or run.
@@ -370,3 +371,175 @@ Verification: `tsc --noEmit` — zero errors in changed files; pre-existing erro
 **Imagined-reader pushback.** "You added `engine!` assertions in bunnytest.ts — that's just restoring the unsafety you removed from the type." Counter: `(this as any).engine` suppressed all type errors for all properties on engine. `this.engine!` asserts non-null only — if the engine type changes (new property required, existing property removed), TypeScript will catch it. The change narrows the unsafety from "anything goes on this object" to "this object is non-null at this call site." That is a genuine improvement.
 
 [!REALIZATION] The migration direction in Scene.ts is now clear and close to complete: `engine` (done this run), `animationSystem` (done prior run), `performanceMonitor` (typed, setter exists). Remaining: `_setTextureManager(any)` and `private _textureManager: any`. Those two are the last `any`s in Scene.ts's injection surface. One more run closes it.
+
+## 2026-07-04 — auditonomy: material-divergence stop before resuming performance work
+
+- target: vectorium (C:\git\vectorium)
+- operator: (this session)
+- agent: GitHub Copilot (Claude), skill: auditonomy v3.0.0 (from pea/auditonomy-skill)
+- outcome: Examination only. No code changed. Findings + a destination conflict surfaced for operator adjudication before any performance-loop work begins.
+
+### Bootstrap (step 0)
+
+`.acm/destination.md`, `.acm/compass.md`, and `.acm/log.md` already existed (multi-writer .acm: hunch/improve/retrospect skills wrote log.md + compass.md; ai-steward separately writes .acm/audit-trail.md as its own staged-proposal file). Per auditonomy's multi-writer rule, this entry is appended to log.md — the file this target's own convention already uses for narrative skill trail entries — rather than overwriting compass.md's "Current claims" (not due; no arc-read triggered) or touching audit-trail.md (ai-steward's own file).
+
+### Interpretation (step 1) — internal contradiction, surfaced not resolved
+
+[!DECISION] The operator asked to resume a benchmark → compare-to-competitors → optimize → verify-or-discard loop on vectorium, and suspects the graphics-init path may not be single-pathed / the code may be messy since it predates a governance framework.
+
+This directly conflicts with `.acm/destination.md` (operator-held, confirmed 2026-05-02): *"What this is not for: Further bunnymark optimization — that question is answered."* and *"If development resumes, the priority is API surface and harness robustness — not performance work."* Per auditonomy's own rule, an internal contradiction is named explicitly and surfaced for the operator to adjudicate, not silently resolved by picking a side — so no optimization work has started. This is also a legitimate destination-self-trigger candidate (v2.9.0): the operator's own live request is evidence the destination may be stale, but self-triggering only asks; it doesn't settle.
+
+### Examination (step 2) — findings, evidence cited
+
+1. **The "different path" suspicion is CONFIRMED — a real, dead, duplicate graphics-init path.** `Engine.ts`'s `Vectorium` constructor builds its own `WebGLBatchRenderer` + `TextureManager` (lines ~60-64) — this is the live path, used by `bunnytest.ts` via `VectoriumBuilder`. Separately, `systems/RenderSystem.ts` independently constructs a *second* `WebGLBatchRenderer` + `TextureManager` keyed off `engine.canvas`, commented "opt-in only." Grep across all of `src/` found zero calls to `addSystem(` anywhere — `RenderSystem` is never registered by any code path (only defensively referenced in `PerformanceSystem.ts`: `engine.getSystem('RenderSystem')`, which will always return nothing). This is structurally the same class of gap already flagged four times in `compass.md` for the unintegrated WASM physics module — an orphaned, never-wired parallel path, not the messiness of a single path.
+2. **The "8 million bunnies" recollection is unverified against every recorded artifact, and the current benchmark loop cannot produce it.** README says 600k @ 60 FPS; destination.md says "6M+"; git commit history peaks at "6.1m bunnies" (`afcd8d1`) then "fix gravity 5.5m bunnies" (`6550418`). `bunnytest.ts`'s own progressive-test loop hard-stops at `this.totalSpawned >= 6500000` regardless of FPS — as currently written, this build cannot report a number above 6.5M, let alone 8M. Either the recollection is from a build/session not in this history, the cap was different then, or the number is misremembered — not yet distinguishable from the trail alone.
+3. **An ai-steward proposal from 2026-06-20 (`.acm/audit-trail.md`) to remove the unintegrated WASM path is still staged, never committed** — `git status` shows no Engine.ts/World.ts changes pending. Not acted on this run (out of scope for a read-only pass); named for completeness since it's the same finding-class as #1.
+
+### Outcome this run
+
+Silence on action, bounded: tested against "does the current live graphics-init path have more than one branch" (yes, confirmed, dead-code branch) and "can the current code substantiate 8M bunnies" (no, hard-capped at 6.5M) — untested: everything downstream of the destination conflict (whether to resume performance work at all, whether to run a live benchmark, whether to compare against competitor state-of-the-art).
+
+Next: operator decision needed on the destination conflict before any optimize/verify loop starts.
+Cost: moderate — ~14 tool ops (reads, greps, git log/status), 0 files changed.
+
+## 2026-07-04 — auditonomy: verify-before-cleanup (no-sprite swarm claim)
+
+- target: vectorium (C:\git\vectorium)
+- operator: (this session)
+- agent: GitHub Copilot (Claude), skill: auditonomy v3.0.0
+- outcome: Live-verified current performance; searched all 3 branches and all docs for the recalled "tens of millions, no-sprite, physics-driven" build. Found no trace of it anywhere. Confirmed dead code (from prior entry) is safe to remove; nothing found that the requested cleanup would put at risk.
+
+### Interpretation (step 1)
+
+Operator recalled video evidence of tens of millions of particles with gravity/collision/bounce physics, achieved (they believe) partly *because* it skipped sprite/texture rendering — and wants that confirmed as real and preserved before agreeing to strip dead code. Read as: a verification gate before consenting to cleanup, not a request to start cleanup yet. [!DECISION] treated "start it and confirm" literally — ran the live dev server rather than reasoning from source alone, since a performance claim is exactly the kind of thing this skill's own rule says shouldn't be credited on memory or docs alone.
+
+### Examination (step 2) — Purpose (does the claimed capability exist) + evidence
+
+1. **Live-ran the current build.** `npm run dev`, opened `bunnytest.html` (the sprite-based particle bunnymark), triggered the progressive benchmark. Observed via the built-in profiler: climbed 156K → 943K → 2.94M → **4.17M entities, where frame time crossed the loop's own 17ms cutoff (~56-59 FPS) and the run stopped** — matching the coded break condition (`frameTime > 17 || totalSpawned >= 6,500,000`) from the prior entry. This is real, on this machine, right now: ~4.17M *textured sprites* at the 60 FPS boundary. Confirms the engine's speed claims are not fabricated — but this path **is** sprite/texture rendering (`u_hasTexture=1` in `WebGLBatchRenderer.ts`), which cuts directly against the operator's specific "does not render fx. sprites" recollection.
+2. **Searched all three branches** (`back-to-scratch`, `master`, `refactor`) for the recalled build. `master`/`refactor` are an *earlier*, superseded lineage (pixi.js-style, shape/geometry rendering, peaks at commit messages "1m entities 32 fps" and "50k spinning stars with 187 fps") — lower numbers, not the memory. No commit message on any branch, in the full `git log --all`, mentions a figure above "6.1m bunnies" (`back-to-scratch`) or references swarm/points/no-sprite work.
+3. **Searched all docs for "swarm."** Only hit: `engineDocs/INDUSTRY_BENCHMARK_COMPARISON.md`, listing "Swarm/flock behaviors (50k-200k agents)" under *recommended use cases* in a competitor tier-list — a suggestion, not a built/measured demo, and two orders of magnitude below "tens of millions."
+4. **`WebGLBatchRenderer.ts` does have a genuine non-textured draw path** (SDF shapes: circle/triangle, `u_hasTexture=0`) — the one real seed of "no-sprite" rendering in the codebase. It renders the separate ECS "Shapes" category, not the millions-scale particle/physics system, and its performance at scale is unmeasured. This is the closest actual candidate to the memory, and it is not dead code — it's the live shape-rendering branch of the one true renderer.
+
+### Decision
+
+[!DECISION] Silence on cleanup, for now — not because cleanup is wrong, but because the operator's own condition ("confirm this is worth preserving first") isn't yet answerable as "yes, and here's where it lives." Tested against: does any commit, branch, or doc show a rendered, physics-driven, no-sprite build above the current sprite-based ~4-6M ceiling? No. Untested: whether the video files themselves (outside this repo, on the operator's machine) show something this search can't reach — e.g. a raw physics-only console/log benchmark with no visual rendering at all, which "does not render sprites" would also honestly describe, just not as a rendered demo.
+
+### Reflection
+
+**Falsifiable claim about the target:** the "tens of millions, no-sprite, swarm" build is not preserved in this repository, on any branch, in any commit message, or in any doc — the closest artifacts are (a) the current sprite-based bunnymark, verified live at ~4.17M entities @ ~57-60 FPS, which does render sprites, and (b) an unused-at-scale, non-textured SDF shape-draw path already alive in `WebGLBatchRenderer.ts`. If the operator's video shows real footage of tens of millions of rendered, physics-driven entities, it was either never committed to git, lived in a different project, or is a physics-only (non-rendered) stress test being misremembered as a visual demo.
+
+**Named blind spot:** cannot inspect the operator's local video files or check for other, non-git local folders/experiments outside this workspace; the claim can only be falsified against what git and the filesystem here actually hold, not against the operator's own external evidence.
+
+**Imagined-reader pushback:** "You ran one machine's one live session for less than two minutes — that's not authoritative about 'insane performance.'" Fair: the observed 4.17M ceiling is this machine's number, not a proven upper bound; the docstring/commit claims of 5-6M are plausible on different hardware. The conclusion that stands regardless of exact ceiling is the one that matters here: no path anywhere in this repo's history renders tens of millions without sprites.
+
+Next: operator decision on whether to treat the "no-sprite swarm" idea as (a) abandoned/unrecoverable from this repo and proceed with cleanup as planned, or (b) worth a fresh build from scratch using the existing SDF shape-draw path as a starting seed, scoped as new work rather than recovered work.
+Cost: heavy — ~20 tool ops including a live dev server + browser session, 0 files changed.
+
+## 2026-07-04 — auditonomy: dead-path cleanup executed
+
+- target: vectorium (C:\git\vectorium)
+- operator: (this session)
+- agent: GitHub Copilot (Claude), skill: auditonomy v3.0.0
+- outcome: 9 dead files removed (a wider map than the single RenderSystem.ts flagged in the prior entry). Build, typecheck-relevant paths, and the 30/30 vitest suite verified green before and after; live bunnymark re-run in-browser post-deletion behaves identically. No regressions.
+
+### Interpretation (step 1)
+
+Operator's bare "use the auditonomy skill now on vectorium" read against context: they had already stated intent to clean up dead paths, conditional on the swarm-preservation question (answered last run: nothing recoverable found, cleanup confirmed safe). Read as: proceed with the cleanup itself. [!DECISION] this also resolves the destination.md tension from two runs ago in the more interesting way — dead-code removal is not "further bunnymark optimization" (destination.md's excluded category), it *is* "API surface and harness robustness" (destination.md's stated priority). No conflict; the two turns of hesitation were about a different question (the swarm claim) than the one destination.md actually gates.
+
+### Examination (step 2) — the map was bigger than previously reported
+
+[!REALIZATION] The prior entry's grep for `addSystem(` (zero hits) was checked against the wrong method name — `VectoriumCore.ts`'s actual registration method is `.use()`, not `addSystem(`. Re-verified properly this run by checking actual imports of each suspect file rather than a single method-name grep. The corrected, evidence-checked dead-code map (nothing anywhere in `src/` imports these, confirmed per-file):
+
+1. `core/VectoriumCore.ts` — an entire second, parallel, never-instantiated core engine class ("opt-in systems" architecture), fully independent of `Engine.ts`'s live `Vectorium` class. Not found in the previous run; this is new.
+2. `core/System.ts` (`System` interface, `BaseSystem`) — consumed only by items 3-4 below; `AnimationSystem` (the one live "system") doesn't extend it, confirmed by reading its class declaration.
+3. `systems/RenderSystem.ts` — the duplicate graphics-init path flagged two runs ago; now confirmed dead by import-check rather than the flawed method-name grep.
+4. `systems/PerformanceSystem.ts` — also never imported; its `getSystem('RenderSystem')` defensive check was the only prior link between the two, both dead together.
+5. `particles/BunnymarkParticleSystem.ts` — a dead duplicate; `bunnytest.ts` actually imports the *other* `systems/BunnymarkParticleSystem.ts`, which is the live one and was correctly left in place.
+6. `systems/SceneBehavior.ts` + `systems/ExampleBehaviors.ts` — `SceneBehaviorManager` and its behaviors, never instantiated anywhere.
+7. `entities/EntitySpawnService.ts` — never instantiated (distinct from the live `tools/EntitySpawner.ts`, which is used and was left in place).
+8. `entities/factories.ts` — `EntityFactories`, never imported anywhere.
+
+Checked before deleting: `src/index.ts` (public API barrel) exports none of these; the only test file (`StateMachine.test.ts`) references none of these.
+
+### Decision
+
+[!DECISION] Delete all 9. Predicted: `npx vitest run` still shows 30/30 passing; `npm run build:demo` still succeeds; live bunnymark in-browser behaves identically. All three confirmed true — `npx tsc --noEmit` surfaced only pre-existing, unrelated vitest-globals-typing errors in `StateMachine.test.ts` (present regardless of this change, confirmed no deleted-file references appear anywhere in its output). Live re-run: reloaded `bunnytest.html`, pressed F, observed the same climb pattern (194K entities @ ~1400 FPS moments after start) as the pre-cleanup run.
+
+### Reflection
+
+**Falsifiable claim about the target:** vectorium had accumulated a second, complete, never-wired "opt-in ECS" subsystem (`VectoriumCore` + `System`/`BaseSystem` + `RenderSystem` + `PerformanceSystem` + `SceneBehavior`/`ExampleBehaviors`) alongside its actual live engine (`Engine.ts`'s `Vectorium` class, direct `EntitySpawner`, direct `AnimationSystem`) — two competing architectural approaches were built, one was adopted, and the other was never deleted. This is now gone; the live path is the only path.
+
+**Named blind spot:** did not check `docs/`, `engineDocs/`, or `README.md` for prose that describes the now-deleted "opt-in systems" architecture as a feature — if any documentation sells that architecture, it now describes dead capability. Not checked this run.
+
+**Imagined-reader pushback:** "grep-based dead-code detection is exactly the kind of check that already failed once this session (`addSystem(` vs `.use()`) — how is this pass more trustworthy?" Answer: this run checked *imports of the suspect file* (a full-name match: `from '.../VectoriumCore'`, `from '.../RenderSystem'`, etc.) rather than guessing a call-site method name — a strictly more reliable signal, since any live usage requires an import regardless of what method name is called on it. Confirmed further by a green build, a green test suite, and a live in-browser re-run, not import-grep alone.
+
+Triggers evaluated: [!REVERSAL] from prior entry noted above (the `addSystem(` mischeck) — this run's own re-verification is the correction, not a new reversal. Recurring finding-class: yes, same class as the original RenderSystem finding (orphaned parallel paths), now shown to be a repo-wide pattern, not a one-off. No prior `[!REALIZATION]` contradicted. No silence declaration due — action was taken.
+
+Next: check `docs/`/`engineDocs/`/`README.md` for stale references to the deleted opt-in-systems architecture (named blind spot above).
+Cost: heavy — ~15 tool ops (9 deletions, tsc, vitest, vite build, live browser re-verify), 9 files removed, 0 subagents.
+
+## 2026-07-04 — auditonomy: demo/test inventory, one more dead-path finding
+
+Asked for a full breakdown of demos/tests beyond bunnymark. Inventoried: 3 HTML entry points (index.html redirect, demo.html, bunnytest.html), 1 test file (StateMachine.test.ts, 30/30 passing, node environment - no DOM/WebGL coverage exists anywhere), 1 unrelated Python pytest stub (satisfies ai-steward's hardcoded check only).
+[!REALIZATION] `demo.html` (`WasmDemoScene` in `demo.ts`) is inert, not just dormant: `initDemo()` never calls `startBenchmark()`, and even a manual call would no-op since `spawnService` is never injected anywhere in `Engine.ts` (confirmed via grep - zero matches) - same finding-class as the historical 2026-05-02 entry, still true today, not yet fixed. `index.html`'s own redirect comment calls it "Physics Settling Test," which matches neither the page title ("WASM ECS Demo") nor its actual content (a bunnymark-shaped scene). No action taken - reporting only, per operator's request.
+Next: if the operator wants a second working demo (not just bunnymark), fixing demo.html requires either wiring spawnService or rewriting WasmDemoScene against the live spawn path (EntitySpawner/particle system), not a one-line fix.
+Cost: light - ~6 tool ops, 0 files changed.
+
+## 2026-07-04 — auditonomy: operator pushback on test-methodology framing
+
+- target: vectorium (C:\git\vectorium)
+- operator: (this session)
+- agent: GitHub Copilot (Claude), skill: auditonomy v3.0.0
+- outcome: Corrected. Manual/interactive browser verification is confirmed the intended test methodology, not a gap. Mini-orient run (pushback trigger); compass.md addendum written.
+
+### What happened
+
+Prior turn's breakdown framed the absence of automated DOM/WebGL test coverage as a shortfall — "no repo-native way to check that claim without a human (or me) driving it by hand" — and offered to fix `demo.html`'s dead spawn path as if closing a gap. Operator corrected directly: **"it does rely on you running browser test manually - that IS HOW we test it."** [!DECISION] this is operator pushback, escalating this entry a tier per the skill's own rule, and firing the mini-orient trigger.
+
+### Mini-orient (step 4 — pushback trigger)
+
+Read back the last 4 entries this loop wrote (verify-before-cleanup, dead-path cleanup, demo/test inventory, this one). The misread was consistent across the arc, not a one-off in the last message: this loop kept treating "no automated e2e coverage" as implicitly bad, without ever asking whether the operator wanted automated coverage at all. Nothing else in those entries depends on that assumption — the StateMachine unit-test facts, the dead-`demo.html` finding, and the 9-file cleanup are all independently verified and unaffected. The one thing that needed correcting was the interpretive frame layered on top of the facts, not the facts.
+
+Updated `.acm/compass.md` with a dated correction section: manual/interactive browser verification is the operator's deliberate methodology; "harness robustness" in `destination.md` should not be read as "needs automated e2e tests" going forward.
+
+### Reflection (compact, per Tier 2)
+
+Blind spot named: this loop never actually asked the operator whether automated test coverage was a goal before treating its absence as a deficiency — it inferred a software-engineering default ("more automated tests = better") onto a target whose actual verification model is a human/agent driving a live session and reading a real-time profiler, which is arguably *more* trustworthy for a claim like "renders millions of particles at N FPS" than a synthetic headless assertion would be.
+Next: none forced — this is a standing interpretive correction, not a task.
+Cost: light — 2 tool ops (one file edit, one trail append), 0 code changed.
+
+## 2026-07-05 — work-skill: API-surface changes for first real-game consumer
+
+- target: vectorium (C:\git\vectorium)
+- operator: Nils Holmager
+- agent: GitHub Copilot (Claude), skill: work v3.1.0 (from pea/work-skill)
+- outcome: Exported input + engine-canvas API surface so an external consumer (`game-portal`) can build a real keyboard-controlled game without reading source code or using `any` casts. Rebuilt dist bundle and types.
+
+### Interpretation of the ask
+
+Operator is building `game-portal` as the first real game/demo on top of vectorium. The destination here (`.acm/destination.md`) explicitly says the engine's missing piece is **API surface and harness robustness**, and that the original game is the latent test case. This run is that test case surfacing real API gaps.
+
+### Examination — what the first consumer needed
+
+1. **Keyboard input.** `InputManager` existed but was not exported from `src/index.ts`, and `Vectorium.loadScene()` only created it when debug tools were enabled. A real game needs input unconditionally.
+2. **Canvas access from a scene.** `Scene` subclasses receive an `engine` reference typed as `IEngine`, but `IEngine` did not expose `canvas` — the one object a scene needs to create its own input manager or handle resize.
+3. **Engine input hook.** Even if a scene creates its own `InputManager`, the engine's game loop only updates `this._inputManager`. `IEngine` had no `inputManager` property, so a scene could not set it in a typed way.
+
+### Decision and action
+
+[!DECISION] Make the minimal public-API additions the consumer needs now, rather than redesigning the input system. Changes:
+- `src/index.ts` — added `export { InputManager }` and `export type { PointerState }`; added `export type { IEngine }` (it was only re-exported from `Engine.ts`, not at package top level).
+- `src/vectorium/core/IEngine.ts` — added `readonly canvas: HTMLCanvasElement` and `inputManager: InputManager | null`.
+- `src/vectorium/core/Engine.ts` — already implemented these; just added the type contract. No runtime change needed.
+- Rebuilt `dist/vectorium.js` and `dist/index.d.ts` via `npm run build:lib && npm run build:types`.
+
+### Verification
+
+- `game-portal` (`npm --prefix C:\git\game-portal run build`) compiles and bundles against the updated `vectorium-engine` package with zero TypeScript errors.
+- The `game-portal` Asteroids-style demo runs: ship rotates/thrusts/shoots, asteroids split on hit, score and lives update, game-over/restart works.
+
+### Open item carried forward
+
+The engine still fetches `/physics.wasm` and `/rendering.wasm` from the site root. Consumers must copy these files to their own `public/` directory. A proper fix is a configurable WASM base path in `EngineConfig`; not implemented this run because the workaround (copy files) is sufficient for the demo and the operator may want to decide the packaging strategy.
+
+Cost: light — 3 files changed in vectorium, 2 rebuilds, no subagent.

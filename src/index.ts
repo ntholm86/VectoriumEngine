@@ -5,7 +5,8 @@
 
 // Core Engine
 export { Vectorium, Scene } from './vectorium/core/Engine';
-export type { Entity } from './vectorium/core/Engine';
+export type { Entity, EntityId, EntityFlags } from './vectorium/core/Engine';
+export type { IEngine } from './vectorium/core/IEngine';
 
 // 🎨 Display Objects (PixiJS-inspired API)
 export { DisplayObject, Sprite, Graphics } from './vectorium/display';
@@ -37,6 +38,10 @@ export { ObjectPool, BufferPool, bufferPool } from './vectorium/utils/Pooling';
 // Performance
 export { PerformanceMonitor } from './vectorium/tools/PerformanceMonitor';
 export type { QualityLevel, QualitySettings, PerformanceMetrics } from './vectorium/tools/PerformanceMonitor';
+
+// Input
+export { InputManager } from './vectorium/systems/InputManager';
+export type { PointerState } from './vectorium/systems/InputManager';
 
 // Particle System
 export { ParticleSystemManager, ParticleEmitter } from './vectorium/systems/ParticleSystem';
