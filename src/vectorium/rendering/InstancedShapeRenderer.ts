@@ -98,9 +98,20 @@ ${SDF_SHAPE_LIBRARY_GLSL}
 void main() {
   float dist = getShapeSDF(vShapeUV, vShapeType);
   float edge = fwidth(dist);
-  float alpha = 1.0 - smoothstep(-edge, edge, dist);
+  float shapeAlpha = 1.0 - smoothstep(-edge, edge, dist);
 
-  fragColor = vec4(vColor.rgb, vColor.a * alpha);
+  // Neon-glow composition: purely color/alpha math on the existing SDF distance --
+  // no extra geometry or quad padding, so it carries no measurable cost at
+  // benchmarked entity counts. Two parts: (1) an inner rim brighten near the
+  // shape's own edge, (2) an outward halo using the margin already present
+  // between each shape's SDF radius and its quad bounds (e.g. circle r=0.9 of 1.0).
+  float rim = smoothstep(0.18, 0.0, abs(dist)) * step(dist, 0.0);
+  float halo = smoothstep(0.22, 0.0, max(dist, 0.0));
+
+  vec3 color = vColor.rgb + rim * 0.5 + vColor.rgb * halo * 0.6;
+  float alpha = max(shapeAlpha, halo * vColor.a * 0.55);
+
+  fragColor = vec4(color, alpha);
   if (fragColor.a < 0.01) discard;
 }
 `;

@@ -219,6 +219,8 @@ export class World {
       const oldWobbleSpeed = this.wobbleSpeed;
       const oldFadeDirection = this.fadeDirection;
       const oldBaseSize = this.baseSize;
+      const oldEnableGravity = this.enableGravity;
+      const oldEnableCollisions = this.enableCollisions;
       
       // Switch to WASM arrays (physics)
       this.positionX = wasmBridge.positionXView;
@@ -240,6 +242,13 @@ export class World {
       this.wobbleSpeed = wasmBridge.wobbleSpeedView;
       this.fadeDirection = wasmBridge.fadeDirectionView;
       this.baseSize = wasmBridge.baseSizeView;
+      // Per-entity physics opt-in flags -- previously JS-only and never seen by
+      // WASM at all (the bug: applyGravity/detectCollisionsInternal used to run
+      // for ALL awake entities once ANY entity requested gravity/collision).
+      if (wasmBridge.enableGravityView && wasmBridge.enableCollisionsView) {
+        this.enableGravity = wasmBridge.enableGravityView;
+        this.enableCollisions = wasmBridge.enableCollisionsView;
+      }
       
       // Copy existing entities to WASM memory (if any exist)
       if (this.entityCount > 0) {
@@ -260,6 +269,10 @@ export class World {
         this.wobbleSpeed.set(oldWobbleSpeed.subarray(0, this.entityCount));
         this.fadeDirection.set(oldFadeDirection.subarray(0, this.entityCount));
         this.baseSize.set(oldBaseSize.subarray(0, this.entityCount));
+        if (wasmBridge.enableGravityView && wasmBridge.enableCollisionsView) {
+          this.enableGravity.set(oldEnableGravity.subarray(0, this.entityCount));
+          this.enableCollisions.set(oldEnableCollisions.subarray(0, this.entityCount));
+        }
         
         // CRITICAL FIX: Re-enable gravity/collisions for all existing entities
         // The counters got reset, so we need to recount

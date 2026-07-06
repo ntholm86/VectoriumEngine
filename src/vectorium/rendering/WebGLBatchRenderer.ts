@@ -552,9 +552,16 @@ float getShapeSDF(vec2 uv, int shapeType) {
 void main() {
   float dist = getShapeSDF(vShapeUV, vShapeType);
   float edge = fwidth(dist);
-  float alpha = 1.0 - smoothstep(-edge, edge, dist);
-  
-  fragColor = vec4(vColor.rgb, vColor.a * alpha);
+  float shapeAlpha = 1.0 - smoothstep(-edge, edge, dist);
+
+  // Kept in visual parity with InstancedShapeRenderer's fragment shader (same neon-glow composition).
+  float rim = smoothstep(0.18, 0.0, abs(dist)) * step(dist, 0.0);
+  float halo = smoothstep(0.22, 0.0, max(dist, 0.0));
+
+  vec3 color = vColor.rgb + rim * 0.5 + vColor.rgb * halo * 0.6;
+  float alpha = max(shapeAlpha, halo * vColor.a * 0.55);
+
+  fragColor = vec4(color, alpha);
   if (fragColor.a < 0.01) discard;
 }
 `;

@@ -39,6 +39,12 @@ let wobbleSpeed: Float32Array = new Float32Array(0);
 let fadeDirection: Int8Array = new Int8Array(0);
 let baseSize: Float32Array = new Float32Array(0);
 
+// Per-entity physics opt-in flags (previously JS-only, never reaching WASM --
+// applyGravity/detectCollisionsInternal used to apply to ALL awake entities
+// once ANY entity requested gravity/collision, ignoring these per-entity flags)
+let enableGravityFlags: Uint8Array = new Uint8Array(0);
+let enableCollisionsFlags: Uint8Array = new Uint8Array(0);
+
 // 🚀 Sin/Cos Lookup Tables (0.1° precision = 3600 entries)
 const SIN_TABLE_SIZE: i32 = 3600;
 let sinTable: Float32Array = new Float32Array(SIN_TABLE_SIZE);
@@ -111,6 +117,8 @@ export function initPhysics(count: i32): void {
   wobbleSpeed = new Float32Array(count);
   fadeDirection = new Int8Array(count);
   baseSize = new Float32Array(count);
+  enableGravityFlags = new Uint8Array(count);
+  enableCollisionsFlags = new Uint8Array(count);
   
   // Pre-calculate sin/cos lookup tables (0.1° precision)
   for (let i = 0; i < SIN_TABLE_SIZE; i++) {
@@ -304,18 +312,18 @@ function querySpatialHashOptimized(cellX: i32, cellY: i32): i32 {
 export function applyGravity(dt: f32, gravityY: f32): void {
   const gravityAccel = gravityY * dt;
   const simdCount = entityCount & ~3;
-  
+
   // Scalar unrolled loop (4 at a time)
   for (let i = 0; i < simdCount; i += 4) {
-    if (sleepState[i] == 0) velocityY[i] += gravityAccel;
-    if (sleepState[i + 1] == 0) velocityY[i + 1] += gravityAccel;
-    if (sleepState[i + 2] == 0) velocityY[i + 2] += gravityAccel;
-    if (sleepState[i + 3] == 0) velocityY[i + 3] += gravityAccel;
+    if (sleepState[i] == 0 && enableGravityFlags[i] != 0) velocityY[i] += gravityAccel;
+    if (sleepState[i + 1] == 0 && enableGravityFlags[i + 1] != 0) velocityY[i + 1] += gravityAccel;
+    if (sleepState[i + 2] == 0 && enableGravityFlags[i + 2] != 0) velocityY[i + 2] += gravityAccel;
+    if (sleepState[i + 3] == 0 && enableGravityFlags[i + 3] != 0) velocityY[i + 3] += gravityAccel;
   }
-  
+
   // Scalar remainder
   for (let i = simdCount; i < entityCount; i++) {
-    if (sleepState[i] == 0) {
+    if (sleepState[i] == 0 && enableGravityFlags[i] != 0) {
       velocityY[i] += gravityY * dt;
     }
   }
@@ -449,7 +457,7 @@ function detectCollisionsInternal(): i32 {
   
   // Check each awake entity against its spatial neighbors
   for (let i = 0; i < entityCount && collisionCount < maxCollisionPairs; i++) {
-    if (sleepState[i] != 0) continue; // Skip sleeping entities (they don't initiate checks)
+    if (sleepState[i] != 0 || enableCollisionsFlags[i] == 0) continue; // Skip sleeping or collision-disabled entities
     
     const xi = positionX[i];
     const yi = positionY[i];
@@ -542,10 +550,20 @@ function detectCollisionsInternal(): i32 {
       finalMask = v128.and(finalMask, collMask2);
       
       const collisionMask = i32x4.bitmask(finalMask);
-      
+
+      // Per-entity collision opt-in: the neighbor (j side) must also have
+      // collision enabled -- otherwise a single flagged entity would collide
+      // with every unflagged entity nearby (the exact bug this fixes).
+      let flagMask = 0;
+      if (enableCollisionsFlags[cellIndices[cellIdx0]] != 0) flagMask |= 1;
+      if (enableCollisionsFlags[cellIndices[cellIdx1]] != 0) flagMask |= 2;
+      if (enableCollisionsFlags[cellIndices[cellIdx2]] != 0) flagMask |= 4;
+      if (enableCollisionsFlags[cellIndices[cellIdx3]] != 0) flagMask |= 8;
+      const gatedMask = collisionMask & flagMask;
+
       // Check each lane that had a collision
       for (let lane = 0; lane < 4; lane++) {
-        if ((collisionMask & (1 << lane)) != 0) {
+        if ((gatedMask & (1 << lane)) != 0) {
           const cellIdx = querySpatialHashResult[n + lane];
           const j: i32 = cellIndices[cellIdx];
           
@@ -570,6 +588,7 @@ function detectCollisionsInternal(): i32 {
       
       // Avoid duplicate pairs and self-collision
       if (j <= i) continue;
+      if (enableCollisionsFlags[j] == 0) continue; // neighbor must also opt in
       
       // Fast position/radius access from cell-local arrays (cache-friendly!)
       const xj = cellPosX[cellIdx];
@@ -1174,6 +1193,14 @@ export function getRotationSpeedPtr(): usize {
 
 export function getAnimationTypePtr(): usize {
   return animationType.dataStart;
+}
+
+export function getEnableGravityPtr(): usize {
+  return enableGravityFlags.dataStart;
+}
+
+export function getEnableCollisionsPtr(): usize {
+  return enableCollisionsFlags.dataStart;
 }
 
 export function getFlagsPtr(): usize {

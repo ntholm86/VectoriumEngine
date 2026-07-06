@@ -34,6 +34,8 @@ export class WasmPhysicsBridge {
   public wobbleSpeedView: Float32Array | null = null;
   public fadeDirectionView: Int8Array | null = null;
   public baseSizeView: Float32Array | null = null;
+  public enableGravityView: Uint8Array | null = null;
+  public enableCollisionsView: Uint8Array | null = null;
   
   /**
    * Load and initialize WASM module
@@ -148,6 +150,16 @@ export class WasmPhysicsBridge {
       this.baseSizeView = new Float32Array(
         this.wasmMemory!.buffer,
         this.wasmModule.getBaseSizePtr(),
+        entityCount
+      );
+      this.enableGravityView = new Uint8Array(
+        this.wasmMemory!.buffer,
+        this.wasmModule.getEnableGravityPtr(),
+        entityCount
+      );
+      this.enableCollisionsView = new Uint8Array(
+        this.wasmMemory!.buffer,
+        this.wasmModule.getEnableCollisionsPtr(),
         entityCount
       );
       
