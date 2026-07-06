@@ -514,3 +514,15 @@ Bare ask ("identify the bug yourself and verify it - there may be several bugs, 
 Blind spot: did not audit the rest of PerformanceMonitor.ts's ~30 other data-metric bindings for the same duplicate-key pattern - this was found by lucky visual inspection of one screenshot, not a systematic sweep. A quick grep for duplicate data-metric values across the file would be cheap and is a good next candidate if more profiler trust is wanted.
 
 Cost: moderate - repo history dig (git show on a deleted file), 2 files changed, 1 self-caught runtime bug in my own fix, ~10 live browser verification rounds, 1 build, 1 test run, 2 screenshots, 1 commit. No subagent.
+
+## 2026-07-06 - confirm-no-sprite-rendering-bug
+
+Operator claim: "i believe there is some kind of bug in vectorium because all the games looks like this. Just shapes - no sprites." Read intent: operator saw ONSLAUGHT (and by extension the other game-portal games) rendering as flat vector shapes with no textured sprites, and inferred an engine rendering defect. Verified the claim directly rather than accepting or dismissing it on priors.
+
+**[!DECISION] Verified vectorium sprite rendering works, before concluding anything about game-portal.** Opened bunnytest.html live, triggered the real sprite-texture bunnymark (scene.startBenchmark(), the actual bunny.png texture path via TextureManager.loadTexture + InstancedSpriteRenderer) - NOT a shape entity. Screenshot confirms 2,000 fully-detailed bunny sprite images (ears, eyes, shading all visible) rendering correctly at 60 FPS. This is the same sprite pipeline this repo has benchmarked against PixiJS/Phaser all week - conclusively rules out "vectorium can't render sprites."
+
+**[!REALIZATION]** The actual explanation is a design choice, not a defect: grepped all six game-portal scenes (Asteroids, Swarm, Stormwing, Breach, Nebula, Onslaught) for any texture/sprite/`.png` reference - zero matches across all of them. Every entity in every game-portal game is built via Graphics.square/circle/triangle or world.setShapeType (SDF vector shapes) exclusively. This is a 100% consistent pattern across 6 independently-built games, not an accident isolated to one - each game was deliberately built using vectorium's SDF shape rendering (the engine's own namesake feature), never touching the sprite/texture API at all.
+
+**Conclusion: no vectorium engine bug.** The sprite pipeline is proven functional; the "just shapes" look is because game-portal's games were never built to use it. If the operator wants sprite/texture-based visuals (actual character/enemy images) in these games instead of vector shapes, that is a content + wiring decision for game-portal (needs actual image assets plus swapping Graphics.* calls for Sprite.from()/TextureManager calls in each scene) - a feature request, not a bug fix. Not acted on without an explicit ruling, since it touches every game's visual identity.
+
+Cost: light - grep across 2 repos, 1 live browser verification (bunnytest.html), 1 screenshot, no code changes (nothing to fix). No subagent.
