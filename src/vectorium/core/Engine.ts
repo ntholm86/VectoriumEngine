@@ -15,6 +15,7 @@ import { AnimationManager } from '../systems/AnimationManager';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { InputManager } from '../systems/InputManager';
 import { ParticleSystemManager } from '../systems/ParticleSystem';
+import { ShapeType } from '../utils/ShapeType';
 
 export { Viewport, Scene };
 export type { Entity, EntityId, EntityFlags } from './Entity';
@@ -205,6 +206,7 @@ export class Vectorium implements IEngine {
     
     if (this.config.debugTools.entitySpawner && this._inputManager) {
       const entitySpawner = new EntitySpawner(this.currentScene, this._inputManager, this.performanceMonitor);
+      entitySpawner.registerSpawnCallback((x, y, config) => this.handleSpawnRequest(x, y, config));
       this.panelManager.register('spawner', entitySpawner);
     }
     
@@ -437,6 +439,89 @@ export class Vectorium implements IEngine {
 
   getEntitySpawner(): EntitySpawner | undefined {
     return this.panelManager.get('spawner') as EntitySpawner | undefined;
+  }
+
+  /**
+   * Maps EntitySpawner's panel `visualType` option values to ShapeType IDs.
+   * 'sprite' and 'text' are intentionally excluded — they have no live
+   * implementation since EntitySpawnService was removed (see handleSpawnRequest).
+   */
+  private static readonly SPAWN_SHAPE_MAP: Record<string, ShapeType> = {
+    circle: ShapeType.CIRCLE,
+    triangle: ShapeType.TRIANGLE,
+    star5: ShapeType.STAR_5,
+    star6: ShapeType.STAR_6,
+    hexagon: ShapeType.HEXAGON,
+    square: ShapeType.SQUARE,
+    pentagon: ShapeType.PENTAGON,
+    octagon: ShapeType.OCTAGON,
+    diamond: ShapeType.DIAMOND,
+    heart: ShapeType.HEART,
+    pentagram: ShapeType.PENTAGRAM,
+    vesica: ShapeType.VESICA,
+    moon: ShapeType.MOON,
+    cross: ShapeType.CROSS,
+    egg: ShapeType.EGG,
+    roundedx: ShapeType.ROUNDED_X,
+    pie: ShapeType.PIE,
+    arc: ShapeType.ARC,
+    ring: ShapeType.RING,
+    trapezoid: ShapeType.TRAPEZOID,
+    horseshoe: ShapeType.HORSESHOE,
+  };
+
+  /**
+   * Handles a click-to-spawn request from the EntitySpawner debug panel.
+   *
+   * Restores the "CLICK CANVAS TO SPAWN" feature, which was silently broken
+   * after EntitySpawnService was deleted as legacy scaffolding — the panel's
+   * onSpawnCallback was never re-registered by anything, so clicks did nothing
+   * (no error, no entity). Covers all shape-based visual types via the current
+   * World API. Sprite/text/animation options are named, not silently ignored:
+   * a full restoration would need TextPool + TextureManager + a tween system,
+   * which is separate, project-sized work, not part of this fix.
+   */
+  private handleSpawnRequest(x: number, y: number, config: {
+    count: number;
+    physicsMode: 'none' | 'gravity' | 'collision' | 'full';
+    visualType: string;
+    animationConfig?: { type: string };
+  }): void {
+    if (!this.currentScene) return;
+
+    if (config.visualType === 'sprite' || config.visualType === 'text') {
+      console.warn(`🎮 EntitySpawner: "${config.visualType}" spawning has no live implementation (EntitySpawnService was removed) — pick a shape type instead.`);
+      return;
+    }
+    const shapeType = Vectorium.SPAWN_SHAPE_MAP[config.visualType];
+    if (shapeType === undefined) {
+      console.warn(`🎮 EntitySpawner: unknown visual type "${config.visualType}"`);
+      return;
+    }
+    if (config.animationConfig && config.animationConfig.type !== 'none') {
+      console.warn(`🎮 EntitySpawner: animation type "${config.animationConfig.type}" is not wired yet — spawning without animation.`);
+    }
+
+    const world = this.currentScene.world;
+    const wantsGravity = config.physicsMode === 'gravity' || config.physicsMode === 'full';
+    const wantsCollision = config.physicsMode === 'collision' || config.physicsMode === 'full';
+    const count = Math.max(1, config.count || 1);
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 100 + Math.random() * 300;
+      const id = world.createEntity(
+        x + (Math.random() - 0.5) * 20,
+        y + (Math.random() - 0.5) * 20,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed
+      );
+      world.setShapeType(id, shapeType);
+      world.setSize(id, 8 + Math.random() * 16);
+      world.setColor(id, Math.floor(Math.random() * 0xffffff));
+      world.setGravityEnabled(id, wantsGravity);
+      world.setCollisionsEnabled(id, wantsCollision);
+    }
   }
 
   enableClickToSpawn(): void {

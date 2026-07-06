@@ -959,7 +959,7 @@ export class PerformanceMonitor extends UIPanel {
         <div class="ui-section">
               <div class="ui-row">
                 <span class="ui-label">Active</span>
-                <span class="ui-value" data-metric="active">0</span>
+                <span class="ui-value" data-metric="ecsactive">0</span>
               </div>
               <div class="ui-row">
                 <span class="ui-label">├─ Shapes</span>
@@ -1336,6 +1336,10 @@ export class PerformanceMonitor extends UIPanel {
     const activeCount = metrics.entitiesProcessed / 1000;
     const activeClass = getColorClass(activeCount, {excellent: 5, good: 10, ok: 25, warning: 50, critical: 100, severe: 200}, false);
     set('active', `${activeCount.toFixed(1)}K`, activeClass);
+    // ECS METRICS breakdown's "Active" row previously shared the "active" data-metric key with the
+    // header stat above; querySelector only updates the first match, so this row was always stuck at 0.
+    // Now has its own key, formatted like its Shapes/Text siblings (plain count below 1K).
+    set('ecsactive', activeCount > 1 ? `${activeCount.toFixed(1)}K` : metrics.entitiesProcessed.toString(), activeClass);
     
     // Shape and text entity counts (from World)
     const world = (window as any).vectoriumCurrentWorld;
