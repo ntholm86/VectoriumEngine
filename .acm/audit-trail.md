@@ -453,3 +453,64 @@ Operator remained confused after the prior fix's brief mention: "we had 6.5M bun
 No new measurements taken this run — pure documentation clarity fix, informed entirely by prior trail entries and today's already-established facts.
 
 Cost: light — 1 README section rewritten, 1 lint-driven correction, no builds/tests needed (docs only).
+
+---
+
+## 2026-07-05 — unify-render-paths-instanced-shapes
+
+Operator: frustrated that bunnytest and Scene/World are two paths; believed bunnymark optimization had optimized the whole engine (this morning's measurement proved it had not); wants ONE path that handles everything, configurable for benchmarks — "unless this is stupid."
+
+**Interpretation + architectural ruling (Tier 3).** Judged the proposal correct for RENDERING and incorrect for PHYSICS, and said so before acting: rendering unification is exactly right (the general path's bottleneck was CPU corner/rotation math + 80 B/entity vertex upload — precisely what instancing removes, already proven at 3.2M on this engine); physics unification is not (game code must read/write positions CPU-side every frame — Asteroids collision does — which GPU-resident transform-feedback state cannot serve). Result: one render technique everywhere; GPU physics stays an opt-in particle configuration = the operator's own "configure it for bunnymark" framing.
+
+**[!DECISION]** Built InstancedShapeRenderer (static unit quad + per-instance [x,y,rotDeg,size,packedMeta] @ 20 B/instance, VS does rotation/scale/camera, FS reuses the SDF library extracted to shaders/sdfShapes.ts as single source of truth — DRY + guaranteed visual parity). WebGLBatchRenderer gains ONE public entry point drawEntities() (instanced on WebGL2, legacy CPU batcher fallback on WebGL1 only) + supportsInstancedEntities getter; Scene.renderECSBatch now makes a single call and no longer fills the index array on the instanced path. Metadata packing kept byte-identical to legacy ([R8|G8|B8|A3|Shape5]).
+
+**Prediction vs outcome.** Predicted ceiling ~300k -> >=700k. Outcome: **~500k @ 60 FPS** (450k=63.9, 500k=61.2, 550k=56.8) — +67%, real but short of prediction. 600k: 29.7 -> 18.8 ms; 1M now 33.6 FPS (previously the 600k rate). Remaining cost at high counts: World.updateFrame physics (~6ms @ 600k) + per-instance fill loop + GPU — the CPU corner-math term is gone but physics and fill remain, which the prediction underweighted. Honest gap noted, not smoothed over.
+
+**Verified:** entity-bench fresh-page ladder (GPU-synced), pixel strip 60/60 non-black, zero GL errors; Asteroids played live — ship visibly rotated mid-flight, asteroids/bullets correct, crisp SDF shapes (screenshot). Churn regression tests caught the contract change exactly as designed (stub had the old entry point), updated to pin drawEntities; 32/32 green. README updated to ~500k with before/after table. Two commits pushed (da8c8d6 feat, 7499e0a docs+harness+trail), 0b9a6ce..7499e0a.
+
+**[!REALIZATION]** The churn test failing on the API change was the test WORKING — it forced the new path to prove the sparse-ID invariant before landing. Guard tests pay for themselves fastest during redesigns, not during maintenance.
+
+Blind spots: (1) legacy drawBulkShapesIndexed is now WebGL1-fallback-only dead weight on WebGL2 — removal candidate once WebGL1 support is explicitly ruled on; (2) textured-sprite general entities still use drawBulkSpritesIndexed — same unification applies, not done this run (scope); (3) 3-bit alpha quantization inherited from legacy packing — parity-preserving but coarse; a future format could widen it. Next candidates: sprite-path unification, then re-audit the physics side (updateFrame ~6ms @ 600k is the next bottleneck term).
+
+Cost: heavy — 2 new files, 3 files rewired, 1 test updated, 2 builds, 2 test runs, 3 measurement rounds, live game verification, 2 commits + push. No subagent.
+
+---
+
+## 2026-07-05 — rival-benchmark-general-gaming-path
+
+Operator: "how does my engine ACTUALLY compare against pixi.js and others — not bunnymark, the actual gaming path." Read as: the destination's "beat all other canvas engines" claim must be proven on each engine's idiomatic game-object path, with the real-game workload (movement + rotation), same synced protocol.
+
+**[!DECISION]** Three harnesses, one workload (drift + wall bounce + continuous per-entity rotation, 800x600, GPU-synced): entity-bench (vectorium World + instanced shapes, rotation via engine-integrated setRotationSpeed — idiomatic), pixi-general (PixiJS v8 Container+Sprite, JS update loop — idiomatic), phaser-general (Phaser 3 GameObjects.Image, scene update — idiomatic; Phaser installed as devDependency). Each engine does the workload the way its own users would write it — that IS the comparison, architecture included.
+
+**Results (fresh pages, pixel-verified, zero GL errors):**
+| Engine | 60 FPS ceiling | @100k |
+|---|---|---|
+| Vectorium | ~500k (500k = 62.4 FPS w/ rotation) | 3.8 ms (265 FPS) |
+| PixiJS v8 | ~100k (100k = 61.7) | 16.2 ms |
+| Phaser 3 | ~85k (interpolated; 100k = 54.8) | 18.2 ms |
+
+**5x PixiJS, ~6x Phaser on the path games actually use.** Notably vectorium's rotation is free (GPU-side trig since unification) — the rotation workload cost rivals real CPU time but vectorium nothing measurable vs the rotation-free ladder earlier today.
+
+Honest asymmetries, stated in README not hidden: (1) vectorium draws SDF circles, rivals draw the 26x37 bunny texture — comparable coverage, different fragment work; (2) vectorium physics runs in engine typed arrays, rivals in per-object JS loops — this is the architectural difference being measured, not an unfairness, but a reader should know both. Phaser measure() drives renderer.preRender/sys.render/postRender manually — verified rendering via pixel readback before trusting it.
+
+README gains a "Rival Comparison — the general gaming path" section. Committed + pushed (83833ec).
+
+Blind spots: single machine/browser as always; Phaser ceiling interpolated between 50k/100k rungs rather than bisected on a fresh page; no Two.js/Kontra/etc — "others" currently = the two biggest, more can join via the same harness pattern. Next candidates: publish-grade medians protocol, sprite-path unification (would let vectorium run this exact benchmark with textures for full symmetry).
+
+Cost: heavy-ish — 4 new files, 1 dep install, 3 ladders + verification rounds, README update, commit+push. No subagent.
+
+## 2026-07-06 - fix-dead-spawn-callback-and-profiler-metric-collision
+
+Bare ask ("identify the bug yourself and verify it - there may be several bugs, use the work skill"). Read from orientation.md's own "Watch for" list: the demo.html spawn-callback gap was already named twice (identify-rendering-bug-vectorium, meaningful-commits-and-push entries) as a real, unresolved harness bug, distinct from a rendering bug - the cheapest, already-diagnosed starting point rather than fresh speculative hunting.
+
+**[!DECISION] Bug 1 - dead spawn callback, verified before touching code.** Opened demo.html live, clicked the canvas repeatedly: Active entity count stayed 0, zero console output (silent failure, not even an error). Traced the chain: Engine.enableClickToSpawn() -> EntitySpawner.triggerSpawn() -> checks this.onSpawnCallback -> grep confirmed registerSpawnCallback() is defined but has exactly one call site (itself) anywhere in src - nothing ever registers it, since EntitySpawnService was deleted as legacy scaffolding in a prior session. Considered restoring the full deleted EntitySpawnService (recovered via git show 1e833cb~1) but its scope (texture caching, trig LUTs, tween/animation system, text rendering) is a genuine project, not a bug fix - the panel promises 21 shape types + sprite + text + animation, none of which are equal-sized problems. Scoped the real fix to shape-type spawning only (21 options, all mapped exactly via the existing ShapeType enum - zero guessing), and made sprite/text/animation FAIL LOUDLY (console.warn naming the gap) instead of silently, converting "100% broken, invisibly" into "core case works, edges named."
+
+**[!REALIZATION]** First implementation attempt referenced `Engine.SPAWN_SHAPE_MAP` - get_errors reported zero problems, but live-clicking threw `ReferenceError: Engine is not defined` (the class is actually named `Vectorium`). Static analysis missed a real runtime bug that live verification caught immediately - the same lesson this repo's own orientation.md already carries about benchmarks ("ask what the benchmark structurally cannot see") applies to get_errors too: it is not a substitute for running the code.
+
+**[!DECISION] Bug 2 - found opportunistically while verifying Bug 1's fix, not hunted separately.** Screenshot after the Bug 1 fix showed ECS METRICS "Active: 0" next to "Shapes: 100" - inconsistent. Tested whether "Active" meant "entities under active physics" (a plausible non-bug reading, since physicsMode was "none" in the first check) by re-running with physicsMode=full: Active stayed 0, Shapes read 200. Ruled out the benign reading, traced the real cause: two DOM elements both carry data-metric="active" (the header "Entities" stat and the ECS METRICS breakdown row), and PerformanceMonitor's set() helper uses querySelector (singular) - only the first DOM match ever updates. Fixed by giving the breakdown row its own data-metric="ecsactive" key plus a matching set() call.
+
+**Verified together:** npm run build clean (wasm+lib+types), npm test 32/32 green, live re-test (star5 shapes, physicsMode=full): Active and Shapes both read 100 in agreement, screenshot confirms correct rendering with physics running. Committed as eb5bb45.
+
+Blind spot: did not audit the rest of PerformanceMonitor.ts's ~30 other data-metric bindings for the same duplicate-key pattern - this was found by lucky visual inspection of one screenshot, not a systematic sweep. A quick grep for duplicate data-metric values across the file would be cheap and is a good next candidate if more profiler trust is wanted.
+
+Cost: moderate - repo history dig (git show on a deleted file), 2 files changed, 1 self-caught runtime bug in my own fix, ~10 live browser verification rounds, 1 build, 1 test run, 2 screenshots, 1 commit. No subagent.
