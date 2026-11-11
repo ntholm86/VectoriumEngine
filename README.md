@@ -837,3 +837,7 @@ This is a showcase engine demonstrating production-grade patterns. Feel free to 
 ---
 
 **Built with ❤️ using TypeScript, WebGL2, and modern web APIs**
+
+---
+
+Author: [Nils Wendelboe Holmager](https://nilsholmager.com/) · [Project context and connected work](https://nilsholmager.com/work/vectorium-engine/)
