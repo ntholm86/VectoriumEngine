@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PixiJS Bunnymark — rival benchmark (vs Vectorium)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      display: flex;
+      justify-content: flex-start;
+      align-items: flex-start;
+      flex-direction: column;
+      min-height: 100vh;
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Courier New', monospace;
+      overflow: hidden;
+      gap: 20px;
+      padding: 20px;
+    }
+    canvas {
+      display: flex;
+      border: 2px solid #e91e63;
+      box-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
+    }
+    #info {
+      width: 800px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border: 1px solid #e91e63;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <h1>🐰 PixiJS Bunnymark (rival benchmark)</h1>
+    <p>Same parameters and GPU-synced stop condition as Vectorium's bunnytest.html.</p>
+    <p>Press <strong>F</strong> to start the progressive benchmark.</p>
+    <p id="status">idle</p>
+  </div>
+  <div id="canvas-slot"></div>
+  <script type="module" src="/src/pixi-bunnymark.ts"></script>
+</body>
+</html>
